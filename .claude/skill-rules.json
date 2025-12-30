@@ -24,5 +24,23 @@
       "from.*youtube"
     ],
     "description": "Automatically invoke when user mentions YouTube URLs or video generation for trading tutorials"
+  },
+  "implement-strategy": {
+    "triggers": [
+      "implement strategy",
+      "build from sad",
+      "generate code from architecture",
+      "implement from architecture",
+      "build strategy from",
+      "code from sad",
+      "implement sad"
+    ],
+    "patterns": [
+      "implement.*strategy",
+      "build.*from.*architecture",
+      "generate.*code.*from.*sad",
+      "/implement-strategy"
+    ],
+    "description": "Generate NinjaTrader code from a Strategy Architecture Document (SAD)"
   }
 }

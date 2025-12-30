@@ -34,3 +34,7 @@ venv/
 # Local config
 *.local.json
 *.local.md
+
+# Temporary video frames (keep .gitkeep)
+data/temp-frames/*
+!data/temp-frames/.gitkeep

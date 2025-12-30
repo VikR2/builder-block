@@ -154,9 +154,7 @@ export default async function ScriptDetailPage({
             {/* Actions */}
             <div className="flex gap-3 mt-6">
               <a
-                href={`/api/download-script?path=${encodeURIComponent(
-                  script.file_path
-                )}`}
+                href={`/api/download-script?id=${script.id}`}
                 download
                 className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
               >
