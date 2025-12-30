@@ -3,13 +3,13 @@
     "nt-skills": {
       "command": "node",
       "args": [
-        "/home/satvik/repos/builder-block/.claude/mcp-servers/nt-skills/dist/index.js"
+        "/workspace/.claude/mcp-servers/nt-skills/dist/index.js"
       ]
     },
     "youtube-transcript": {
       "command": "node",
       "args": [
-        "/home/satvik/repos/builder-block/.claude/mcp-servers/youtube-transcript/index.js"
+        "/workspace/.claude/mcp-servers/youtube-transcript/index.js"
       ]
     }
   }

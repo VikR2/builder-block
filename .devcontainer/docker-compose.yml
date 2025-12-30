@@ -1,0 +1,51 @@
+services:
+  # Persistent container - stays running, reconnect anytime
+  claude-persistent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: builder-block-persistent
+    user: node
+    volumes:
+      - ..:/workspace:cached
+      - claude-cache:/home/node/.claude        # Plugin cache
+      - node-modules:/workspace/node_modules   # Node dependencies
+      - npm-cache:/home/node/.npm              # NPM cache
+      - uv-cache:/home/node/.cache/uv          # Python/uv cache
+    env_file:
+      - .env
+    environment:
+      - CLAUDE_PROJECT_DIR=/workspace
+    working_dir: /workspace
+    # Keep container running forever
+    command: sleep infinity
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # VS Code devcontainer service (uses same volumes)
+  claude-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: node
+    volumes:
+      - ..:/workspace:cached
+      - claude-cache:/home/node/.claude
+      - node-modules:/workspace/node_modules
+      - npm-cache:/home/node/.npm
+      - uv-cache:/home/node/.cache/uv
+    env_file:
+      - .env
+    environment:
+      - CLAUDE_PROJECT_DIR=/workspace
+    working_dir: /workspace
+    command: sleep infinity
+    stdin_open: true
+    tty: true
+
+volumes:
+  claude-cache:    # Claude plugins and config
+  node-modules:    # Node.js dependencies (npm install)
+  npm-cache:       # NPM download cache
+  uv-cache:        # Python uv cache
