@@ -2080,6 +2080,35 @@ def sanitize_name(name: str) -> str:
     return ''.join(word.capitalize() for word in words)
 
 
+def is_complete_strategy_video(concepts: dict, transcript: str) -> bool:
+    """
+    Detect if video teaches a complete trading strategy.
+
+    A complete strategy video has:
+    1. Entry patterns (how to enter trades)
+    2. Risk management (stop loss, take profit, etc.)
+    3. Keywords indicating full strategy/trade review
+
+    Returns:
+        True if this appears to be a complete strategy video
+    """
+    has_entry = bool(concepts.get('entry_patterns'))
+    has_risk = bool(concepts.get('risk_management'))
+
+    # Normalize transcript for matching (handle "top- down" variations)
+    transcript_normalized = transcript.lower().replace('- ', '-').replace(' -', '-')
+
+    strategy_keywords = [
+        'top-down', 'topdown', 'full strategy', 'complete strategy',
+        'trade review', 'trade example', 'how i traded', 'my trade',
+        'entry and exit', 'full breakdown', 'step by step', 'walkthrough',
+        'chart lesson', 'reviewing a trade', 'trade from'
+    ]
+    has_strategy_keywords = any(kw in transcript_normalized for kw in strategy_keywords)
+
+    return has_entry and has_risk and has_strategy_keywords
+
+
 def generate_indicator_code(
     name: str,
     description: str,
@@ -2958,6 +2987,9 @@ Examples:
         skills = get_relevant_skills(concepts)
         skills_matched = [s.get("id") for s in skills if s.get("id")]
 
+        # Check if this is a complete strategy video (used for auto-generation)
+        is_complete_strategy = is_complete_strategy_video(concepts, transcript)
+
         # =====================================================================
         # PHASE 2: Skill Extraction (if enabled)
         # =====================================================================
@@ -2965,6 +2997,15 @@ Examples:
         if args.extract_skills:
             # Step 3a: Check which concepts are new vs existing
             skill_analysis = find_new_vs_existing_skills(concepts, transcript)
+
+            # For complete strategy videos, include ambiguous skills
+            if is_complete_strategy:
+                print("\n[AUTO] Complete strategy video detected!")
+                # For complete strategies, also save ambiguous skills (bypass confirmation)
+                if skill_analysis["ambiguous"]:
+                    print(f"[AUTO] Including {len(skill_analysis['ambiguous'])} ambiguous skills for complete strategy")
+                    skill_analysis["new_skills"].extend(skill_analysis["ambiguous"])
+                    skill_analysis["ambiguous"] = []
 
             # Step 3b: Save new skills
             if skill_analysis["new_skills"]:
@@ -3126,6 +3167,27 @@ Examples:
             # Step 5: Save SAD
             sad_path = save_architecture_document(sad_content, sad_filename)
 
+            # Step 6: Auto-generate Strategy.cs for complete strategy videos
+            strategy_path = None
+            if is_complete_strategy:
+                print("\n[AUTO] Generating Strategy.cs for complete strategy...")
+                strategy_name = sad_filename.replace('.md', '')
+                strategy_code = generate_strategy_code(
+                    name=strategy_name,
+                    description=f"Auto-generated from YouTube: {args.url}",
+                    concepts=concepts,
+                    skills=skills,
+                    url=args.url,
+                )
+                strategy_filename = f"{sanitize_name(strategy_name)}Strategy.cs"
+                strategy_path = save_file(
+                    strategy_code,
+                    strategy_filename,
+                    "strategy",
+                    args.output_dir,
+                )
+                print(f"[AUTO] Strategy saved: {strategy_path}")
+
             # Step 10: Record video processing
             record_video_processed(
                 args.url,
@@ -3137,23 +3199,34 @@ Examples:
             # Success summary
             print()
             print("=" * 60)
-            print("  Strategy Architecture Document generated!")
+            if strategy_path:
+                print("  Complete Strategy Generated!")
+            else:
+                print("  Strategy Architecture Document generated!")
             print("=" * 60)
             print()
-            print(f"File: {sad_path}")
+            print(f"SAD: {sad_path}")
+            if strategy_path:
+                print(f"Strategy: {strategy_path}")
             if skills_extracted:
                 print(f"New skills saved: {len(skills_extracted)}")
             if skills_matched:
                 print(f"Existing skills matched: {len(skills_matched)}")
             print()
-            print("Next steps:")
-            sad_name = sad_filename.replace(".md", "")
-            print(f"  Run '/implement-strategy {sad_name}' to generate code")
-            print()
-            print("Or review and edit the SAD first:")
-            print(f"  1. Open {sad_path}")
-            print("  2. Fill in TODOs and answer User Questions")
-            print("  3. Run /implement-strategy when ready")
+            if strategy_path:
+                print("Next steps:")
+                print("  1. Open strategy in NinjaTrader and compile (F5)")
+                print("  2. Backtest in Strategy Analyzer")
+                print("  3. Review and refine entry/exit logic")
+            else:
+                print("Next steps:")
+                sad_name = sad_filename.replace(".md", "")
+                print(f"  Run '/implement-strategy {sad_name}' to generate code")
+                print()
+                print("Or review and edit the SAD first:")
+                print(f"  1. Open {sad_path}")
+                print("  2. Fill in TODOs and answer User Questions")
+                print("  3. Run /implement-strategy when ready")
             print()
 
         # Cleanup frames (unless --keep-frames)

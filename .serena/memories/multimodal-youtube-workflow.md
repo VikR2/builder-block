@@ -132,3 +132,23 @@ python scripts/backfill_indicators.py [--dry-run]
 - `skills.indicator_path` - Path to generated indicator file
 - `skills.needs_indicator` - 1 if category needs visual representation
 - `skills.dll_class_name` - Future: class name for DLL compilation
+
+## Auto-Generated Strategies (Complete Strategy Videos)
+
+When a video is detected as a **complete strategy** (teaching a full trading system):
+1. Ambiguous skills are auto-saved (bypass confirmation)
+2. Indicators are generated for new skills
+3. SAD is generated
+4. **Strategy.cs is auto-generated**
+
+**Detection criteria:**
+- Has entry patterns (fair value gap, order block, sweep, etc.)
+- Has risk management (stop loss, take profit, etc.)
+- Has strategy keywords: "top-down", "chart lesson", "trade review", "full strategy", etc.
+
+**Output:**
+```
+[AUTO] Complete strategy video detected!
+[AUTO] Generating Strategy.cs for complete strategy...
+[AUTO] Strategy saved: scripts-output/Strategies/TopDownChartLessonStrategy.cs
+```
