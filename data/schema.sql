@@ -36,7 +36,12 @@ CREATE TABLE IF NOT EXISTS skills (
   -- Tracking
   usage_count INTEGER DEFAULT 0,       -- How many scripts use this
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  -- Indicator generation
+  indicator_path TEXT,                 -- Path to generated indicator .cs file
+  needs_indicator INTEGER DEFAULT 0,   -- 1 if category needs visual representation
+  dll_class_name TEXT                  -- Class name for DLL compilation (e.g., "LiquiditySweep")
 );
 
 CREATE INDEX IF NOT EXISTS idx_skills_category ON skills(category);

@@ -2273,6 +2273,109 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
     return code
 
 
+# =============================================================================
+# Step 3e: Generate Indicator for Skill
+# =============================================================================
+
+# Categories that need visual representation on chart
+VISUAL_CATEGORIES = ["Entry Patterns", "Market Structure", "Market Analysis"]
+SKIP_CATEGORIES = ["Risk Management", "Trade Management", "Indicators"]
+
+
+def generate_indicator_for_skill(
+    skill: dict,
+    output_dir: Path = None,
+) -> str | None:
+    """
+    Generate a NinjaTrader indicator for a skill if it needs visual representation.
+
+    Args:
+        skill: Skill record dict with name, category, description, nlp_keywords, etc.
+        output_dir: Base output directory (defaults to scripts-output/)
+
+    Returns:
+        Path to generated indicator file, or None if not needed
+    """
+    # Check if category needs indicator
+    category = skill.get("category", "")
+    if category not in VISUAL_CATEGORIES:
+        print(f"    Skipping indicator for '{skill.get('name')}' (category: {category})")
+        return None
+
+    if output_dir is None:
+        output_dir = Path(__file__).parent.parent / "scripts-output"
+
+    # Parse keywords
+    nlp_keywords = skill.get("nlp_keywords", "[]")
+    if isinstance(nlp_keywords, str):
+        try:
+            keywords = json.loads(nlp_keywords)
+        except json.JSONDecodeError:
+            keywords = []
+    else:
+        keywords = nlp_keywords or []
+
+    # Build concepts dict for template
+    concepts = {"keywords": keywords}
+
+    # Generate indicator code using existing template
+    code = generate_indicator_code(
+        name=skill.get("name", "Unknown"),
+        description=skill.get("description", "Generated from skill library"),
+        concepts=concepts,
+        skills=[skill],
+        url=skill.get("source_url", ""),
+    )
+
+    # Generate safe filename
+    safe_name = sanitize_name(skill.get("name", "Unknown"))
+    filename = f"{safe_name}Indicator.cs"
+
+    # Save to Indicators directory
+    indicators_dir = output_dir / "Indicators"
+    indicators_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = indicators_dir / filename
+
+    # Handle existing file (don't overwrite)
+    if file_path.exists():
+        print(f"    Indicator already exists: {file_path}")
+        return str(file_path)
+
+    file_path.write_text(code, encoding="utf-8")
+    print(f"    Generated indicator: {file_path}")
+
+    return str(file_path)
+
+
+def update_skill_indicator_path(skill_id: int, indicator_path: str) -> bool:
+    """
+    Update the indicator_path for a skill in the database.
+
+    Args:
+        skill_id: ID of the skill to update
+        indicator_path: Path to the generated indicator file
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        db_path = Path(__file__).parent.parent / "data" / "builder.db"
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE skills SET indicator_path = ?, needs_indicator = 1 WHERE id = ?",
+            (indicator_path, skill_id)
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"    Warning: Could not update indicator_path: {e}")
+        return False
+
+
 def generate_strategy_code(
     name: str,
     description: str,
@@ -2876,6 +2979,28 @@ Examples:
                 # Refresh skills list with newly created
                 if saved_ids:
                     skills = get_relevant_skills(concepts)
+
+                # Step 3e: Generate indicators for new skills
+                print(f"\n[3e/10] Generating indicators for new skills...")
+                for skill_id in saved_ids:
+                    # Get full skill data from database
+                    try:
+                        db_path = Path(__file__).parent.parent / "data" / "builder.db"
+                        import sqlite3
+                        conn = sqlite3.connect(db_path)
+                        conn.row_factory = sqlite3.Row
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT * FROM skills WHERE id = ?", (skill_id,))
+                        row = cursor.fetchone()
+                        conn.close()
+
+                        if row:
+                            skill = dict(row)
+                            indicator_path = generate_indicator_for_skill(skill)
+                            if indicator_path:
+                                update_skill_indicator_path(skill_id, indicator_path)
+                    except Exception as e:
+                        print(f"    Warning: Could not generate indicator for skill {skill_id}: {e}")
 
             # Step 3c: Handle ambiguous and skipped
             if skill_analysis["ambiguous"] or skill_analysis["skip"]:

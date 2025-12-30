@@ -103,3 +103,32 @@ uv run python -m runtime.harness scripts/generate_from_youtube.py \
 ## Related
 - `/implement-strategy` - Generate code from SAD
 - `740.cs` - Reference quality for generated code
+
+## Auto-Generated Indicators (New)
+
+When a skill is saved to the library, the pipeline automatically:
+1. Checks if the skill's category needs visualization
+2. Generates a NinjaTrader indicator (.cs) if applicable
+3. Updates the skill record with `indicator_path`
+
+**Visual Categories** (auto-generate indicator):
+- Entry Patterns
+- Market Structure  
+- Market Analysis
+
+**Skip Categories** (no indicator needed):
+- Risk Management
+- Trade Management
+- Indicators
+
+**Indicator Location:** `scripts-output/Indicators/{SkillName}Indicator.cs`
+
+**Backfill Command:**
+```bash
+python scripts/backfill_indicators.py [--dry-run]
+```
+
+**Schema Additions:**
+- `skills.indicator_path` - Path to generated indicator file
+- `skills.needs_indicator` - 1 if category needs visual representation
+- `skills.dll_class_name` - Future: class name for DLL compilation
