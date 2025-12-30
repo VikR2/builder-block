@@ -1,0 +1,11 @@
+{
+  "name": "youtube-transcript-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP server for fetching YouTube transcripts",
+  "main": "index.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "youtube-transcript": "^1.2.1"
+  }
+}

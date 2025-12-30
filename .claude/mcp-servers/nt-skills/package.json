@@ -1,0 +1,20 @@
+{
+  "name": "nt-skills-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for NinjaTrader skills knowledge base",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

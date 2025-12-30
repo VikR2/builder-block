@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Refined financial studio theme */
+    --background: 220 13% 6%;
+    --foreground: 210 40% 98%;
+    --card: 220 13% 9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 13% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 167 76% 42%;
+    --primary-foreground: 220 13% 9%;
+    --secondary: 220 13% 15%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 220 13% 15%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 220 13% 9%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 13% 18%;
+    --input: 220 13% 20%;
+    --ring: 167 76% 42%;
+    --radius: 0.75rem;
+    --chart-1: 167 76% 42%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 210 40% 98%;
+    --chart-5: 215 20.2% 65.1%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  code, pre {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+  }
+
+  /* Centered container */
+  .container {
+    @apply mx-auto px-4 sm:px-6 lg:px-8;
+    max-width: 1400px;
+  }
+}
+
+@layer components {
+  .stat-card {
+    @apply relative overflow-hidden rounded-xl border bg-card p-6 transition-all duration-300;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  .stat-card::before {
+    content: '';
+    @apply absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-accent opacity-0 transition-opacity duration-300;
+  }
+  .stat-card:hover {
+    @apply -translate-y-1 border-primary/40;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+  .stat-card:hover::before {
+    @apply opacity-100;
+  }
+
+  .skill-card {
+    @apply relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .skill-card::after {
+    content: '';
+    @apply absolute left-0 top-0 h-full w-1 bg-primary scale-y-0 transition-transform duration-300;
+    transform-origin: bottom;
+  }
+  .skill-card:hover::after {
+    @apply scale-y-100;
+  }
+  .skill-card:hover {
+    @apply translate-x-1 bg-card/80;
+  }
+
+  .project-card {
+    @apply relative rounded-xl border bg-card p-6 transition-all duration-300 cursor-pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  .project-card:hover {
+    @apply -translate-y-1 border-accent/40;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+
+  .terminal-glow {
+    text-shadow: 0 0 10px currentColor;
+  }
+
+  .category-badge {
+    @apply relative overflow-hidden;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.1) 0%, hsl(var(--primary) / 0.05) 100%);
+  }
+
+  .metrics-grid {
+    background:
+      linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px),
+      linear-gradient(180deg, hsl(var(--border)) 1px, transparent 1px);
+    background-size: 20px 20px;
+    mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+  }
+
+  /* Background effects */
+  .bg-gradient-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(79, 134, 247, 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(0, 212, 170, 0.08) 0%, transparent 50%);
+    z-index: 0;
+  }
+}

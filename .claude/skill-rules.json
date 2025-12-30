@@ -1,0 +1,28 @@
+{
+  "generate-from-youtube": {
+    "triggers": [
+      "youtube",
+      "generate from youtube",
+      "convert this video",
+      "from this youtube",
+      "youtube.com/watch",
+      "youtu.be/",
+      "learn from this video",
+      "create from video",
+      "extract from youtube",
+      "youtube strategy",
+      "youtube indicator",
+      "trading video"
+    ],
+    "patterns": [
+      "\\bhttps?://(?:www\\.)?youtube\\.com/watch\\?v=[\\w-]+",
+      "\\bhttps?://youtu\\.be/[\\w-]+",
+      "generate.*youtube",
+      "youtube.*strategy",
+      "youtube.*indicator",
+      "convert.*video",
+      "from.*youtube"
+    ],
+    "description": "Automatically invoke when user mentions YouTube URLs or video generation for trading tutorials"
+  }
+}
