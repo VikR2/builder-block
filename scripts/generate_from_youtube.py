@@ -92,6 +92,18 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+# Strategy composition engine
+try:
+    from strategy_composer import (
+        compose_strategy_from_skills,
+        analyze_strategy_gaps,
+        print_gap_analysis,
+    )
+except ImportError:
+    compose_strategy_from_skills = None
+    analyze_strategy_gaps = None
+    print_gap_analysis = None
+
 # MCP tool calling - will be available via runtime.harness
 try:
     from runtime.mcp_client import call_mcp_tool
@@ -3170,23 +3182,76 @@ Examples:
             # Step 6: Auto-generate Strategy.cs for complete strategy videos
             strategy_path = None
             if is_complete_strategy:
-                print("\n[AUTO] Generating Strategy.cs for complete strategy...")
-                strategy_name = sad_filename.replace('.md', '')
-                strategy_code = generate_strategy_code(
-                    name=strategy_name,
-                    description=f"Auto-generated from YouTube: {args.url}",
-                    concepts=concepts,
-                    skills=skills,
-                    url=args.url,
-                )
-                strategy_filename = f"{sanitize_name(strategy_name)}Strategy.cs"
-                strategy_path = save_file(
-                    strategy_code,
-                    strategy_filename,
-                    "strategy",
-                    args.output_dir,
-                )
-                print(f"[AUTO] Strategy saved: {strategy_path}")
+                print("\n[AUTO] Complete strategy video detected!")
+
+                # Analyze gaps using composition engine
+                if analyze_strategy_gaps and compose_strategy_from_skills:
+                    gaps = analyze_strategy_gaps(skills, concepts)
+                    print_gap_analysis(gaps)
+
+                    # Check if we have minimum requirements
+                    if not gaps['is_complete']:
+                        print("\n[!] WARNING: Strategy may be incomplete.")
+                        print("    Missing entry patterns or market structure.")
+                        user_input = input("\n    Generate anyway? (y/N): ").strip().lower()
+                        if user_input != 'y':
+                            print("    Skipping strategy generation.")
+                        else:
+                            print("\n[AUTO] Generating composed strategy from skills...")
+                            strategy_name = sad_filename.replace('.md', '')
+                            strategy_code = compose_strategy_from_skills(
+                                name=strategy_name,
+                                description=f"Auto-generated from YouTube: {args.url}",
+                                matched_skills=skills,
+                                concepts=concepts,
+                                url=args.url,
+                            )
+                            strategy_filename = f"{sanitize_name(strategy_name)}Strategy.cs"
+                            strategy_path = save_file(
+                                strategy_code,
+                                strategy_filename,
+                                "strategy",
+                                args.output_dir,
+                            )
+                            print(f"[AUTO] Strategy saved: {strategy_path}")
+                    else:
+                        # Complete - generate without confirmation
+                        print("\n[AUTO] Generating composed strategy from skills...")
+                        strategy_name = sad_filename.replace('.md', '')
+                        strategy_code = compose_strategy_from_skills(
+                            name=strategy_name,
+                            description=f"Auto-generated from YouTube: {args.url}",
+                            matched_skills=skills,
+                            concepts=concepts,
+                            url=args.url,
+                        )
+                        strategy_filename = f"{sanitize_name(strategy_name)}Strategy.cs"
+                        strategy_path = save_file(
+                            strategy_code,
+                            strategy_filename,
+                            "strategy",
+                            args.output_dir,
+                        )
+                        print(f"[AUTO] Strategy saved: {strategy_path}")
+                else:
+                    # Fallback to old generator if composition engine not available
+                    print("\n[AUTO] Generating Strategy.cs (template mode)...")
+                    strategy_name = sad_filename.replace('.md', '')
+                    strategy_code = generate_strategy_code(
+                        name=strategy_name,
+                        description=f"Auto-generated from YouTube: {args.url}",
+                        concepts=concepts,
+                        skills=skills,
+                        url=args.url,
+                    )
+                    strategy_filename = f"{sanitize_name(strategy_name)}Strategy.cs"
+                    strategy_path = save_file(
+                        strategy_code,
+                        strategy_filename,
+                        "strategy",
+                        args.output_dir,
+                    )
+                    print(f"[AUTO] Strategy saved: {strategy_path}")
 
             # Step 10: Record video processing
             record_video_processed(
