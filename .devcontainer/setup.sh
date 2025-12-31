@@ -24,14 +24,18 @@ else
 fi
 
 # Build project MCP server
+# NOTE: Must rebuild node_modules in container because better-sqlite3 has native bindings
+# that are platform-specific (Windows vs Linux)
 echo "Building nt-skills MCP server..."
 cd /workspace/.claude/mcp-servers/nt-skills
+rm -rf node_modules  # Force rebuild for Linux
 npm install
 npm run build
 
 # Install youtube-transcript MCP server dependencies
 echo "Installing youtube-transcript MCP server..."
 cd /workspace/.claude/mcp-servers/youtube-transcript
+rm -rf node_modules  # Force rebuild for Linux
 npm install
 
 # Verify database exists and is accessible
