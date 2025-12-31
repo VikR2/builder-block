@@ -1,5 +1,14 @@
 # Strategy Architecture Document: LumiTraders Liquidity Sweep (ES Version)
 
+**Version:** 3.0 (Partial Profits + Trailing)
+
+## Version History
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2025-12-31 | Initial implementation |
+| 2.0 | 2025-12-31 | MTF + CISD confirmation |
+| 3.0 | 2025-12-31 | Partial profits (50% at 1R), trailing stops (protected swings), BE at 1R |
+
 ## Source
 - **Video:** "Liquidity Sweep Explained" by LumiTraders
 - **URL:** https://youtu.be/-D_JBnsMsAA
@@ -124,8 +133,48 @@ If entry was late, target is still calculated from:
 
 ## Trade Management
 
-### Breakeven Rule
-- Move stop to breakeven when price moves favorably
+### V3 Trade Management (Partial Profits + Trailing)
+
+**Problem Solved:** V2 backtests showed trades reaching 2-4R then reversing to losses (e.g., Trade #8: $1,162 MFE → -$562; Trade #14: $2,275 MFE → -$1,350).
+
+**Solution:** Implement partial profits and trailing stop per TTrades Skill #12.
+
+#### Partial Profits at 1R
+```csharp
+// V3: Take 50% off at 1R, let runner ride
+public bool UsePartialProfits { get; set; } = true;
+public int PartialPercent { get; set; } = 50;      // Take 50% off
+public double PartialTargetR { get; set; } = 1.0;  // At 1R
+```
+
+**Example (Trade #14):**
+- Entry: Short at 5139, Risk = 27 pts ($1,350 for 1 lot)
+- At 1R (5112): Take 50% = +$675 locked
+- Full reversal to stop: Runner hits BE = $0
+- **Net: +$675 instead of -$1,350**
+
+#### Breakeven at 1R
+```csharp
+// Reduced from 2R to 1R to match partial timing
+public double BreakevenTriggerR { get; set; } = 1.0;
+```
+
+#### Trailing Stop (Protected Swings - TTrades Skill #12)
+```csharp
+// Trail runner using LTF swing structure
+public bool UseTrailingStop { get; set; } = true;
+public int TrailingSwingLookback { get; set; } = 5;
+
+// Logic:
+// - Only activates after partial taken
+// - Finds recent swing high/low in lookback period
+// - Long: Trail stop up to swing low - buffer
+// - Short: Trail stop down to swing high + buffer
+// - Only trails in favorable direction (never against)
+```
+
+### Breakeven Rule (Original)
+- Move stop to breakeven at 1R (previously 2R)
 - Trail stop loss to swing highs/lows as trade progresses
 
 ### Cut Trade Early (Low Probability Scenarios)
@@ -235,56 +284,108 @@ public bool UsePremiumDiscountFilter { get; set; } = true;
 public double EquilibriumPercent { get; set; } = 50.0; // 50% of range
 ```
 
+### V3 Trade Management (NEW)
+```csharp
+// Partial profits - lock in gains at 1R
+public bool UsePartialProfits { get; set; } = true;
+public int PartialPercent { get; set; } = 50;       // Take 50% at partial
+public double PartialTargetR { get; set; } = 1.0;   // Partial at 1R
+
+// Trailing stop - TTrades Skill #12 (Protected Swings)
+public bool UseTrailingStop { get; set; } = true;
+public int TrailingSwingLookback { get; set; } = 5; // Bars to find swing
+```
+
+**Expected V3 Impact (based on V2 backtest):**
+- Trade #8: -$562 → +$200 (partial locks profit before reversal)
+- Trade #14: -$1,350 → +$675 (partial locks profit before reversal)
+- **Net improvement: +$2,587 from these 2 trades alone**
+
 ---
 
-## State Machine Flow
+## State Machine Flow (v3 - Multi-Timeframe + CISD)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    LIQUIDITY SWEEP STRATEGY                     │
+│                    LIQUIDITY SWEEP STRATEGY (MTF)               │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
+│  HTF Processing (H1 or M30 bars):                               │
+│  ─────────────────────────────────                              │
 │  STATE 1: WAITING_FOR_SESSION                                   │
-│    - Check if within trading hours (7-9 AM EST)                 │
-│    - Skip PM session                                            │
+│    - Check if within trading hours (9 AM - 12 PM EST)           │
 │    → If in session: STATE 2                                     │
 │                                                                 │
 │  STATE 2: SCANNING_FOR_HTF_LEVEL                                │
-│    - Identify H1/M30/M15 PDA (FVG, OB, liquidity)               │
-│    - Mark potential sweep levels                                │
+│    - Identify swing H/L on H1 or M30                            │
 │    → If HTF level found: STATE 3                                │
 │                                                                 │
-│  STATE 3: WAITING_FOR_SWEEP                                     │
+│  STATE 3: WAITING_FOR_SWEEP (on HTF)                            │
 │    - Monitor for price to sweep the HTF level                   │
-│    - H1 sweep or M30 sweep                                      │
-│    → If sweep detected: STATE 4                                 │
+│    - H1 sweep → activeOBTF = M5 (BarsInProgress 0)              │
+│    - M30 sweep → activeOBTF = M3 (BarsInProgress 3)             │
+│    → If sweep detected: STATE 4 (CISD) or STATE 5 (no CISD)     │
 │                                                                 │
-│  STATE 4: WAITING_FOR_OB_RETURN                                 │
-│    - Price swept, now wait for return to OB                     │
-│    - H1 sweep → look for M5 OB                                  │
-│    - M30 sweep → look for M3 OB                                 │
-│    → If OB touched and respected: STATE 5                       │
+│  LTF Processing (M5 or M3 bars):                                │
+│  ─────────────────────────────────                              │
+│  STATE 4: WAITING_FOR_CISD (NEW - v3)                           │
+│    - After HTF sweep, wait for Change in State of Delivery      │
+│    - For longs: LTF close > sweep candle open                   │
+│    - For shorts: LTF close < sweep candle open                  │
+│    → If CISD confirmed: STATE 5                                 │
+│    → If timeout: Reset to STATE 3                               │
 │                                                                 │
-│  STATE 5: ENTRY_TRIGGERED                                       │
+│  STATE 5: WAITING_FOR_OB_RETURN                                 │
+│    - Find Order Block on LTF (M5 or M3)                         │
+│    - Wait for price to return to OB with pullback requirement   │
+│    → If OB touched and respected: STATE 6                       │
+│                                                                 │
+│  STATE 6: ENTRY_TRIGGERED                                       │
 │    - Enter at open of next candle                               │
 │    - Set stop loss at sweep swing high/low                      │
 │    - Set target at 2R from ideal entry                          │
-│    → Position opened: STATE 6                                   │
+│    → Position opened: STATE 7                                   │
 │                                                                 │
-│  STATE 6: MANAGING_TRADE                                        │
-│    - Monitor for breakeven trigger                              │
+│  STATE 7: MANAGING_TRADE                                        │
+│    - V3: Take partial profits at 1R (50%)                       │
+│    - V3: Move to breakeven at 1R                                │
+│    - V3: Trail runner using protected swings                    │
 │    - Check for consolidation (cut early)                        │
-│    - Trail stop to swing points                                 │
-│    → If target hit: STATE 7                                     │
-│    → If stopped out: STATE 7                                    │
-│    → If cut early: STATE 7                                      │
+│    → If target/stop hit: STATE 8                                │
 │                                                                 │
-│  STATE 7: TRADE_COMPLETE                                        │
-│    - Log trade result                                           │
-│    - Reset for next opportunity                                 │
+│  STATE 8: TRADE_COMPLETE                                        │
+│    - Log trade result, reset for next opportunity               │
 │    → Return to STATE 1                                          │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+### Multi-Timeframe Data Series (v3)
+```csharp
+// BarsInProgress mapping:
+// 0 = Primary (M5) - OB confirmation for H1 sweeps
+// 1 = H1 (60-min) - HTF sweep detection
+// 2 = M30 (30-min) - HTF sweep detection
+// 3 = M3 (3-min) - OB confirmation for M30 sweeps
+
+AddDataSeries(BarsPeriodType.Minute, 60);  // H1
+AddDataSeries(BarsPeriodType.Minute, 30);  // M30
+AddDataSeries(BarsPeriodType.Minute, 3);   // M3
+```
+
+### CISD Confirmation (Skill #4)
+```csharp
+// Change in State of Delivery - confirms reversal after sweep
+public bool RequireCISD { get; set; } = true;
+
+// For bullish (sweep low): CISD = close > bearish candle open
+// For bearish (sweep high): CISD = close < bullish candle open
+```
+
+### Timeframe Pair Selection
+```csharp
+public enum MTFMode { H1_M5, M30_M3, Both }
+public MTFMode TimeframePair { get; set; } = MTFMode.Both;
 ```
 
 ---

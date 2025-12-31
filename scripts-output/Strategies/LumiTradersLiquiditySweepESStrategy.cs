@@ -60,6 +60,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             WAITING_FOR_SESSION,
             SCANNING_FOR_HTF_LEVEL,
             WAITING_FOR_SWEEP,
+            WAITING_FOR_CISD,        // NEW: Wait for Change in State of Delivery
             WAITING_FOR_OB_RETURN,
             ENTRY_TRIGGERED,
             MANAGING_TRADE,
@@ -67,6 +68,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         public enum BiasType { Neutral, Bullish, Bearish }
+        
+        public enum MTFMode { H1_M5, M30_M3, Both }
         #endregion
 
         #region Variables
@@ -116,12 +119,27 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // Session State (for strict enforcement across state machine)
         private bool isInTradingSession;
+        
+        // CISD Tracking (Change in State of Delivery)
+        private bool cisdConfirmed;
+        private double cisdCandleOpen;  // The candle open to compare against
+        private int cisdCandleBar;
+        
+        // Active Timeframe Pair (which pair triggered the setup)
+        private int activeSweepTF;  // 1 = H1, 2 = M30
+        private int activeOBTF;     // 0 = M5, 3 = M3
 
         // Trade Management
         private int barsInConsolidation;
         private double consolidationHigh;
         private double consolidationLow;
         private double lastClosePrice;
+
+        // V3 Trade Management: Partial Profits & Trailing
+        private bool partialTaken;
+        private int initialQuantity;
+        private double riskAmount;  // Store risk at entry for R calculations
+        private double trailingSwingLevel;
 
         // Previous Day Data
         private double previousDayHigh;
@@ -198,6 +216,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Debug
                 EnableDebug = true;
+                
+                // MTF Settings
+                TimeframePair = MTFMode.Both;
+                RequireCISD = true;
+                
+                // V3 Trade Management: Partial Profits & Trailing
+                UsePartialProfits = true;
+                PartialPercent = 50;
+                PartialTargetR = 1.0;
+                UseTrailingStop = true;
+                TrailingSwingLookback = 5;
+            }
+            else if (State == State.Configure)
+            {
+                // Add data series for multi-timeframe analysis
+                // BarsInProgress 0 = Primary (5-min) - for OB when H1 sweep
+                // BarsInProgress 1 = H1 (60-min) - for sweep detection
+                // BarsInProgress 2 = M30 (30-min) - for sweep detection
+                // BarsInProgress 3 = M3 (3-min) - for OB when M30 sweep
+                AddDataSeries(BarsPeriodType.Minute, 60);  // H1
+                AddDataSeries(BarsPeriodType.Minute, 30);  // M30
+                AddDataSeries(BarsPeriodType.Minute, 3);   // M3
             }
             else if (State == State.DataLoaded)
             {
@@ -215,10 +255,27 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBar < BarsRequiredToTrade) return;
+            // Multi-timeframe routing
+            // BarsInProgress: 0=M5, 1=H1, 2=M30, 3=M3
+            
+            if (CurrentBars[0] < BarsRequiredToTrade) return;
+            if (BarsInProgress > 0 && CurrentBars[BarsInProgress] < BarsRequiredToTrade) return;
+            
+            // HTF sweep detection runs on H1 (1) and M30 (2)
+            if (BarsInProgress == 1 || BarsInProgress == 2)
+            {
+                HandleHTFTimeframe();
+                return;
+            }
+            
+            // LTF logic runs on M5 (0) and M3 (3)
+            // Only process if this is the active OB timeframe for the current setup
+            if (BarsInProgress == 3 && activeOBTF != 3) return;
+            if (BarsInProgress == 0 && activeOBTF == 3) return;
+            
             if (State == State.Realtime && IsFirstTickOfBar == false) return;
 
-            DateTime barTime = Time[0];
+            DateTime barTime = Times[BarsInProgress][0];
             int hour = barTime.Hour;
             int minute = barTime.Minute;
 
@@ -291,6 +348,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 case StrategyState.WAITING_FOR_SWEEP:
                     HandleWaitingForSweep();
                     break;
+                    
+                case StrategyState.WAITING_FOR_CISD:
+                    HandleWaitingForCISD();
+                    break;
 
                 case StrategyState.WAITING_FOR_OB_RETURN:
                     HandleWaitingForOBReturn();
@@ -321,6 +382,173 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         #region State Machine Handlers
+
+        /// <summary>
+        /// Handle Higher Timeframe bar updates (H1 or M30) for sweep detection
+        /// </summary>
+        private void HandleHTFTimeframe()
+        {
+            // Determine which TF pair this is
+            bool isH1 = (BarsInProgress == 1);
+            bool isM30 = (BarsInProgress == 2);
+            
+            // Check if this TF pair is enabled
+            if (isH1 && TimeframePair == MTFMode.M30_M3) return;
+            if (isM30 && TimeframePair == MTFMode.H1_M5) return;
+            
+            // Only scan for sweeps when we're in the right state
+            if (currentState != StrategyState.WAITING_FOR_SWEEP && 
+                currentState != StrategyState.SCANNING_FOR_HTF_LEVEL) return;
+            
+            int tfBarsInProgress = BarsInProgress;
+            double htfHigh = Highs[tfBarsInProgress][0];
+            double htfLow = Lows[tfBarsInProgress][0];
+            double htfClose = Closes[tfBarsInProgress][0];
+            double htfOpen = Opens[tfBarsInProgress][0];
+            
+            // Update HTF swing points using this timeframe's bars
+            double highestHigh = 0;
+            double lowestLow = double.MaxValue;
+            
+            for (int i = 1; i <= SwingLookback && i < CurrentBars[tfBarsInProgress]; i++)
+            {
+                if (Highs[tfBarsInProgress][i] > highestHigh)
+                    highestHigh = Highs[tfBarsInProgress][i];
+                if (Lows[tfBarsInProgress][i] < lowestLow)
+                    lowestLow = Lows[tfBarsInProgress][i];
+            }
+            
+            htfSwingHigh = highestHigh;
+            htfSwingLow = lowestLow;
+            htfLevelIdentified = true;
+            
+            // Check Premium/Discount filter
+            bool allowLong = !UsePremiumDiscountFilter || !inPremiumZone;
+            bool allowShort = !UsePremiumDiscountFilter || !inDiscountZone;
+            
+            // Detect sweep of HTF low (bullish setup)
+            if (allowLong && htfLow < htfSwingLow - (SweepThresholdTicks * TickSize))
+            {
+                if (htfClose > htfSwingLow)  // Wick below but close above = sweep
+                {
+                    sweepDetected = true;
+                    sweepPrice = htfLow;
+                    sweepBar = CurrentBars[0];  // Primary TF bar
+                    sweepDirection = 1;  // Bullish
+                    sweptLevel = htfSwingLow;
+                    activeSweepTF = tfBarsInProgress;
+                    activeOBTF = isH1 ? 0 : 3;  // H1 sweep → M5 OB, M30 sweep → M3 OB
+                    
+                    // Store the CISD candle info (the bearish candle that made the sweep)
+                    cisdCandleOpen = htfOpen;
+                    cisdCandleBar = CurrentBars[0];
+                    cisdConfirmed = false;
+                    
+                    if (EnableDebug) Print(Times[0][0].ToString("HH:mm") + " | HTF SWEEP LOW on " + 
+                        (isH1 ? "H1" : "M30") + " @ " + sweepPrice.ToString("F2"));
+                    
+                    if (RequireCISD)
+                    {
+                        currentState = StrategyState.WAITING_FOR_CISD;
+                        if (EnableDebug) Print(Times[0][0].ToString("HH:mm") + " | STATE: WAITING_FOR_CISD");
+                    }
+                    else
+                    {
+                        FindOrderBlock(sweepDirection);
+                        currentState = StrategyState.WAITING_FOR_OB_RETURN;
+                    }
+                }
+            }
+            
+            // Detect sweep of HTF high (bearish setup)
+            if (allowShort && htfHigh > htfSwingHigh + (SweepThresholdTicks * TickSize))
+            {
+                if (htfClose < htfSwingHigh)  // Wick above but close below = sweep
+                {
+                    sweepDetected = true;
+                    sweepPrice = htfHigh;
+                    sweepBar = CurrentBars[0];
+                    sweepDirection = -1;  // Bearish
+                    sweptLevel = htfSwingHigh;
+                    activeSweepTF = tfBarsInProgress;
+                    activeOBTF = isH1 ? 0 : 3;
+                    
+                    // Store the CISD candle info (the bullish candle that made the sweep)
+                    cisdCandleOpen = htfOpen;
+                    cisdCandleBar = CurrentBars[0];
+                    cisdConfirmed = false;
+                    
+                    if (EnableDebug) Print(Times[0][0].ToString("HH:mm") + " | HTF SWEEP HIGH on " + 
+                        (isH1 ? "H1" : "M30") + " @ " + sweepPrice.ToString("F2"));
+                    
+                    if (RequireCISD)
+                    {
+                        currentState = StrategyState.WAITING_FOR_CISD;
+                        if (EnableDebug) Print(Times[0][0].ToString("HH:mm") + " | STATE: WAITING_FOR_CISD");
+                    }
+                    else
+                    {
+                        FindOrderBlock(sweepDirection);
+                        currentState = StrategyState.WAITING_FOR_OB_RETURN;
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Wait for Change in State of Delivery before proceeding to OB entry
+        /// </summary>
+        private void HandleWaitingForCISD()
+        {
+            // STRICT SESSION FILTER
+            if (!isInTradingSession)
+            {
+                if (EnableDebug) Print(Times[BarsInProgress][0].ToString("HH:mm") + " | Outside session, resetting");
+                ResetSweepState();
+                currentState = StrategyState.WAITING_FOR_SESSION;
+                return;
+            }
+            
+            int obTF = activeOBTF;  // 0 = M5, 3 = M3
+            double ltfClose = Closes[obTF][0];
+            
+            // For bullish (sweep low): CISD = close > bearish candle open
+            if (sweepDirection == 1)
+            {
+                if (ltfClose > cisdCandleOpen)
+                {
+                    cisdConfirmed = true;
+                    if (EnableDebug) Print(Times[obTF][0].ToString("HH:mm") + " | CISD CONFIRMED (Bullish) | Close " + 
+                        ltfClose.ToString("F2") + " > " + cisdCandleOpen.ToString("F2"));
+                    
+                    FindOrderBlock(sweepDirection);
+                    currentState = StrategyState.WAITING_FOR_OB_RETURN;
+                    if (EnableDebug) Print(Times[obTF][0].ToString("HH:mm") + " | STATE: WAITING_FOR_OB_RETURN");
+                }
+            }
+            // For bearish (sweep high): CISD = close < bullish candle open
+            else if (sweepDirection == -1)
+            {
+                if (ltfClose < cisdCandleOpen)
+                {
+                    cisdConfirmed = true;
+                    if (EnableDebug) Print(Times[obTF][0].ToString("HH:mm") + " | CISD CONFIRMED (Bearish) | Close " + 
+                        ltfClose.ToString("F2") + " < " + cisdCandleOpen.ToString("F2"));
+                    
+                    FindOrderBlock(sweepDirection);
+                    currentState = StrategyState.WAITING_FOR_OB_RETURN;
+                    if (EnableDebug) Print(Times[obTF][0].ToString("HH:mm") + " | STATE: WAITING_FOR_OB_RETURN");
+                }
+            }
+            
+            // Timeout: if too many bars pass without CISD, reset
+            if (CurrentBars[0] - cisdCandleBar > OBLookback * 3)
+            {
+                if (EnableDebug) Print(Times[obTF][0].ToString("HH:mm") + " | CISD timeout, resetting");
+                ResetSweepState();
+                currentState = StrategyState.WAITING_FOR_SWEEP;
+            }
+        }
 
         private void HandleWaitingForSession(bool inTradingSession)
         {
@@ -645,14 +873,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            // V3: Partial profits at 1R
+            ManagePartialProfits();
+
+            // Breakeven management (now at 1R to match partial timing)
+            ManageBreakeven();
+
+            // V3: Trail runner using protected swings
+            TrailStopToSwing();
+
             // Consolidation detection (cut trade early if no follow-through)
             if (CutOnConsolidation)
             {
                 CheckConsolidation();
             }
-
-            // Breakeven management
-            ManageBreakeven();
         }
 
         private void HandleTradeComplete(bool inTradingSession)
@@ -798,8 +1032,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             double profit = Position.MarketPosition == MarketPosition.Long
                 ? Close[0] - Position.AveragePrice : Position.AveragePrice - Close[0];
 
-            double riskAmount = Math.Abs(Position.AveragePrice - stopLoss);
-            double profitR = riskAmount > 0 ? profit / riskAmount : 0;
+            double currentRiskAmount = Math.Abs(Position.AveragePrice - stopLoss);
+            double profitR = currentRiskAmount > 0 ? profit / currentRiskAmount : 0;
 
             if (profitR >= BreakevenTriggerR)
             {
@@ -807,6 +1041,117 @@ namespace NinjaTrader.NinjaScript.Strategies
                 SetStopLoss(activeOrderName, CalculationMode.Price, Position.AveragePrice, false);
                 if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | BREAKEVEN SET @ " + Position.AveragePrice.ToString("F2") +
                     " (Profit: " + profitR.ToString("F2") + "R)");
+            }
+        }
+
+        /// <summary>
+        /// V3: Take partial profits at specified R-multiple
+        /// </summary>
+        private void ManagePartialProfits()
+        {
+            if (!UsePartialProfits) return;
+            if (Position.MarketPosition == MarketPosition.Flat) return;
+            if (partialTaken) return;  // Already took partial
+            if (Position.Quantity <= 1) return;  // Need at least 2 contracts for partials
+
+            double profit = Position.MarketPosition == MarketPosition.Long
+                ? Close[0] - Position.AveragePrice : Position.AveragePrice - Close[0];
+
+            double profitR = riskAmount > 0 ? profit / riskAmount : 0;
+
+            if (profitR >= PartialTargetR)
+            {
+                // Calculate partial quantity
+                int partialQty = (int)Math.Floor(Position.Quantity * PartialPercent / 100.0);
+                if (partialQty < 1) partialQty = 1;
+
+                // Take partial profit
+                if (Position.MarketPosition == MarketPosition.Long)
+                {
+                    ExitLong(partialQty, "PartialProfit", activeOrderName);
+                }
+                else
+                {
+                    ExitShort(partialQty, "PartialProfit", activeOrderName);
+                }
+
+                partialTaken = true;
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | PARTIAL PROFIT: " + partialQty + " contracts @ " +
+                    profitR.ToString("F2") + "R | Runner: " + (Position.Quantity - partialQty) + " contracts");
+            }
+        }
+
+        /// <summary>
+        /// V3: Trail stop using protected swing structure (TTrades Skill #12)
+        /// </summary>
+        private void TrailStopToSwing()
+        {
+            if (!UseTrailingStop) return;
+            if (Position.MarketPosition == MarketPosition.Flat) return;
+            if (!partialTaken) return;  // Only trail after partial taken
+
+            // Find recent swing for trailing
+            double newSwingLevel = 0;
+
+            if (Position.MarketPosition == MarketPosition.Long)
+            {
+                // Find recent swing low for long position
+                double lowestSwingLow = double.MaxValue;
+                for (int i = 1; i <= TrailingSwingLookback && i < CurrentBar; i++)
+                {
+                    // Simple swing low: bar lower than neighbors
+                    if (i >= 2 && Low[i] < Low[i - 1] && Low[i] < Low[i + 1])
+                    {
+                        if (Low[i] < lowestSwingLow && Low[i] > Position.AveragePrice)
+                        {
+                            lowestSwingLow = Low[i];
+                        }
+                    }
+                }
+
+                if (lowestSwingLow < double.MaxValue)
+                {
+                    newSwingLevel = lowestSwingLow - (StopBufferTicks * TickSize);
+
+                    // Only trail UP, never down
+                    if (newSwingLevel > trailingSwingLevel && newSwingLevel > stopLoss)
+                    {
+                        trailingSwingLevel = newSwingLevel;
+                        SetStopLoss(activeOrderName, CalculationMode.Price, trailingSwingLevel, false);
+                        if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | TRAILING STOP: Moved to " +
+                            trailingSwingLevel.ToString("F2") + " (swing low @ " + lowestSwingLow.ToString("F2") + ")");
+                    }
+                }
+            }
+            else  // Short position
+            {
+                // Find recent swing high for short position
+                double highestSwingHigh = 0;
+                for (int i = 1; i <= TrailingSwingLookback && i < CurrentBar; i++)
+                {
+                    // Simple swing high: bar higher than neighbors
+                    if (i >= 2 && High[i] > High[i - 1] && High[i] > High[i + 1])
+                    {
+                        if (High[i] > highestSwingHigh && High[i] < Position.AveragePrice)
+                        {
+                            highestSwingHigh = High[i];
+                        }
+                    }
+                }
+
+                if (highestSwingHigh > 0)
+                {
+                    newSwingLevel = highestSwingHigh + (StopBufferTicks * TickSize);
+
+                    // Only trail DOWN, never up
+                    if ((trailingSwingLevel == 0 || newSwingLevel < trailingSwingLevel) && newSwingLevel < stopLoss)
+                    {
+                        trailingSwingLevel = newSwingLevel;
+                        SetStopLoss(activeOrderName, CalculationMode.Price, trailingSwingLevel, false);
+                        if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | TRAILING STOP: Moved to " +
+                            trailingSwingLevel.ToString("F2") + " (swing high @ " + highestSwingHigh.ToString("F2") + ")");
+                    }
+                }
             }
         }
 
@@ -833,6 +1178,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             htfLevelIdentified = false;
             idealEntryPrice = 0;
+            
+            // Reset CISD state
+            cisdConfirmed = false;
+            cisdCandleOpen = 0;
+            cisdCandleBar = 0;
+            
+            // Reset active TF tracking
+            activeSweepTF = 0;
+            activeOBTF = 0;
         }
 
         private void ResetDailyState()
@@ -874,6 +1228,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             consolidationLow = 0;
             lastClosePrice = 0;
 
+            // V3 Trade Management reset
+            partialTaken = false;
+            initialQuantity = 0;
+            riskAmount = 0;
+            trailingSwingLevel = 0;
+
             // Clear swing point lists
             if (recentSwingHighs != null) recentSwingHighs.Clear();
             if (recentSwingLows != null) recentSwingLows.Clear();
@@ -885,6 +1245,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (marketPosition == MarketPosition.Long || marketPosition == MarketPosition.Short)
             {
+                // Store initial quantity and risk for V3 trade management
+                if (execution.Order.Name == activeOrderName)
+                {
+                    initialQuantity = quantity;
+                    riskAmount = Math.Abs(price - stopLoss);
+                    partialTaken = false;
+                    trailingSwingLevel = 0;
+                    
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | ENTRY: " + quantity + " contracts | Risk: " + 
+                        riskAmount.ToString("F2") + " ($" + (riskAmount * 50 * quantity).ToString("F0") + ")");
+                }
+                
                 SetStopLoss(execution.Order.Name, CalculationMode.Price, stopLoss, false);
                 SetProfitTarget(execution.Order.Name, CalculationMode.Price, takeProfit);
             }
@@ -896,6 +1268,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 breakevenSet = false;
                 barsInConsolidation = 0;
+                
+                // V3: Reset trade management state
+                partialTaken = false;
+                initialQuantity = 0;
+                riskAmount = 0;
+                trailingSwingLevel = 0;
+                
                 currentState = StrategyState.TRADE_COMPLETE;
             }
         }
@@ -1009,9 +1388,43 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Equilibrium Percent", Order = 2, GroupName = "6. Filters")]
         public double EquilibriumPercent { get; set; }
 
+        // Multi-Timeframe Settings
+        [NinjaScriptProperty]
+        [Display(Name = "Timeframe Pair", Order = 1, GroupName = "6. Multi-Timeframe")]
+        public MTFMode TimeframePair { get; set; }
+        
+        [NinjaScriptProperty]
+        [Display(Name = "Require CISD Confirmation", Order = 2, GroupName = "6. Multi-Timeframe")]
+        public bool RequireCISD { get; set; }
+
+        // V3 Trade Management: Partial Profits
+        [NinjaScriptProperty]
+        [Display(Name = "Use Partial Profits", Order = 1, GroupName = "7. V3 Trade Management")]
+        public bool UsePartialProfits { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(10, 90)]
+        [Display(Name = "Partial Profit %", Order = 2, GroupName = "7. V3 Trade Management")]
+        public int PartialPercent { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0.5, 3.0)]
+        [Display(Name = "Partial Target (R)", Order = 3, GroupName = "7. V3 Trade Management")]
+        public double PartialTargetR { get; set; }
+
+        // V3 Trade Management: Trailing Stop
+        [NinjaScriptProperty]
+        [Display(Name = "Use Trailing Stop", Order = 4, GroupName = "7. V3 Trade Management")]
+        public bool UseTrailingStop { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(3, 20)]
+        [Display(Name = "Trailing Swing Lookback", Order = 5, GroupName = "7. V3 Trade Management")]
+        public int TrailingSwingLookback { get; set; }
+        
         // Debug
         [NinjaScriptProperty]
-        [Display(Name = "Enable Debug Output", Order = 1, GroupName = "7. Debug")]
+        [Display(Name = "Enable Debug Output", Order = 1, GroupName = "8. Debug")]
         public bool EnableDebug { get; set; }
 
         #endregion
