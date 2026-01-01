@@ -1,0 +1,28 @@
+{
+  "recommendations": {
+    "filters_to_add": {
+      "focus_hours": [
+        10,
+        9
+      ],
+      "disable_days": [
+        "Thursday"
+      ]
+    },
+    "parameter_adjustments": {},
+    "analysis_notes": [
+      "Best performing hours: 10, 9",
+      "Days with significant losses: Thursday",
+      "Winners have lower MAE ($690) than losers ($1460) - entries are good"
+    ]
+  },
+  "metrics": {
+    "total_trades": 64,
+    "win_rate": 57.8125,
+    "profit_factor": 2.704007285974499,
+    "total_profit": 46775.0,
+    "max_drawdown": 5875.0,
+    "max_consecutive_losses": 2,
+    "avg_bars_held": 14.640625
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "analysis_summary": {
+    "total_trades": 39,
+    "win_rate": 46.15384615384615,
+    "profit_factor": 2.1280701754385967,
+    "total_profit": 8037.5,
+    "max_drawdown": 2300.0,
+    "avg_trade": 206.0897435897436
+  },
+  "problems_identified": [
+    {
+      "rank": 1,
+      "pattern": "mfe_reversal",
+      "severity": "HIGH",
+      "impact": -6962.5,
+      "trades_affected": 7,
+      "description": "7 trades reached profit but reversed to loss",
+      "details": {
+        "reversals": [
+          {
+            "trade": 1,
+            "mfe": 787.5,
+            "profit": -1050.0,
+            "entry_time": "2025-01-15 11:35",
+            "direction": "Short"
+          },
+          {
+            "trade": 7,
+            "mfe": 212.5,
+            "profit": -150.0,
+            "entry_time": "2025-03-03 11:35",
+            "direction": "Long"
+          },
+          {
+            "trade": 8,
+            "mfe": 1162.5,
+            "profit": -562.5,
+            "entry_time": "2025-03-05 10:30",
+            "direction": "Long"
+          },
+          {
+            "trade": 14,
+            "mfe": 2275.0,
+            "profit": -1350.0,
+            "entry_time": "2025-04-07 11:25",
+            "direction": "Short"
+          },
+          {
+            "trade": 27,
+            "mfe": 1412.5,
+            "profit": -1287.5,
+            "entry_time": "2025-08-01 11:20",
+            "direction": "Long"
+          },
+          {
+            "trade": 29,
+            "mfe": 175.0,
+            "profit": -250.0,
+            "entry_time": "2025-09-02 11:30",
+            "direction": "Long"
+          },
+          {
+            "trade": 31,
+            "mfe": 937.5,
+            "profit": -300.0,
+            "entry_time": "2025-10-02 10:20",
+            "direction": "Short"
+          }
+        ],
+        "total_left_on_table": 11912.5,
+        "avg_mfe_at_reversal": 994.6428571428571
+      },
+      "recommended_skill": "partial-profits, trailing-stop-protected-swings",
+      "expected_recovery": 3481.25
+    }
+  ],
+  "total_expected_improvement": 3481.25,
+  "recommendation_summary": {
+    "mfe_reversal": {
+      "skill": "partial-profits, trailing-stop-protected-swings",
+      "expected_recovery": 3481.25
+    }
+  }
+}

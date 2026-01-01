@@ -53,7 +53,7 @@ using NinjaTrader.NinjaScript.DrawingTools;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class TtradesReversalV2Strategy : Strategy
+    public class TtradesReversalV3Strategy : Strategy
     {
         #region Enums
         public enum BiasType { Neutral, Bullish, Bearish }
@@ -126,13 +126,19 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double fvgBottom;
         private int fvgDirection;  // 1 = bullish, -1 = bearish
         #endregion
+        // ERL/IRL Tracking (External/Internal Range Liquidity)
+        private bool inPremiumZone;   // Above equilibrium
+        private bool inDiscountZone;  // Below equilibrium
+        private double erlTarget;     // External Range Liquidity target (PDH/PDL)
+        private double irlLevel;      // Internal Range Liquidity level (range EQ)
+
 
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
                 Description = @"TTrades ICT Reversal Strategy V2 - Dynamic skill integration";
-                Name = "TtradesReversalV2";
+                Name = "TtradesReversalV3";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.AllEntries;
@@ -173,6 +179,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BearishThreshold = 45.0;
 
                 EnableDebug = true;
+
+                // ERL/IRL and Zone Defaults
+                UsePremiumDiscountZones = true;
+                UseDynamicTargets = true;
+                MinReversalStage = 2;
+
             }
             else if (State == State.DataLoaded)
             {
@@ -598,11 +610,27 @@ if (reversalStage >= 4 && breakerBlockFormed > 0)
 
 // Entry allowed after Stage 1+ (sweep required minimum)
 // Higher stages = more confirmation
-bool entryAllowed = reversalStage >= 1;
+bool entryAllowed = reversalStage >= MinReversalStage;
 
 if (EnableDebug && reversalStage > 0)
     Print(Time[0].ToString("HH:mm") + " | REVERSAL STAGE: " + reversalStage + "/5");
 
+
+            
+            // Premium/Discount Zone Filter - Only long in discount, short in premium
+            if (UsePremiumDiscountZones && equilibrium > 0)
+            {
+                if (tradeDirection == 1 && inPremiumZone)
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | SKIP LONG: In premium zone (above EQ)");
+                    tradeDirection = 0;  // Cancel long signal
+                }
+                if (tradeDirection == -1 && inDiscountZone)
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | SKIP SHORT: In discount zone (below EQ)");
+                    tradeDirection = 0;  // Cancel short signal
+                }
+            }
 
             //------------------------------------------------------------------
             // ENTRY EXECUTION (if entry conditions met)
@@ -626,9 +654,32 @@ if (EnableDebug && reversalStage > 0)
                         stopLoss += StopBufferTicks * TickSize;
 
                     entryPrice = Close[0];
-                    takeProfit = tradeDirection == 1
-                        ? Close[0] + (TakeProfitTicks * TickSize)
-                        : Close[0] - (TakeProfitTicks * TickSize);
+                    // Calculate dynamic target using ERL (PDH/PDL)
+                    if (UseDynamicTargets && previousDayHigh > 0 && previousDayLow > 0)
+                    {
+                        if (tradeDirection == 1)
+                        {
+                            // Long target: Previous Day High (ERL)
+                            erlTarget = previousDayHigh;
+                            double dynamicTP = Math.Min(erlTarget, Close[0] + (TakeProfitTicks * TickSize));
+                            takeProfit = dynamicTP;
+                            if (EnableDebug) Print("Dynamic TP (PDH): " + erlTarget.ToString("F2") + " | Using: " + takeProfit.ToString("F2"));
+                        }
+                        else
+                        {
+                            // Short target: Previous Day Low (ERL)
+                            erlTarget = previousDayLow;
+                            double dynamicTP = Math.Max(erlTarget, Close[0] - (TakeProfitTicks * TickSize));
+                            takeProfit = dynamicTP;
+                            if (EnableDebug) Print("Dynamic TP (PDL): " + erlTarget.ToString("F2") + " | Using: " + takeProfit.ToString("F2"));
+                        }
+                    }
+                    else
+                    {
+                        takeProfit = tradeDirection == 1
+                            ? Close[0] + (TakeProfitTicks * TickSize)
+                            : Close[0] - (TakeProfitTicks * TickSize);
+                    }
                     breakevenSet = false;
                     tradeTaken = true;
 
@@ -731,6 +782,13 @@ if (EnableDebug && reversalStage > 0)
             equilibrium = 0.0;
             rangeSet = false;
 
+            
+            // ERL/IRL reset
+            inPremiumZone = false;
+            inDiscountZone = false;
+            erlTarget = 0.0;
+            irlLevel = 0.0;
+
             // FVG tracking reset
             fvgTop = 0.0;
             fvgBottom = 0.0;
@@ -831,6 +889,23 @@ if (EnableDebug && reversalStage > 0)
         [NinjaScriptProperty]
         [Display(Name = "Enable Debug", Order = 1, GroupName = "4. Debug")]
         public bool EnableDebug { get; set; }
+        
+        // Premium/Discount Zone Filter
+        [NinjaScriptProperty]
+        [Display(Name = "Use Premium/Discount Zones", Order = 10, GroupName = "5. Optimization Filters")]
+        public bool UsePremiumDiscountZones { get; set; }
+
+        // Dynamic Targets (PDH/PDL)
+        [NinjaScriptProperty]
+        [Display(Name = "Use Dynamic Targets (PDH/PDL)", Order = 11, GroupName = "5. Optimization Filters")]
+        public bool UseDynamicTargets { get; set; }
+
+        // Minimum Reversal Stage
+        [NinjaScriptProperty]
+        [Range(1, 5)]
+        [Display(Name = "Minimum Reversal Stage", Order = 12, GroupName = "5. Optimization Filters")]
+        public int MinReversalStage { get; set; }
+
         #endregion
     }
 }

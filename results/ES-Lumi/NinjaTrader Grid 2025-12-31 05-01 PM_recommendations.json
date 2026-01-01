@@ -1,0 +1,22 @@
+{
+  "recommendations": {
+    "filters_to_add": {
+      "focus_hours": [
+        10
+      ]
+    },
+    "parameter_adjustments": {},
+    "analysis_notes": [
+      "Best performing hours: 10"
+    ]
+  },
+  "metrics": {
+    "total_trades": 39,
+    "win_rate": 46.15384615384615,
+    "profit_factor": 2.1280701754385967,
+    "total_profit": 8037.5,
+    "max_drawdown": 2300.0,
+    "max_consecutive_losses": 3,
+    "avg_bars_held": 13.76923076923077
+  }
+}

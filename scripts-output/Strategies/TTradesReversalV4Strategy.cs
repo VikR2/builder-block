@@ -53,7 +53,7 @@ using NinjaTrader.NinjaScript.DrawingTools;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class TtradesReversalV2Strategy : Strategy
+    public class TtradesReversalV4Strategy : Strategy
     {
         #region Enums
         public enum BiasType { Neutral, Bullish, Bearish }
@@ -126,13 +126,43 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double fvgBottom;
         private int fvgDirection;  // 1 = bullish, -1 = bearish
         #endregion
+        // ERL/IRL Tracking (External/Internal Range Liquidity)
+        private bool inPremiumZone;   // Above equilibrium
+        private bool inDiscountZone;  // Below equilibrium
+        private double erlTarget;     // External Range Liquidity target (PDH/PDL)
+        private double irlLevel;
+        // V4: Enhanced bias and target tracking
+        private bool strongShortBias;     // True when short conditions are confirmed
+        private bool htfAligned;          // Higher timeframe alignment
+        private double sessionTargetTicks; // Intraday target based on session range
+
+        // V4: Asia/London Session Tracking (for smarter intraday targets)
+        private double asiaSessionHigh;   // Asia session high (20:00-02:00 ET)
+        private double asiaSessionLow;    // Asia session low
+        private double londonSessionHigh; // London session high (03:00-08:00 ET)
+        private double londonSessionLow;  // London session low
+        private bool asiaSessionSet;      // Asia session complete
+        private bool londonSessionSet;    // London session complete
+
+        // V4: Track if session levels were "taken" (price traded through)
+        private bool asiaHighTaken;       // Price broke above Asia high
+        private bool asiaLowTaken;        // Price broke below Asia low
+        private bool londonHighTaken;     // Price broke above London high
+        private bool londonLowTaken;      // Price broke below London low
+
+        // V4: Hourly High/Low for fallback targets
+        private double currentHourHigh;   // Current hour's high
+        private double currentHourLow;    // Current hour's low
+        private double prevHourHigh;      // Previous hour's high
+        private double prevHourLow;       // Previous hour's low
+        private int lastHour;             // Track hour changes
 
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
                 Description = @"TTrades ICT Reversal Strategy V2 - Dynamic skill integration";
-                Name = "TtradesReversalV2";
+                Name = "TtradesReversalV4";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.AllEntries;
@@ -173,6 +203,44 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BearishThreshold = 45.0;
 
                 EnableDebug = true;
+
+                // ERL/IRL and Zone Defaults
+                UsePremiumDiscountZones = true;
+                UseDynamicTargets = true;
+                MinReversalStage = 2;
+                // V4 Defaults
+                RequireStrongShortBias = true;
+                RequireHTFAlignment = true;
+                UseSessionLevelTargets = true;
+
+                // Asia Session (ET): 20:00-02:00 (overnight)
+                AsiaStartHour = 20;
+                AsiaEndHour = 2;
+
+                // London Session (ET): 03:00-08:00
+                LondonStartHour = 3;
+                LondonEndHour = 8;
+
+
+
+                // ERL/IRL and Zone Defaults
+                UsePremiumDiscountZones = true;
+                UseDynamicTargets = true;
+                MinReversalStage = 2;
+                // V4 Defaults
+                RequireStrongShortBias = true;
+                RequireHTFAlignment = true;
+                UseSessionLevelTargets = true;
+
+                // Asia Session (ET): 20:00-02:00 (overnight)
+                AsiaStartHour = 20;
+                AsiaEndHour = 2;
+
+                // London Session (ET): 03:00-08:00
+                LondonStartHour = 3;
+                LondonEndHour = 8;
+
+
             }
             else if (State == State.DataLoaded)
             {
@@ -235,6 +303,88 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool inRangeBuild = currentMins >= rangeStartMins && currentMins < rangeEndMins;
             bool inExecution = currentMins >= rangeEndMins && currentMins < execEndMins;
             bool inSession = hour >= RangeStartHour && hour < SessionEndHour;
+
+            // V4: Track Hourly High/Low (for fallback targets)
+            if (hour != lastHour)
+            {
+                // New hour - save previous hour's range
+                prevHourHigh = currentHourHigh;
+                prevHourLow = currentHourLow;
+                currentHourHigh = High[0];
+                currentHourLow = Low[0];
+                lastHour = hour;
+            }
+            else
+            {
+                // Same hour - update current range
+                currentHourHigh = Math.Max(currentHourHigh, High[0]);
+                currentHourLow = Math.Min(currentHourLow, Low[0]);
+            }
+
+            // V4: Track Asia/London Session Highs/Lows
+            bool inAsiaSession = false;
+            bool inLondonSession = false;
+
+            // Asia session spans overnight (e.g., 20:00-02:00)
+            if (AsiaStartHour > AsiaEndHour)
+                inAsiaSession = (hour >= AsiaStartHour || hour < AsiaEndHour);
+            else
+                inAsiaSession = (hour >= AsiaStartHour && hour < AsiaEndHour);
+
+            // London session (e.g., 03:00-08:00)
+            inLondonSession = (hour >= LondonStartHour && hour < LondonEndHour);
+
+            // Track Asia session high/low
+            if (inAsiaSession)
+            {
+                if (asiaSessionHigh == 0 || High[0] > asiaSessionHigh)
+                    asiaSessionHigh = High[0];
+                if (asiaSessionLow == 0 || Low[0] < asiaSessionLow)
+                    asiaSessionLow = Low[0];
+            }
+            else if (!asiaSessionSet && asiaSessionHigh > 0)
+            {
+                asiaSessionSet = true;
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | ASIA SESSION SET: H=" + asiaSessionHigh.ToString("F2") + " L=" + asiaSessionLow.ToString("F2"));
+            }
+
+            // Track London session high/low
+            if (inLondonSession)
+            {
+                if (londonSessionHigh == 0 || High[0] > londonSessionHigh)
+                    londonSessionHigh = High[0];
+                if (londonSessionLow == 0 || Low[0] < londonSessionLow)
+                    londonSessionLow = Low[0];
+            }
+            else if (!londonSessionSet && londonSessionHigh > 0 && hour >= LondonEndHour)
+            {
+                londonSessionSet = true;
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | LONDON SESSION SET: H=" + londonSessionHigh.ToString("F2") + " L=" + londonSessionLow.ToString("F2"));
+            }
+
+            // V4: Check if session levels were "taken" (price traded through)
+            if (asiaSessionSet && !asiaHighTaken && High[0] > asiaSessionHigh)
+            {
+                asiaHighTaken = true;
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | ASIA HIGH TAKEN @ " + High[0].ToString("F2"));
+            }
+            if (asiaSessionSet && !asiaLowTaken && Low[0] < asiaSessionLow)
+            {
+                asiaLowTaken = true;
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | ASIA LOW TAKEN @ " + Low[0].ToString("F2"));
+            }
+            if (londonSessionSet && !londonHighTaken && High[0] > londonSessionHigh)
+            {
+                londonHighTaken = true;
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | LONDON HIGH TAKEN @ " + High[0].ToString("F2"));
+            }
+            if (londonSessionSet && !londonLowTaken && Low[0] < londonSessionLow)
+            {
+                londonLowTaken = true;
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | LONDON LOW TAKEN @ " + Low[0].ToString("F2"));
+            }
+
+
 
             // Candle properties (commonly used)
             bool is_bullish = Close[0] > Open[0];
@@ -598,11 +748,105 @@ if (reversalStage >= 4 && breakerBlockFormed > 0)
 
 // Entry allowed after Stage 1+ (sweep required minimum)
 // Higher stages = more confirmation
-bool entryAllowed = reversalStage >= 1;
+bool entryAllowed = reversalStage >= MinReversalStage;
 
 if (EnableDebug && reversalStage > 0)
     Print(Time[0].ToString("HH:mm") + " | REVERSAL STAGE: " + reversalStage + "/5");
 
+
+            
+            // Premium/Discount Zone Filter - Only long in discount, short in premium
+            if (UsePremiumDiscountZones && equilibrium > 0)
+            {
+                if (tradeDirection == 1 && inPremiumZone)
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | SKIP LONG: In premium zone (above EQ)");
+                    tradeDirection = 0;  // Cancel long signal
+                }
+                if (tradeDirection == -1 && inDiscountZone)
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | SKIP SHORT: In discount zone (below EQ)");
+                    tradeDirection = 0;  // Cancel short signal
+                }
+            }
+
+            // V4: Strong Short Bias Filter
+            if (RequireStrongShortBias && tradeDirection == -1)
+            {
+                strongShortBias = false;
+
+                // Condition 1: Previous day was bearish (closed below open)
+                bool pdBearish = previousDayClose < previousDayOpen;
+
+                // Condition 2: Price below yesterday's equilibrium
+                double pdEQ = (previousDayHigh + previousDayLow) / 2.0;
+                bool belowPDEQ = Close[0] < pdEQ;
+
+                // Strong short: bearish PD + below EQ, OR sweep of PDH
+                if ((pdBearish && belowPDEQ) || (High[0] >= previousDayHigh))
+                    strongShortBias = true;
+
+                if (!strongShortBias)
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | V4 SKIP SHORT: Weak bias (PD bearish=" + pdBearish + ", belowEQ=" + belowPDEQ + ")");
+                    tradeDirection = 0;
+                }
+            }
+
+            // V4: Higher Timeframe Alignment Check
+            if (RequireHTFAlignment && tradeDirection != 0)
+            {
+                htfAligned = false;
+
+                if (tradeDirection == 1)  // Long setup
+                {
+                    // Daily: Price below PDH (room to run up)
+                    bool dailyLongOK = Close[0] < previousDayHigh;
+                    // Opening Range: Swept range low (liquidity taken)
+                    bool orLongOK = lowSwept;
+                    // Intraday: CISD confirmed
+                    bool ltfLongOK = cisdConfirmed > 0;
+
+                    htfAligned = dailyLongOK && orLongOK && ltfLongOK;
+                }
+                else if (tradeDirection == -1)  // Short setup
+                {
+                    // Daily: Price above PDL (room to run down)
+                    bool dailyShortOK = Close[0] > previousDayLow;
+                    // Opening Range: Swept range high (liquidity taken)
+                    bool orShortOK = highSwept;
+                    // Intraday: CISD confirmed
+                    bool ltfShortOK = cisdConfirmed > 0;
+
+                    htfAligned = dailyShortOK && orShortOK && ltfShortOK;
+                }
+
+                if (!htfAligned)
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | V4 SKIP: No HTF alignment for " + (tradeDirection == 1 ? "LONG" : "SHORT"));
+                    tradeDirection = 0;
+                }
+            }
+
+
+
+
+
+            
+            // Premium/Discount Zone Filter - Only long in discount, short in premium
+            if (UsePremiumDiscountZones && equilibrium > 0)
+            {
+                if (tradeDirection == 1 && inPremiumZone)
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | SKIP LONG: In premium zone (above EQ)");
+                    tradeDirection = 0;  // Cancel long signal
+                }
+                if (tradeDirection == -1 && inDiscountZone)
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | SKIP SHORT: In discount zone (below EQ)");
+                    tradeDirection = 0;  // Cancel short signal
+                }
+            }
 
             //------------------------------------------------------------------
             // ENTRY EXECUTION (if entry conditions met)
@@ -626,9 +870,156 @@ if (EnableDebug && reversalStage > 0)
                         stopLoss += StopBufferTicks * TickSize;
 
                     entryPrice = Close[0];
-                    takeProfit = tradeDirection == 1
+                    // Calculate dynamic target using ERL (PDH/PDL)
+                    if (UseDynamicTargets && previousDayHigh > 0 && previousDayLow > 0)
+                    {
+                        if (tradeDirection == 1)
+                        {
+                            // Long target: Previous Day High (ERL)
+                            erlTarget = previousDayHigh;
+                            double dynamicTP = Math.Min(erlTarget, Close[0] + (TakeProfitTicks * TickSize));
+                            takeProfit = dynamicTP;
+                            if (EnableDebug) Print("Dynamic TP (PDH): " + erlTarget.ToString("F2") + " | Using: " + takeProfit.ToString("F2"));
+                        }
+                        else
+                        {
+                            // Short target: Previous Day Low (ERL)
+                            erlTarget = previousDayLow;
+                            double dynamicTP = Math.Max(erlTarget, Close[0] - (TakeProfitTicks * TickSize));
+                            takeProfit = dynamicTP;
+                            if (EnableDebug) Print("Dynamic TP (PDL): " + erlTarget.ToString("F2") + " | Using: " + takeProfit.ToString("F2"));
+                        }
+                    }
+                    else
+                    {
+                        // V4 FIXED: Calculate dynamic target with direction guard and Asia/London session levels
+                    double fixedTP = tradeDirection == 1
                         ? Close[0] + (TakeProfitTicks * TickSize)
                         : Close[0] - (TakeProfitTicks * TickSize);
+
+                    // V4: Determine best session level target (Asia/London highs/lows, or hourly fallback)
+                    double sessionLevelTarget = 0;
+                    string targetSource = "Fixed";
+
+                    if (UseSessionLevelTargets)
+                    {
+                        if (tradeDirection == 1)  // Long - look for resistance levels above
+                        {
+                            // Priority: London High (if not taken) > Asia High (if not taken) > Prev Hour High
+                            if (londonSessionSet && !londonHighTaken && londonSessionHigh > Close[0])
+                            {
+                                sessionLevelTarget = londonSessionHigh;
+                                targetSource = "LondonH";
+                            }
+                            else if (asiaSessionSet && !asiaHighTaken && asiaSessionHigh > Close[0])
+                            {
+                                sessionLevelTarget = asiaSessionHigh;
+                                targetSource = "AsiaH";
+                            }
+                            else if (prevHourHigh > Close[0])
+                            {
+                                // Fallback to previous hour high for better R:R
+                                sessionLevelTarget = prevHourHigh;
+                                targetSource = "PrevHourH";
+                            }
+                        }
+                        else  // Short - look for support levels below
+                        {
+                            // Priority: London Low (if not taken) > Asia Low (if not taken) > Prev Hour Low
+                            if (londonSessionSet && !londonLowTaken && londonSessionLow < Close[0] && londonSessionLow > 0)
+                            {
+                                sessionLevelTarget = londonSessionLow;
+                                targetSource = "LondonL";
+                            }
+                            else if (asiaSessionSet && !asiaLowTaken && asiaSessionLow < Close[0] && asiaSessionLow > 0)
+                            {
+                                sessionLevelTarget = asiaSessionLow;
+                                targetSource = "AsiaL";
+                            }
+                            else if (prevHourLow > 0 && prevHourLow < Close[0])
+                            {
+                                // Fallback to previous hour low for better R:R
+                                sessionLevelTarget = prevHourLow;
+                                targetSource = "PrevHourL";
+                            }
+                        }
+                    }
+
+                    if (UseDynamicTargets && previousDayHigh > 0 && previousDayLow > 0)
+                    {
+                        if (tradeDirection == 1)
+                        {
+                            // V4 FIX: Only use PDH if it's ABOVE entry (in profit direction)
+                            if (previousDayHigh > Close[0])
+                            {
+                                erlTarget = previousDayHigh;
+                                // Use closer of: PDH, fixed ticks
+                                takeProfit = Math.Min(erlTarget, fixedTP);
+                                // V4: Use Asia/London level if closer and valid
+                                if (sessionLevelTarget > Close[0] && sessionLevelTarget < takeProfit)
+                                    takeProfit = sessionLevelTarget;
+                            }
+                            else
+                            {
+                                // PDH is behind us - use session level or fixed ticks
+                                if (sessionLevelTarget > Close[0])
+                                    takeProfit = Math.Min(sessionLevelTarget, fixedTP);
+                                else
+                                    takeProfit = fixedTP;
+                            }
+                            if (EnableDebug) Print("V4 TP (Long): Source=" + targetSource +
+                                " | PDH=" + previousDayHigh.ToString("F2") +
+                                " | LondonH=" + londonSessionHigh.ToString("F2") + (londonHighTaken ? " (taken)" : "") +
+                                " | AsiaH=" + asiaSessionHigh.ToString("F2") + (asiaHighTaken ? " (taken)" : "") +
+                                " | PrevHourH=" + prevHourHigh.ToString("F2") +
+                                " | Entry=" + Close[0].ToString("F2") + " | TP=" + takeProfit.ToString("F2"));
+                        }
+                        else
+                        {
+                            // V4 FIX: Only use PDL if it's BELOW entry (in profit direction)
+                            if (previousDayLow < Close[0])
+                            {
+                                erlTarget = previousDayLow;
+                                // Use closer of: PDL, fixed ticks
+                                takeProfit = Math.Max(erlTarget, fixedTP);
+                                // V4: Use Asia/London level if closer and valid
+                                if (sessionLevelTarget > 0 && sessionLevelTarget < Close[0] && sessionLevelTarget > takeProfit)
+                                    takeProfit = sessionLevelTarget;
+                            }
+                            else
+                            {
+                                // PDL is behind us - use session level or fixed ticks
+                                if (sessionLevelTarget > 0 && sessionLevelTarget < Close[0])
+                                    takeProfit = Math.Max(sessionLevelTarget, fixedTP);
+                                else
+                                    takeProfit = fixedTP;
+                            }
+                            if (EnableDebug) Print("V4 TP (Short): Source=" + targetSource +
+                                " | PDL=" + previousDayLow.ToString("F2") +
+                                " | LondonL=" + londonSessionLow.ToString("F2") + (londonLowTaken ? " (taken)" : "") +
+                                " | AsiaL=" + asiaSessionLow.ToString("F2") + (asiaLowTaken ? " (taken)" : "") +
+                                " | PrevHourL=" + prevHourLow.ToString("F2") +
+                                " | Entry=" + Close[0].ToString("F2") + " | TP=" + takeProfit.ToString("F2"));
+                        }
+                    }
+                    else
+                    {
+                        // No dynamic targets - use session level or fixed
+                        if (sessionLevelTarget > 0)
+                        {
+                            if (tradeDirection == 1 && sessionLevelTarget > Close[0])
+                                takeProfit = Math.Min(sessionLevelTarget, fixedTP);
+                            else if (tradeDirection == -1 && sessionLevelTarget < Close[0])
+                                takeProfit = Math.Max(sessionLevelTarget, fixedTP);
+                            else
+                                takeProfit = fixedTP;
+                        }
+                        else
+                        {
+                            takeProfit = fixedTP;
+                        }
+                    }
+                    }
                     breakevenSet = false;
                     tradeTaken = true;
 
@@ -731,6 +1122,74 @@ if (EnableDebug && reversalStage > 0)
             equilibrium = 0.0;
             rangeSet = false;
 
+            
+            
+            // V4 reset
+            strongShortBias = false;
+            htfAligned = false;
+            sessionTargetTicks = 0;
+
+            // V4: Reset Asia/London session tracking
+            asiaSessionHigh = 0;
+            asiaSessionLow = 0;
+            londonSessionHigh = 0;
+            londonSessionLow = 0;
+            asiaSessionSet = false;
+            londonSessionSet = false;
+
+            // V4: Reset "taken" flags
+            asiaHighTaken = false;
+            asiaLowTaken = false;
+            londonHighTaken = false;
+            londonLowTaken = false;
+
+            // V4: Reset hourly tracking
+            currentHourHigh = 0;
+            currentHourLow = 0;
+            prevHourHigh = 0;
+            prevHourLow = 0;
+            lastHour = -1;
+
+            // ERL/IRL reset
+            inPremiumZone = false;
+            inDiscountZone = false;
+            erlTarget = 0.0;
+            irlLevel = 0.0;
+
+            
+            
+            // V4 reset
+            strongShortBias = false;
+            htfAligned = false;
+            sessionTargetTicks = 0;
+
+            // V4: Reset Asia/London session tracking
+            asiaSessionHigh = 0;
+            asiaSessionLow = 0;
+            londonSessionHigh = 0;
+            londonSessionLow = 0;
+            asiaSessionSet = false;
+            londonSessionSet = false;
+
+            // V4: Reset "taken" flags
+            asiaHighTaken = false;
+            asiaLowTaken = false;
+            londonHighTaken = false;
+            londonLowTaken = false;
+
+            // V4: Reset hourly tracking
+            currentHourHigh = 0;
+            currentHourLow = 0;
+            prevHourHigh = 0;
+            prevHourLow = 0;
+            lastHour = -1;
+
+            // ERL/IRL reset
+            inPremiumZone = false;
+            inDiscountZone = false;
+            erlTarget = 0.0;
+            irlLevel = 0.0;
+
             // FVG tracking reset
             fvgTop = 0.0;
             fvgBottom = 0.0;
@@ -831,6 +1290,60 @@ if (EnableDebug && reversalStage > 0)
         [NinjaScriptProperty]
         [Display(Name = "Enable Debug", Order = 1, GroupName = "4. Debug")]
         public bool EnableDebug { get; set; }
+        
+        // Premium/Discount Zone Filter
+        [NinjaScriptProperty]
+        [Display(Name = "Use Premium/Discount Zones", Order = 10, GroupName = "5. Optimization Filters")]
+        public bool UsePremiumDiscountZones { get; set; }
+
+        // Dynamic Targets (PDH/PDL)
+        [NinjaScriptProperty]
+        [Display(Name = "Use Dynamic Targets (PDH/PDL)", Order = 11, GroupName = "5. Optimization Filters")]
+        public bool UseDynamicTargets { get; set; }
+
+        // Minimum Reversal Stage
+        [NinjaScriptProperty]
+        [Range(1, 5)]
+        [Display(Name = "Minimum Reversal Stage", Order = 12, GroupName = "5. Optimization Filters")]
+        public int MinReversalStage { get; set; }
+
+        // V4: Strong Short Bias Filter
+        [NinjaScriptProperty]
+        [Display(Name = "Require Strong Short Bias", Order = 13, GroupName = "5. Optimization Filters")]
+        public bool RequireStrongShortBias { get; set; }
+
+        // V4: Higher Timeframe Alignment
+        [NinjaScriptProperty]
+        [Display(Name = "Require HTF Alignment", Order = 14, GroupName = "5. Optimization Filters")]
+        public bool RequireHTFAlignment { get; set; }
+
+        // V4: Session Range Targets (Asia/London)
+        [NinjaScriptProperty]
+        [Display(Name = "Use Session Levels (Asia/London)", Order = 15, GroupName = "5. Optimization Filters")]
+        public bool UseSessionLevelTargets { get; set; }
+
+        // V4: Asia Session Time (ET) - typically 20:00-02:00
+        [NinjaScriptProperty]
+        [Range(0, 23)]
+        [Display(Name = "Asia Session Start Hour", Order = 16, GroupName = "6. Session Times")]
+        public int AsiaStartHour { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 23)]
+        [Display(Name = "Asia Session End Hour", Order = 17, GroupName = "6. Session Times")]
+        public int AsiaEndHour { get; set; }
+
+        // V4: London Session Time (ET) - typically 03:00-08:00
+        [NinjaScriptProperty]
+        [Range(0, 23)]
+        [Display(Name = "London Session Start Hour", Order = 18, GroupName = "6. Session Times")]
+        public int LondonStartHour { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 23)]
+        [Display(Name = "London Session End Hour", Order = 19, GroupName = "6. Session Times")]
+        public int LondonEndHour { get; set; }
+
         #endregion
     }
 }

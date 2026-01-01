@@ -1,0 +1,30 @@
+{
+  "recommendations": {
+    "filters_to_add": {
+      "focus_hours": [
+        9
+      ],
+      "disable_days": [
+        "Monday",
+        "Wednesday"
+      ],
+      "max_consecutive_losses": 3
+    },
+    "parameter_adjustments": {},
+    "analysis_notes": [
+      "Best performing hours: 9",
+      "Days with significant losses: Monday, Wednesday",
+      "Max loss streak of 11 suggests adding streak limiter",
+      "Winners have lower MAE ($147) than losers ($322) - entries are good"
+    ]
+  },
+  "metrics": {
+    "total_trades": 101,
+    "win_rate": 15.841584158415841,
+    "profit_factor": 0.9189933149823044,
+    "total_profit": -2060.0,
+    "max_drawdown": 5560.0,
+    "max_consecutive_losses": 11,
+    "avg_bars_held": 5.316831683168317
+  }
+}

@@ -13,6 +13,75 @@ Extract trading concepts from YouTube videos and generate NinjaTrader C# code (I
 - User asks to "learn from this video", "convert this to a script", or "generate from YouTube"
 - Keywords: "youtube", "video tutorial", "from this video", "youtube.com/watch"
 
+---
+
+## REQUIRED: QA Validation Gates
+
+**CRITICAL:** Before proceeding with any extraction or code generation, you MUST stop and get explicit user approval at these checkpoints. This is NOT optional.
+
+### Gate 1: Video Intent Classification (After Analysis)
+
+After fetching transcript and/or analyzing frames, STOP and use AskUserQuestion:
+
+```
+Video Analysis Summary:
+- Title: [video title]
+- Duration: [X minutes]
+- Detected Intent: [skills_library | complete_strategy | educational]
+- Key Concepts Found:
+  • [Concept 1] (confidence: high/medium/low)
+  • [Concept 2]
+  • [Concept 3]
+
+Is this classification correct?
+```
+
+**Options:** Yes proceed / Change intent / Cancel
+
+### Gate 2: Skills List Review (Before Database Write)
+
+Before writing ANY skills to database, present the full list:
+
+```
+Skills to Extract:
+
+NEW (will create in database):
+• [Skill Name] - [brief description]
+
+AMBIGUOUS (similar to existing):
+• "[Extracted]" ≈ existing #[ID] "[Name]"
+  → Recommend: Use existing / Create new
+
+EXISTING (will link to video):
+• #[ID] [Name]
+
+Proceed with extraction?
+```
+
+**Options:** Yes extract all / Edit list / Cancel
+
+### Gate 3: Artifact Generation (For complete_strategy only)
+
+For complete_strategy videos, ask BEFORE generating:
+
+```
+Strategy detected with full entry/exit rules.
+
+Generate artifacts?
+1. Strategy Architecture Document (SAD)? [Yes/No]
+2. NinjaTrader C# Strategy Code? [Yes/No]
+```
+
+**NEVER auto-generate SAD or C# code** - always ask first.
+
+### Why Gates Matter
+
+- Gate 1: Ensures video was understood correctly
+- Gate 2: Prevents duplicate skills, catches errors
+- Gate 3: Code generation is expensive and should be intentional
+
+---
+
 ## Architecture
 
 Generate code based on video content:
