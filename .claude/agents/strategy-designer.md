@@ -260,6 +260,76 @@ When designing the flow, identify key decision points:
 | CISD Check | Close[0] > refCandleOpen | Entry trigger | Wait |
 | BE Check | profit > BETicks | Move stop | Continue |
 
+## CRITICAL: Target Logic Best Practices
+
+### Dynamic Target Direction Validation
+
+**NEVER use external levels (PDH/PDL, session highs/lows) as targets without direction validation!**
+
+```
+WRONG LOGIC (causes "profit target" losses):
+  Long Entry → Set TP = Math.Min(PDH, fixedTP)
+  Problem: If PDH < entry price, TP is BEHIND entry = instant loss!
+
+CORRECT LOGIC:
+  Long Entry:
+    IF PDH > entry_price THEN
+      TP = Math.Min(PDH, fixedTP)  // PDH is valid target
+    ELSE
+      TP = fixedTP                  // Fall back to fixed
+```
+
+### Session-Based Target Hierarchy
+
+For intraday strategies, use this target hierarchy with fallbacks:
+
+```
+LONG TARGETS (find closest valid level in profit direction):
+1. London High (if NOT taken AND > entry)
+2. Asia High (if NOT taken AND > entry)
+3. Previous Hour High (if > entry)
+4. Fixed TakeProfitTicks
+
+SHORT TARGETS (find closest valid level in profit direction):
+1. London Low (if NOT taken AND < entry)
+2. Asia Low (if NOT taken AND < entry)
+3. Previous Hour Low (if < entry)
+4. Fixed TakeProfitTicks
+```
+
+**"Taken" = price already broke through the level (invalidated as target)**
+
+### Multi-Timeframe Confirmation Pattern
+
+For higher-probability setups, require alignment across timeframes:
+
+```
+Daily → Hourly → Entry Timeframe
+
+LONG SETUP ALIGNMENT:
+  Daily:   Price below PDH (room to run up)
+  Session: Range low swept (liquidity taken)
+  Entry:   CISD confirmed bullish
+
+SHORT SETUP ALIGNMENT:
+  Daily:   Price above PDL (room to run down)
+  Session: Range high swept (liquidity taken)
+  Entry:   CISD confirmed bearish
+```
+
+### Premium/Discount Zone Filter
+
+Always validate entries against price position:
+
+```
+LONGS: Only enter in DISCOUNT zone (below equilibrium)
+SHORTS: Only enter in PREMIUM zone (above equilibrium)
+
+Equilibrium = (rangeHigh + rangeLow) / 2
+
+If entry is in wrong zone → SKIP (low probability)
+```
+
 ## State Variables
 
 List all state variables from selected skills:
@@ -286,6 +356,34 @@ Position:
 - Highlight warnings prominently
 - Make approval options clear
 - Wait for explicit user decision before proceeding
+
+## Design Validation Checklist
+
+Before presenting design for approval, verify:
+
+### Target Logic Validation
+- [ ] All dynamic targets have direction guards
+- [ ] Session level targets check if "taken"
+- [ ] Fallback hierarchy defined (session → hourly → fixed)
+- [ ] No Math.Min/Max used without direction validation
+
+### Entry Filter Validation
+- [ ] Premium/Discount zone filter included if using equilibrium
+- [ ] Short bias requires additional confirmation (shorts are harder)
+- [ ] HTF alignment check if using multi-timeframe
+
+### Code Generation Safety
+- [ ] Variable names are unique (no duplicates possible)
+- [ ] Property Display names are descriptive (not strategy name)
+- [ ] All state variables have reset logic in ResetDailyState()
+
+### Common Mistakes to Avoid
+| Mistake | Impact | Prevention |
+|---------|--------|------------|
+| PDH as target when PDH < entry | "Profit target" is actually a loss | Direction guard |
+| Session high as target after sweep | Target already invalidated | Track "taken" state |
+| Same Display name for all properties | Optimizer shows gibberish | Unique property names |
+| Duplicate variable declarations | CS0102 compile error | Check before adding |
 
 ## Handoff to Code Generation
 

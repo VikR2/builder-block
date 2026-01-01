@@ -34,12 +34,12 @@ USAGE:
         [--max-frames 15]             # Max frames to extract (default: 15)
         [--keep-frames]               # Don't delete frames after processing
         [--extract-skills | --no-extract-skills] \\
-        [--confirm-skills] \\
+        [--auto-confirm]              # CAUTION: Bypass skill confirmation QA gate
         [--skip-generation] \\
         [--legacy-codegen]
 
 EXAMPLES:
-    # Default: Generate Strategy Architecture Document (SAD)
+    # Default: Generate SAD with skill confirmation (QA gates enabled)
     uv run python -m runtime.harness scripts/generate_from_youtube.py \\
         --url "https://youtube.com/watch?v=abc123" \\
         --project-id 1
@@ -56,11 +56,11 @@ EXAMPLES:
         --project-id 1 \\
         --skip-generation
 
-    # Interactive mode - confirm each skill before saving
+    # [CAUTION] Bypass skill confirmation - for automated pipelines only
     uv run python -m runtime.harness scripts/generate_from_youtube.py \\
         --url "https://youtube.com/watch?v=def456" \\
         --project-id 1 \\
-        --confirm-skills
+        --auto-confirm
 
     # Legacy mode - generate C# code directly (old behavior)
     uv run python -m runtime.harness scripts/generate_from_youtube.py \\
@@ -2886,8 +2886,14 @@ Examples:
     parser.add_argument(
         "--confirm-skills",
         action="store_true",
+        default=True,
+        help="Require user confirmation before saving skills (default: True for QA)",
+    )
+    parser.add_argument(
+        "--auto-confirm",
+        action="store_true",
         default=False,
-        help="Ask for confirmation before saving each skill",
+        help="[CAUTION] Bypass skill confirmation QA gate - use only when explicitly requested",
     )
     parser.add_argument(
         "--skip-generation",
@@ -3021,11 +3027,15 @@ Examples:
 
             # Step 3b: Save new skills
             if skill_analysis["new_skills"]:
+                # QA Gate: Confirmation required unless explicitly bypassed
+                require_confirm = args.confirm_skills and not args.auto_confirm
+                if args.auto_confirm:
+                    print("⚠️  [WARNING] Auto-confirm enabled - skipping skill confirmation QA gate")
                 saved_ids = save_new_skills(
                     skill_analysis["new_skills"],
                     transcript,
                     args.url,
-                    confirm=args.confirm_skills,
+                    confirm=require_confirm,
                 )
                 skills_extracted = saved_ids
 

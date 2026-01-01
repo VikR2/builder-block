@@ -1,0 +1,105 @@
+{
+  "analysis_summary": {
+    "total_trades": 64,
+    "win_rate": 57.8125,
+    "profit_factor": 2.704007285974499,
+    "total_profit": 46775.0,
+    "max_drawdown": 5875.0,
+    "avg_trade": 730.859375
+  },
+  "problems_identified": [
+    {
+      "rank": 1,
+      "pattern": "mfe_reversal",
+      "severity": "HIGH",
+      "impact": -20475.0,
+      "trades_affected": 10,
+      "description": "10 trades reached profit but reversed to loss",
+      "details": {
+        "reversals": [
+          {
+            "trade": 3,
+            "mfe": 3550.0,
+            "profit": -3800.0,
+            "entry_time": "2025-01-15 11:25",
+            "direction": "Short"
+          },
+          {
+            "trade": 5,
+            "mfe": 575.0,
+            "profit": -350.0,
+            "entry_time": "2025-02-05 10:50",
+            "direction": "Short"
+          },
+          {
+            "trade": 13,
+            "mfe": 850.0,
+            "profit": -600.0,
+            "entry_time": "2025-03-03 11:35",
+            "direction": "Long"
+          },
+          {
+            "trade": 15,
+            "mfe": 2325.0,
+            "profit": -1125.0,
+            "entry_time": "2025-03-05 10:30",
+            "direction": "Long"
+          },
+          {
+            "trade": 26,
+            "mfe": 1650.0,
+            "profit": -3150.0,
+            "entry_time": "2025-04-17 11:30",
+            "direction": "Long"
+          },
+          {
+            "trade": 44,
+            "mfe": 700.0,
+            "profit": -1000.0,
+            "entry_time": "2025-09-02 11:30",
+            "direction": "Long"
+          },
+          {
+            "trade": 49,
+            "mfe": 350.0,
+            "profit": -400.0,
+            "entry_time": "2025-09-15 11:55",
+            "direction": "Short"
+          },
+          {
+            "trade": 50,
+            "mfe": 3750.0,
+            "profit": -1200.0,
+            "entry_time": "2025-10-02 10:20",
+            "direction": "Short"
+          },
+          {
+            "trade": 59,
+            "mfe": 875.0,
+            "profit": -375.0,
+            "entry_time": "2025-11-05 11:15",
+            "direction": "Short"
+          },
+          {
+            "trade": 62,
+            "mfe": 5850.0,
+            "profit": -400.0,
+            "entry_time": "2025-12-04 10:50",
+            "direction": "Short"
+          }
+        ],
+        "total_left_on_table": 32875.0,
+        "avg_mfe_at_reversal": 2047.5
+      },
+      "recommended_skill": "partial-profits, trailing-stop-protected-swings",
+      "expected_recovery": 10237.5
+    }
+  ],
+  "total_expected_improvement": 10237.5,
+  "recommendation_summary": {
+    "mfe_reversal": {
+      "skill": "partial-profits, trailing-stop-protected-swings",
+      "expected_recovery": 10237.5
+    }
+  }
+}

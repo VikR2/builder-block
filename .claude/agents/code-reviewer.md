@@ -83,6 +83,77 @@ For ResetDailyState() method:
 
 ## NinjaTrader Best Practices
 
+### CRITICAL: Code Generation Pitfalls
+
+These are actual bugs discovered during development that MUST be checked:
+
+#### 1. Display Attribute Protection
+**BUG:** Regex replacements for strategy name can corrupt Display attributes
+```csharp
+// BAD: Too broad - matches Display(Name = "...") too!
+code = re.sub(r'Name = "[^"]+"', 'Name = "NewStrategy"', code)
+
+// GOOD: Use negative lookbehind to avoid Display attributes
+code = re.sub(r'(?<!\()Name = "OldStrategy"', 'Name = "NewStrategy"', code)
+```
+
+**Check:** All `[Display(Name = "PropertyName"` attributes must have unique, descriptive names - NOT the strategy name.
+
+#### 2. Duplicate Declaration Prevention (CS0102)
+**BUG:** Code enhancement scripts may add variables/properties that already exist
+```csharp
+// CAUSES CS0102: "already contains a definition"
+private bool strongShortBias;  // Line 130
+// ... later ...
+private bool strongShortBias;  // Line 165 - DUPLICATE!
+```
+
+**Check:** Before adding any variable or property:
+```python
+if 'private bool strongShortBias;' not in code:
+    # Safe to add
+```
+
+#### 3. Dynamic Target Direction Guard (CRITICAL TRADING BUG)
+**BUG:** Using Math.Min/Max for targets without direction validation causes losses
+```csharp
+// BAD: If PDH < entry price, this sets "profit target" BELOW entry = LOSS!
+double dynamicTP = Math.Min(erlTarget, Close[0] + TakeProfitTicks);
+
+// GOOD: Only use PDH if it's in profit direction for longs
+if (tradeDirection == 1)  // Long
+{
+    if (previousDayHigh > Close[0])  // PDH is ABOVE entry
+    {
+        erlTarget = previousDayHigh;
+        takeProfit = Math.Min(erlTarget, fixedTP);
+    }
+    else
+    {
+        takeProfit = fixedTP;  // Fall back to fixed ticks
+    }
+}
+```
+
+**Check:** ALL target calculations must validate direction:
+- Long targets MUST be > entry price
+- Short targets MUST be < entry price
+
+#### 4. Session Level "Taken" Logic
+**BUG:** Using session highs/lows as targets after price already broke through them
+```csharp
+// BAD: If price already broke above Asia high, it's not a valid target
+takeProfit = asiaSessionHigh;  // Price is already above this!
+
+// GOOD: Track if level was "taken" (invalidated)
+if (High[0] > asiaSessionHigh)
+    asiaHighTaken = true;
+
+// Only use as target if NOT taken
+if (!asiaHighTaken && asiaSessionHigh > Close[0])
+    takeProfit = asiaSessionHigh;
+```
+
 ### State Machine Correctness
 ```csharp
 // CORRECT: Check State in OnStateChange
@@ -127,6 +198,9 @@ if (State == State.Terminated)
 - [ ] No null reference risks
 - [ ] Stop loss always set after entry
 - [ ] No infinite loops possible
+- [ ] **No duplicate variable/property declarations (CS0102)**
+- [ ] **Dynamic targets validate direction (long target > entry, short target < entry)**
+- [ ] **Display attributes have unique names (not strategy name)**
 
 ### Important (Warn but allow)
 - [ ] Variables reset daily

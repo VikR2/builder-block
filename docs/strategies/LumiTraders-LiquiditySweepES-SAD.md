@@ -1,6 +1,6 @@
 # Strategy Architecture Document: LumiTraders Liquidity Sweep (ES Version)
 
-**Version:** 3.0 (Partial Profits + Trailing)
+**Version:** 5.0 (11 AM Fade Strategy)
 
 ## Version History
 | Version | Date | Changes |
@@ -8,6 +8,9 @@
 | 1.0 | 2025-12-31 | Initial implementation |
 | 2.0 | 2025-12-31 | MTF + CISD confirmation |
 | 3.0 | 2025-12-31 | Partial profits (50% at 1R), trailing stops (protected swings), BE at 1R |
+| 4.0 | 2025-12-31 | Daily bias filter using swing structure (too loose - allowed Neutral) |
+| 4.1 | 2025-12-31 | Strict SMA-based bias: Price > SMA = longs only, Price < SMA = shorts only |
+| 5.0 | 2025-12-31 | 11 AM Fade: Trade opposite direction when setup forms in 11 AM trap window |
 
 ## Source
 - **Video:** "Liquidity Sweep Explained" by LumiTraders
@@ -301,9 +304,77 @@ public int TrailingSwingLookback { get; set; } = 5; // Bars to find swing
 - Trade #14: -$1,350 → +$675 (partial locks profit before reversal)
 - **Net improvement: +$2,587 from these 2 trades alone**
 
+### V4.1 Strict HTF Bias Filter (NEW)
+```csharp
+// Daily bias filter - strict SMA-based trend
+public bool UseHTFBiasFilter { get; set; } = true;
+public int HTFSwingLookback { get; set; } = 5;  // SMA period (days)
+
+// Logic (V4.1 - strict, no Neutral):
+// - Previous close > 5-day SMA → Bullish → ONLY longs allowed
+// - Previous close < 5-day SMA → Bearish → ONLY shorts allowed
+// - No neutral state - always filtered to one direction
+```
+
+**V4 vs V4.1:**
+- V4.0 used swing structure with Neutral fallback (didn't filter trades)
+- V4.1 uses SMA comparison - always has a direction, strictly filters
+
+**Expected V4.1 Impact:**
+- Filters counter-trend trades (e.g., longs during April 2025 crash)
+- Trade #26 (Apr 17): Long at 5433 during daily downtrend → will be filtered
+- May reduce trade count but improve win rate
+
+### V5 11 AM Fade Strategy (NEW)
+
+**Problem:** Analysis of backtest data revealed that 11 AM trades were 90% losers:
+| Trade | Date | Direction | Entry Time | Result |
+|-------|------|-----------|------------|--------|
+| #3 | Jan 15 | Short | 11:25 AM | -$1,050 |
+| #5 | Feb 18 | Long | 11:35 AM | -$587 |
+| #7 | Mar 3 | Long | 11:35 AM | -$150 |
+| #9 | Mar 13 | Long | 11:25 AM | -$425 |
+
+**Total 11 AM losses:** -$11,200+
+
+**Solution:** Instead of avoiding 11 AM setups, **FADE them** - use them as counter-signals.
+
+```csharp
+// V5: 11 AM Fade parameters
+public bool Use11AMFade { get; set; } = true;
+public int FadeHourStart { get; set; } = 11;  // Start of fade window
+public int FadeHourEnd { get; set; } = 12;    // End of fade window
+```
+
+**Logic Flow:**
+```
+Normal Setup at 11 AM (e.g., Long signal)
+    ↓
+DON'T take the long (it's historically a 90% loser)
+    ↓
+Wait for CISD in OPPOSITE direction (bearish CISD)
+    ↓
+Wait for pullback into LTF Order Block
+    ↓
+Enter SHORT (opposite of original signal)
+    ↓
+Stop loss at original setup's swing level (the trap)
+```
+
+**New States:**
+- `WAITING_FOR_FADE_CISD` - Wait for CISD in opposite direction of original signal
+- `WAITING_FOR_FADE_OB` - Wait for pullback to LTF Order Block in fade direction
+- `FADE_ENTRY_TRIGGERED` - Enter opposite direction of original signal
+
+**Theoretical Impact:**
+If fading turns the 4 major 11 AM losers into winners:
+- Original: -$11,200
+- Faded: +$11,200 (potential)
+- **Swing: +$22,400 improvement**
+
 ---
 
-## State Machine Flow (v3 - Multi-Timeframe + CISD)
+## State Machine Flow (v5 - MTF + CISD + 11AM Fade)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -341,9 +412,31 @@ public int TrailingSwingLookback { get; set; } = 5; // Bars to find swing
 │    → If OB touched and respected: STATE 6                       │
 │                                                                 │
 │  STATE 6: ENTRY_TRIGGERED                                       │
-│    - Enter at open of next candle                               │
+│    - Check for 11 AM fade window (V5)                           │
+│    - If in fade window: → STATE 6a (FADE flow)                  │
+│    - Otherwise: Enter at open of next candle                    │
 │    - Set stop loss at sweep swing high/low                      │
 │    - Set target at 2R from ideal entry                          │
+│    → Position opened: STATE 7                                   │
+│                                                                 │
+│  V5 11AM FADE FLOW (if in fade window 11-12):                   │
+│  ───────────────────────────────────────────                    │
+│  STATE 6a: WAITING_FOR_FADE_CISD                                │
+│    - Original signal direction saved                            │
+│    - Wait for CISD in OPPOSITE direction                        │
+│    - Long trap → wait for bearish CISD                          │
+│    - Short trap → wait for bullish CISD                         │
+│    → If opposite CISD: STATE 6b                                 │
+│                                                                 │
+│  STATE 6b: WAITING_FOR_FADE_OB                                  │
+│    - Find Order Block in fade direction                         │
+│    - Wait for pullback to fade OB                               │
+│    → If OB touched and respected: STATE 6c                      │
+│                                                                 │
+│  STATE 6c: FADE_ENTRY_TRIGGERED                                 │
+│    - Enter OPPOSITE direction of original signal                │
+│    - Stop at original setup's swing (the trap level)            │
+│    - Target: 2R from fade OB                                    │
 │    → Position opened: STATE 7                                   │
 │                                                                 │
 │  STATE 7: MANAGING_TRADE                                        │
@@ -360,17 +453,19 @@ public int TrailingSwingLookback { get; set; } = 5; // Bars to find swing
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Multi-Timeframe Data Series (v3)
+### Multi-Timeframe Data Series (v4)
 ```csharp
 // BarsInProgress mapping:
 // 0 = Primary (M5) - OB confirmation for H1 sweeps
 // 1 = H1 (60-min) - HTF sweep detection
 // 2 = M30 (30-min) - HTF sweep detection
 // 3 = M3 (3-min) - OB confirmation for M30 sweeps
+// 4 = Daily - HTF bias filter (V4)
 
 AddDataSeries(BarsPeriodType.Minute, 60);  // H1
 AddDataSeries(BarsPeriodType.Minute, 30);  // M30
 AddDataSeries(BarsPeriodType.Minute, 3);   // M3
+AddDataSeries(BarsPeriodType.Day, 1);      // Daily (V4)
 ```
 
 ### CISD Confirmation (Skill #4)

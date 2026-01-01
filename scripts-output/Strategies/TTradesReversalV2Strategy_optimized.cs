@@ -125,6 +125,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double fvgTop;
         private double fvgBottom;
         private int fvgDirection;  // 1 = bullish, -1 = bearish
+        
+
+        // Optimization tracking variables
+        private int barsInPosition;
+        private int consecutiveLossCount;
         #endregion
 
         protected override void OnStateChange()
@@ -173,6 +178,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BearishThreshold = 45.0;
 
                 EnableDebug = true;
+
+                // Optimization filter defaults
+                MinimumHoldBars = 10;
+                EntryStartHour = 7;
+                EntryEndHour = 9;
+                EnableMonday = true;
+                EnableTuesday = false;
+                EnableWednesday = false;
+                EnableThursday = true;
+                EnableFriday = true;
+                MaxConsecutiveLosses = 3;
             }
             else if (State == State.DataLoaded)
             {
@@ -316,6 +332,35 @@ else if (isContinuationSetup && previousDayClose < previousDayOpen)
             //==============================================================================
             // PHASE 3: EXECUTION WINDOW - ENTRY DETECTION
             //==============================================================================
+            
+            // Optimization: Entry time window filter
+            if (hour < EntryStartHour || hour >= EntryEndHour)
+            {
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | SKIP: Outside entry window");
+                // Don't return - allow position management but block new entries
+                if (Position.MarketPosition == MarketPosition.Flat) return;
+            }
+
+            // Optimization: Day-of-week filter
+            DayOfWeek dayOfWeek = barTime.DayOfWeek;
+            bool dayAllowed = (dayOfWeek == DayOfWeek.Monday && EnableMonday) ||
+                              (dayOfWeek == DayOfWeek.Tuesday && EnableTuesday) ||
+                              (dayOfWeek == DayOfWeek.Wednesday && EnableWednesday) ||
+                              (dayOfWeek == DayOfWeek.Thursday && EnableThursday) ||
+                              (dayOfWeek == DayOfWeek.Friday && EnableFriday);
+            if (!dayAllowed && Position.MarketPosition == MarketPosition.Flat)
+            {
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | SKIP: " + dayOfWeek + " trading disabled");
+                return;
+            }
+
+            // Optimization: Loss streak limiter
+            if (consecutiveLossCount >= MaxConsecutiveLosses && Position.MarketPosition == MarketPosition.Flat)
+            {
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | SKIP: Loss streak limit (" + consecutiveLossCount + " losses)");
+                return;
+            }
+
             if (!inExecution)
             {
                 ManageBreakeven();
@@ -675,6 +720,15 @@ if (EnableDebug && reversalStage > 0)
 
         protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
         {
+            // Track consecutive losses for streak limiter
+            if (marketPosition == MarketPosition.Flat && Position.Quantity == 0)
+            {
+                double pnl = Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0]);
+                if (pnl < 0)
+                    consecutiveLossCount++;
+                else if (pnl > 0)
+                    consecutiveLossCount = 0;
+            }
             if (marketPosition == MarketPosition.Flat)
             {
                 breakevenSet = false;
@@ -831,6 +885,50 @@ if (EnableDebug && reversalStage > 0)
         [NinjaScriptProperty]
         [Display(Name = "Enable Debug", Order = 1, GroupName = "4. Debug")]
         public bool EnableDebug { get; set; }
+        
+        // Optimization Filter: Minimum Hold Duration
+        [NinjaScriptProperty]
+        [Range(1, 50)]
+        [Display(Name = "Minimum Hold Bars", Order = 1, GroupName = "5. Optimization Filters")]
+        public int MinimumHoldBars { get; set; }
+
+        // Optimization Filter: Entry Time Window
+        [NinjaScriptProperty]
+        [Range(0, 23)]
+        [Display(Name = "Entry Start Hour", Order = 2, GroupName = "5. Optimization Filters")]
+        public int EntryStartHour { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 23)]
+        [Display(Name = "Entry End Hour", Order = 3, GroupName = "5. Optimization Filters")]
+        public int EntryEndHour { get; set; }
+
+        // Optimization Filter: Day-of-Week Trading
+        [NinjaScriptProperty]
+        [Display(Name = "Enable Monday", Order = 4, GroupName = "5. Optimization Filters")]
+        public bool EnableMonday { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Enable Tuesday", Order = 5, GroupName = "5. Optimization Filters")]
+        public bool EnableTuesday { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Enable Wednesday", Order = 6, GroupName = "5. Optimization Filters")]
+        public bool EnableWednesday { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Enable Thursday", Order = 7, GroupName = "5. Optimization Filters")]
+        public bool EnableThursday { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Enable Friday", Order = 8, GroupName = "5. Optimization Filters")]
+        public bool EnableFriday { get; set; }
+
+        // Optimization Filter: Loss Streak Limiter
+        [NinjaScriptProperty]
+        [Range(1, 20)]
+        [Display(Name = "Max Consecutive Losses", Order = 9, GroupName = "5. Optimization Filters")]
+        public int MaxConsecutiveLosses { get; set; }
         #endregion
     }
 }

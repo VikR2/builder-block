@@ -52,11 +52,54 @@ Three categories:
 - **complete_strategy** - Full tradeable system with entry/exit rules
 - **educational** - General concepts without actionable skills
 
-### Step 4: QA Validation
-Claude Code asks:
-- "Video intent appears to be [X] - proceed?"
-- "Found these skills: [list] - extract all?"
-- "Ambiguous skill match - create new or use existing?"
+### Step 4: QA Validation (REQUIRED - DO NOT SKIP)
+
+**CRITICAL:** Claude Code MUST stop and ask for user approval at these checkpoints. This is enforced via:
+- `.claude/rules/youtube-extraction-qa.md` - Claude rule
+- `.claude/skills/generate-from-youtube.md` - Skill requirements
+- `scripts/generate_from_youtube.py` - `--confirm-skills` defaults to True
+
+**Gate 1: Intent Classification**
+```
+Video Analysis Summary:
+- Title: "Liquidity Sweep Explained"
+- Duration: 18 minutes
+- Detected Intent: complete_strategy
+- Key Concepts:
+  - Liquidity Sweep Detection (high)
+  - Order Block Entry (high)
+  - Session Filters (medium)
+
+Is this classification correct?
+[Yes proceed] [Change intent] [Cancel]
+```
+
+**Gate 2: Skills Review**
+```
+Skills to Extract:
+
+NEW (will create in database):
+- Liquidity Sweep Detection - HTF sweep identification
+- HTF Order Block Entry - M5 OB after H1 sweep
+
+AMBIGUOUS (similar to existing):
+- "Session Targets" ~ existing #86 "Session Trading"
+  -> Recommend: Use existing
+
+Extract these skills?
+[Yes extract all] [Edit list] [Cancel]
+```
+
+**Gate 3: Artifact Generation** (complete_strategy only)
+```
+Strategy detected with full entry/exit rules.
+
+Generate artifacts?
+1. Strategy Architecture Document (SAD)? [Yes/No]
+2. NinjaTrader C# Strategy Code? [Yes/No]
+```
+
+**NEVER skip these gates.** If you want to bypass, use `--auto-confirm` (with warning).
 
 ### Step 5: Output Based on Intent
 | Intent | Skills to DB | Generate SAD |
@@ -133,21 +176,42 @@ python scripts/backfill_indicators.py [--dry-run]
 - `skills.needs_indicator` - 1 if category needs visual representation
 - `skills.dll_class_name` - Future: class name for DLL compilation
 
-## Auto-Generated Strategies (Complete Strategy Videos)
+## Complete Strategy Videos (with QA Gates)
 
 When a video is detected as a **complete strategy** (teaching a full trading system):
-1. Ambiguous skills are auto-saved (bypass confirmation)
+
+**With QA Gates (default):**
+1. Claude asks: "Intent: complete_strategy - proceed?" (Gate 1)
+2. Claude asks: "Skills to extract: [list] - proceed?" (Gate 2)
+3. Claude asks: "Generate SAD and C# code?" (Gate 3)
+4. User approves each step
+5. Skills saved, SAD generated, C# generated
+
+**With --auto-confirm (bypass):**
+1. Ambiguous skills are auto-saved
 2. Indicators are generated for new skills
 3. SAD is generated
-4. **Strategy.cs is auto-generated**
+4. Strategy.cs is auto-generated
+5. ⚠️ Warning printed about bypassed QA
 
 **Detection criteria:**
 - Has entry patterns (fair value gap, order block, sweep, etc.)
 - Has risk management (stop loss, take profit, etc.)
 - Has strategy keywords: "top-down", "chart lesson", "trade review", "full strategy", etc.
 
-**Output:**
+**QA-gated output:**
 ```
+[QA GATE 3] Complete strategy detected.
+  Generate Strategy Architecture Document? [Yes/No]
+  Generate NinjaTrader C# Strategy? [Yes/No]
+User: Yes, Yes
+[GENERATING] SAD: docs/strategies/TopDownChartLesson-SAD.md
+[GENERATING] Strategy: scripts-output/Strategies/TopDownChartLessonStrategy.cs
+```
+
+**Bypassed output (--auto-confirm):**
+```
+⚠️ [WARNING] Auto-confirm enabled - skipping skill confirmation QA gate
 [AUTO] Complete strategy video detected!
 [AUTO] Generating Strategy.cs for complete strategy...
 [AUTO] Strategy saved: scripts-output/Strategies/TopDownChartLessonStrategy.cs

@@ -64,7 +64,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             WAITING_FOR_OB_RETURN,
             ENTRY_TRIGGERED,
             MANAGING_TRADE,
-            TRADE_COMPLETE
+            TRADE_COMPLETE,
+            // V5: 11 AM Fade States
+            WAITING_FOR_FADE_CISD,   // Wait for CISD in opposite direction of original signal
+            WAITING_FOR_FADE_OB,     // Wait for pullback to LTF Order Block
+            FADE_ENTRY_TRIGGERED     // Enter opposite direction of original signal
         }
 
         public enum BiasType { Neutral, Bullish, Bearish }
@@ -87,6 +91,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool breakevenSet;
         private DateTime currentDate;
         private BiasType dailyBias;
+        
+        // V5: 11 AM Fade Tracking
+        private bool is11AMFadeMode;
+        private bool originalSignalWasLong;
+        private double fadeOBHigh;
+        private double fadeOBLow;
+        private double fadeSwingLevel;  // Stop loss reference from original setup
 
         // HTF Level Tracking (H1/M30 swing highs/lows)
         private double htfSwingHigh;
@@ -227,6 +238,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 PartialTargetR = 1.0;
                 UseTrailingStop = true;
                 TrailingSwingLookback = 5;
+                
+                // V4: HTF Bias Filter (disabled - too aggressive)
+                UseHTFBiasFilter = false;
+                HTFSwingLookback = 5;
+                
+                // V5: 11 AM Fade Strategy
+                Use11AMFade = true;
+                FadeHourStart = 11;
+                FadeHourEnd = 12;
             }
             else if (State == State.Configure)
             {
@@ -235,9 +255,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // BarsInProgress 1 = H1 (60-min) - for sweep detection
                 // BarsInProgress 2 = M30 (30-min) - for sweep detection
                 // BarsInProgress 3 = M3 (3-min) - for OB when M30 sweep
+                // BarsInProgress 4 = Daily - for HTF bias filter (V4)
                 AddDataSeries(BarsPeriodType.Minute, 60);  // H1
                 AddDataSeries(BarsPeriodType.Minute, 30);  // M30
                 AddDataSeries(BarsPeriodType.Minute, 3);   // M3
+                AddDataSeries(BarsPeriodType.Day, 1);      // Daily (V4)
             }
             else if (State == State.DataLoaded)
             {
@@ -260,6 +282,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             
             if (CurrentBars[0] < BarsRequiredToTrade) return;
             if (BarsInProgress > 0 && CurrentBars[BarsInProgress] < BarsRequiredToTrade) return;
+            
+            // V4: Daily bias calculation runs on Daily (4)
+            if (BarsInProgress == 4)
+            {
+                if (UseHTFBiasFilter)
+                    UpdateDailyBias();
+                return;
+            }
             
             // HTF sweep detection runs on H1 (1) and M30 (2)
             if (BarsInProgress == 1 || BarsInProgress == 2)
@@ -367,6 +397,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 case StrategyState.TRADE_COMPLETE:
                     HandleTradeComplete(isInTradingSession);
+                    break;
+                    
+                // V5: 11 AM Fade States
+                case StrategyState.WAITING_FOR_FADE_CISD:
+                    HandleWaitingForFadeCISD();
+                    break;
+                    
+                case StrategyState.WAITING_FOR_FADE_OB:
+                    HandleWaitingForFadeOB();
+                    break;
+                    
+                case StrategyState.FADE_ENTRY_TRIGGERED:
+                    HandleFadeEntryTriggered();
                     break;
             }
 
@@ -617,9 +660,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // Determine bias-based direction filter
-            bool allowLong = dailyBias == BiasType.Bullish || dailyBias == BiasType.Neutral;
-            bool allowShort = dailyBias == BiasType.Bearish || dailyBias == BiasType.Neutral;
+            // Direction filter - V3: Allow all directions (bias filter removed)
+            // HTF bias filter was too aggressive, filtered winning trades
+            bool allowLong = true;
+            bool allowShort = true;
 
             // Premium/Discount filter
             if (UsePremiumDiscountFilter)
@@ -779,6 +823,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            // V5: Check for 11 AM fade window
+            int currentHour = Time[0].Hour;
+            if (Use11AMFade && currentHour >= FadeHourStart && currentHour < FadeHourEnd)
+            {
+                // Instead of taking this setup, enter fade mode
+                is11AMFadeMode = true;
+                originalSignalWasLong = (sweepDirection == 1);
+                fadeSwingLevel = sweepPrice;  // Save for stop loss reference
+                
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | V5 FADE: 11AM setup detected | Original signal was " + 
+                    (originalSignalWasLong ? "LONG" : "SHORT") + " | Waiting for opposite CISD");
+                
+                // Reset OB tracking for fade setup
+                orderBlockIdentified = false;
+                priceReturnedToOB = false;
+                obRespected = false;
+                
+                currentState = StrategyState.WAITING_FOR_FADE_CISD;
+                return;
+            }
+
             // Entry at OPEN of NEXT candle after OB confirmed
             tradeDirection = sweepDirection;
 
@@ -903,6 +968,283 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 currentState = StrategyState.WAITING_FOR_SESSION;
             }
+        }
+        
+        /// <summary>
+        /// V5: Wait for CISD in OPPOSITE direction of original 11 AM signal
+        /// </summary>
+        private void HandleWaitingForFadeCISD()
+        {
+            // Session check
+            if (!isInTradingSession)
+            {
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE: Outside session, resetting");
+                ResetFadeState();
+                currentState = StrategyState.WAITING_FOR_SESSION;
+                return;
+            }
+            
+            // Check for CISD in opposite direction of original signal
+            // CISD = Change in State of Delivery (close vs open comparison)
+            bool bullishCISD = Close[0] > Open[0];  // Bullish candle = bullish CISD
+            bool bearishCISD = Close[0] < Open[0];  // Bearish candle = bearish CISD
+            
+            if (originalSignalWasLong)
+            {
+                // Original was long setup (bullish sweep) → Wait for bearish CISD to fade short
+                if (bearishCISD)
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE CISD: Bearish CISD confirmed | Looking for bearish OB");
+                    
+                    // Find a bearish order block (last up candle before this CISD)
+                    FindFadeOrderBlock(-1);  // -1 = looking for short entry
+                    
+                    currentState = StrategyState.WAITING_FOR_FADE_OB;
+                }
+            }
+            else
+            {
+                // Original was short setup (bearish sweep) → Wait for bullish CISD to fade long
+                if (bullishCISD)
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE CISD: Bullish CISD confirmed | Looking for bullish OB");
+                    
+                    // Find a bullish order block (last down candle before this CISD)
+                    FindFadeOrderBlock(1);  // 1 = looking for long entry
+                    
+                    currentState = StrategyState.WAITING_FOR_FADE_OB;
+                }
+            }
+            
+            // Timeout: if we don't get opposite CISD within reasonable time
+            if (CurrentBar - sweepBar > OBLookback * 3)
+            {
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE: CISD timeout, resetting");
+                ResetFadeState();
+                currentState = StrategyState.WAITING_FOR_SWEEP;
+            }
+        }
+        
+        /// <summary>
+        /// V5: Wait for price to return to LTF Order Block for fade entry
+        /// </summary>
+        private void HandleWaitingForFadeOB()
+        {
+            // Session check
+            if (!isInTradingSession)
+            {
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE OB: Outside session, resetting");
+                ResetFadeState();
+                currentState = StrategyState.WAITING_FOR_SESSION;
+                return;
+            }
+            
+            if (fadeOBHigh == 0 && fadeOBLow == 0)
+            {
+                // No valid OB found
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE OB: No valid OB, resetting");
+                ResetFadeState();
+                currentState = StrategyState.WAITING_FOR_SWEEP;
+                return;
+            }
+            
+            // Calculate OB midpoint for pullback validation
+            double obRange = fadeOBHigh - fadeOBLow;
+            double obPullbackLevel = fadeOBLow + (obRange * OBPullbackPercent / 100.0);
+            
+            int fadeDirection = originalSignalWasLong ? -1 : 1;  // Opposite of original
+            
+            if (fadeDirection == 1)  // Fade LONG (original was short)
+            {
+                // Price enters bullish OB from above
+                if (Low[0] <= fadeOBHigh && Low[0] >= fadeOBLow)
+                {
+                    bool pullbackMet = Low[0] <= obPullbackLevel;
+                    
+                    if (Close[0] > fadeOBLow && pullbackMet)
+                    {
+                        idealEntryPrice = fadeOBHigh;
+                        if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE OB RESPECTED (Long) | Entry @ " + idealEntryPrice.ToString("F2"));
+                        
+                        currentState = StrategyState.FADE_ENTRY_TRIGGERED;
+                    }
+                }
+            }
+            else  // Fade SHORT (original was long)
+            {
+                // Price enters bearish OB from below
+                if (High[0] >= fadeOBLow && High[0] <= fadeOBHigh)
+                {
+                    double obPullbackLevelShort = fadeOBHigh - (obRange * OBPullbackPercent / 100.0);
+                    bool pullbackMet = High[0] >= obPullbackLevelShort;
+                    
+                    if (Close[0] < fadeOBHigh && pullbackMet)
+                    {
+                        idealEntryPrice = fadeOBLow;
+                        if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE OB RESPECTED (Short) | Entry @ " + idealEntryPrice.ToString("F2"));
+                        
+                        currentState = StrategyState.FADE_ENTRY_TRIGGERED;
+                    }
+                }
+            }
+            
+            // Timeout
+            if (CurrentBar - sweepBar > OBLookback * 4)
+            {
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE OB: Timeout, resetting");
+                ResetFadeState();
+                currentState = StrategyState.WAITING_FOR_SWEEP;
+            }
+        }
+        
+        /// <summary>
+        /// V5: Execute fade trade entry
+        /// </summary>
+        private void HandleFadeEntryTriggered()
+        {
+            if (!isInTradingSession)
+            {
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE ENTRY: Outside session, resetting");
+                ResetFadeState();
+                currentState = StrategyState.WAITING_FOR_SESSION;
+                return;
+            }
+            
+            if (tradeTaken || Position.MarketPosition != MarketPosition.Flat)
+            {
+                currentState = StrategyState.MANAGING_TRADE;
+                return;
+            }
+            
+            // Fade direction is OPPOSITE of original signal
+            tradeDirection = originalSignalWasLong ? -1 : 1;
+            
+            // Stop loss at the original setup's swing level (the trap)
+            if (tradeDirection == 1)  // Fade Long
+            {
+                stopLoss = fadeSwingLevel - (StopBufferTicks * TickSize);
+            }
+            else  // Fade Short
+            {
+                stopLoss = fadeSwingLevel + (StopBufferTicks * TickSize);
+            }
+            
+            // Calculate risk distance
+            double riskDistance = Math.Abs(Close[0] - stopLoss);
+            double riskDistanceTicks = riskDistance / TickSize;
+            
+            // Validate stop loss distance
+            if (riskDistanceTicks > MaxStopLossTicks || riskDistanceTicks <= 0)
+            {
+                if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE SKIP: Stop distance " +
+                    riskDistanceTicks.ToString("F0") + " ticks exceeds max " + MaxStopLossTicks);
+                ResetFadeState();
+                currentState = StrategyState.WAITING_FOR_SWEEP;
+                return;
+            }
+            
+            // Calculate 2R target
+            double idealRisk = Math.Abs(idealEntryPrice - stopLoss);
+            
+            if (tradeDirection == 1)  // Fade Long
+            {
+                takeProfit = idealEntryPrice + (TargetRMultiple * idealRisk);
+                
+                if (takeProfit <= Close[0])
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE SKIP LONG: Target " +
+                        takeProfit.ToString("F2") + " <= Entry " + Close[0].ToString("F2"));
+                    ResetFadeState();
+                    currentState = StrategyState.WAITING_FOR_SWEEP;
+                    return;
+                }
+            }
+            else  // Fade Short
+            {
+                takeProfit = idealEntryPrice - (TargetRMultiple * idealRisk);
+                
+                if (takeProfit >= Close[0])
+                {
+                    if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE SKIP SHORT: Target " +
+                        takeProfit.ToString("F2") + " >= Entry " + Close[0].ToString("F2"));
+                    ResetFadeState();
+                    currentState = StrategyState.WAITING_FOR_SWEEP;
+                    return;
+                }
+            }
+            
+            entryPrice = Close[0];
+            breakevenSet = false;
+            tradeTaken = true;
+            barsInConsolidation = 0;
+            
+            if (tradeDirection == 1)
+            {
+                activeOrderName = "LumiFadeLong";
+                EnterLong(activeOrderName);
+                Print(">>> FADE LONG @ " + entryPrice.ToString("F2") + " SL:" + stopLoss.ToString("F2") +
+                    " TP:" + takeProfit.ToString("F2") + " (Fading 11AM short trap)");
+            }
+            else
+            {
+                activeOrderName = "LumiFadeShort";
+                EnterShort(activeOrderName);
+                Print(">>> FADE SHORT @ " + entryPrice.ToString("F2") + " SL:" + stopLoss.ToString("F2") +
+                    " TP:" + takeProfit.ToString("F2") + " (Fading 11AM long trap)");
+            }
+            
+            ResetFadeState();  // Clear fade tracking
+            currentState = StrategyState.MANAGING_TRADE;
+        }
+        
+        /// <summary>
+        /// V5: Find Order Block for fade entry
+        /// </summary>
+        private void FindFadeOrderBlock(int direction)
+        {
+            fadeOBHigh = 0;
+            fadeOBLow = 0;
+            
+            // Look back to find the last opposing candle
+            for (int i = 1; i <= OBLookback && i < CurrentBar; i++)
+            {
+                if (direction == 1)  // Looking for bullish OB (last down candle)
+                {
+                    if (Close[i] < Open[i])  // Bearish candle
+                    {
+                        fadeOBHigh = High[i];
+                        fadeOBLow = Low[i];
+                        
+                        if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE BULLISH OB FOUND: " +
+                            fadeOBLow.ToString("F2") + " - " + fadeOBHigh.ToString("F2"));
+                        break;
+                    }
+                }
+                else  // Looking for bearish OB (last up candle)
+                {
+                    if (Close[i] > Open[i])  // Bullish candle
+                    {
+                        fadeOBHigh = High[i];
+                        fadeOBLow = Low[i];
+                        
+                        if (EnableDebug) Print(Time[0].ToString("HH:mm") + " | FADE BEARISH OB FOUND: " +
+                            fadeOBLow.ToString("F2") + " - " + fadeOBHigh.ToString("F2"));
+                        break;
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// V5: Reset fade tracking variables
+        /// </summary>
+        private void ResetFadeState()
+        {
+            is11AMFadeMode = false;
+            originalSignalWasLong = false;
+            fadeOBHigh = 0;
+            fadeOBLow = 0;
+            fadeSwingLevel = 0;
         }
 
         #endregion
@@ -1155,6 +1497,44 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        /// <summary>
+        /// V4.1: Update daily bias using SMA trend detection
+        /// Price above SMA = Bullish (longs only), below = Bearish (shorts only)
+        /// </summary>
+        private void UpdateDailyBias()
+        {
+            // Need enough bars for SMA calculation
+            if (CurrentBars[4] < HTFSwingLookback) return;
+            
+            // Calculate simple moving average of daily closes
+            double smaSum = 0;
+            for (int i = 0; i < HTFSwingLookback; i++)
+            {
+                smaSum += Closes[4][i];
+            }
+            double dailySMA = smaSum / HTFSwingLookback;
+            
+            // Get previous day's close (most recent completed daily bar)
+            double prevClose = Closes[4][1];
+            
+            // Determine bias: above SMA = bullish, below = bearish
+            // No neutral - always have a direction for stricter filtering
+            if (prevClose > dailySMA)
+            {
+                dailyBias = BiasType.Bullish;
+            }
+            else
+            {
+                dailyBias = BiasType.Bearish;
+            }
+            
+            if (EnableDebug && Times[4][0].Date != Times[4][1].Date)
+            {
+                Print("DAILY BIAS UPDATE: " + dailyBias.ToString() + 
+                    " (Close: " + prevClose.ToString("F2") + ", SMA" + HTFSwingLookback + ": " + dailySMA.ToString("F2") + ")");
+            }
+        }
+
         private void ManagePosition()
         {
             if (Position.MarketPosition == MarketPosition.Flat) return;
@@ -1187,6 +1567,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Reset active TF tracking
             activeSweepTF = 0;
             activeOBTF = 0;
+            
+            // V5: Reset fade state
+            ResetFadeState();
         }
 
         private void ResetDailyState()
@@ -1422,9 +1805,34 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Trailing Swing Lookback", Order = 5, GroupName = "7. V3 Trade Management")]
         public int TrailingSwingLookback { get; set; }
         
+        // V4: HTF Bias Filter
+        [NinjaScriptProperty]
+        [Display(Name = "Use HTF Bias Filter", Order = 1, GroupName = "8. V4 HTF Bias")]
+        public bool UseHTFBiasFilter { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(3, 20)]
+        [Display(Name = "HTF Swing Lookback (Days)", Order = 2, GroupName = "8. V4 HTF Bias")]
+        public int HTFSwingLookback { get; set; }
+        
+        // V5: 11 AM Fade Strategy
+        [NinjaScriptProperty]
+        [Display(Name = "Use 11 AM Fade", Order = 1, GroupName = "9. V5 11AM Fade")]
+        public bool Use11AMFade { get; set; }
+        
+        [NinjaScriptProperty]
+        [Range(9, 12)]
+        [Display(Name = "Fade Hour Start", Order = 2, GroupName = "9. V5 11AM Fade")]
+        public int FadeHourStart { get; set; }
+        
+        [NinjaScriptProperty]
+        [Range(10, 13)]
+        [Display(Name = "Fade Hour End", Order = 3, GroupName = "9. V5 11AM Fade")]
+        public int FadeHourEnd { get; set; }
+        
         // Debug
         [NinjaScriptProperty]
-        [Display(Name = "Enable Debug Output", Order = 1, GroupName = "8. Debug")]
+        [Display(Name = "Enable Debug Output", Order = 1, GroupName = "10. Debug")]
         public bool EnableDebug { get; set; }
 
         #endregion
