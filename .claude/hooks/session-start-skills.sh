@@ -4,4 +4,4 @@
 set -e
 
 # Pass stdin to Python handler
-python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-skills.py"
+python "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-skills.py"
