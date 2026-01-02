@@ -8,7 +8,10 @@ This rule applies when:
 - User asks to "extract from YouTube"
 - User mentions "youtube extraction"
 - User asks to process a youtube.com or youtu.be URL
-- User invokes the /generate-from-youtube skill
+- User invokes the `/youtube` skill (primary)
+- User invokes the `/generate-from-youtube` skill (legacy)
+
+**Recommended:** Use `/youtube <url>` for the orchestrated workflow with enforced checkpoints.
 
 ## Checkpoint 1: Video Intent Classification
 
