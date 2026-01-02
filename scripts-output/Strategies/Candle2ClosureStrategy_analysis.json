@@ -1,0 +1,764 @@
+{
+  "analyses": [
+    {
+      "segment_index": 0,
+      "timestamp": "0:00",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Demonstration of trading concept"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.839,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "context_setup",
+        "connects_to_segments": [],
+        "builds_on": null
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.87,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 1,
+      "timestamp": "0:30",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Explanation of exit/target rules"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.891,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "exit_rule",
+        "connects_to_segments": [],
+        "builds_on": "Demonstration of trading concept"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.88,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 2,
+      "timestamp": "1:00",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Explanation of exit/target rules"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.887,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "exit_rule",
+        "connects_to_segments": [],
+        "builds_on": "Explanation of exit/target rules"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.88,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 3,
+      "timestamp": "1:30",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Explanation of exit/target rules"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.78,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "exit_rule",
+        "connects_to_segments": [],
+        "builds_on": "Explanation of exit/target rules"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.86,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 4,
+      "timestamp": "2:00",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Explanation of exit/target rules"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 66,
+        "matched_skill_name": "Candle 4 Expansion (TTrades)",
+        "similarity": 0.77,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "exit_rule",
+        "connects_to_segments": [],
+        "builds_on": "Explanation of exit/target rules"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 4 Expansion (TTrades)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.85,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 5,
+      "timestamp": "2:30",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Explanation of exit/target rules"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 65,
+        "matched_skill_name": "Candle 3 Closure (Confirmation)",
+        "similarity": 0.77,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "exit_rule",
+        "connects_to_segments": [],
+        "builds_on": "Explanation of exit/target rules"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 3 Closure (Confirmation)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.85,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 6,
+      "timestamp": "3:00",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Explanation of exit/target rules"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 66,
+        "matched_skill_name": "Candle 4 Expansion (TTrades)",
+        "similarity": 0.787,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "exit_rule",
+        "connects_to_segments": [],
+        "builds_on": "Explanation of exit/target rules"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 4 Expansion (TTrades)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.86,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 7,
+      "timestamp": "3:30",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Explanation of exit/target rules"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.811,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "exit_rule",
+        "connects_to_segments": [],
+        "builds_on": "Explanation of exit/target rules"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.86,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 8,
+      "timestamp": "4:30",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Explanation of exit/target rules"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.787,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "exit_rule",
+        "connects_to_segments": [],
+        "builds_on": "Explanation of exit/target rules"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.86,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 9,
+      "timestamp": "5:00",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Explanation of exit/target rules"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.779,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "exit_rule",
+        "connects_to_segments": [],
+        "builds_on": "Explanation of exit/target rules"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.86,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 10,
+      "timestamp": "5:30",
+      "observation": {
+        "visual": "Chart shows price chart, support/resistance levels",
+        "concept": "Demonstration of exit/target rules"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 82,
+        "matched_skill_name": "Expansion Phase",
+        "similarity": 0.764,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "exit_rule",
+        "connects_to_segments": [],
+        "builds_on": "Explanation of exit/target rules"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Expansion Phase"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.85,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 11,
+      "timestamp": "6:30",
+      "observation": {
+        "visual": "Chart shows price chart, support/resistance levels",
+        "concept": "Demonstration of risk management/stop placement"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 82,
+        "matched_skill_name": "Expansion Phase",
+        "similarity": 0.784,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "risk_management",
+        "connects_to_segments": [],
+        "builds_on": "Demonstration of exit/target rules"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Expansion Phase"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.86,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 12,
+      "timestamp": "7:30",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Demonstration of trading concept"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.747,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "context_setup",
+        "connects_to_segments": [],
+        "builds_on": "Demonstration of risk management/stop placement"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.85,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 13,
+      "timestamp": "8:00",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Demonstration of trading concept"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.772,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "context_setup",
+        "connects_to_segments": [],
+        "builds_on": "Demonstration of trading concept"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.85,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 14,
+      "timestamp": "8:30",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Demonstration of trading concept"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.81,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "context_setup",
+        "connects_to_segments": [],
+        "builds_on": "Demonstration of trading concept"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.86,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 15,
+      "timestamp": "9:30",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Demonstration of trading concept"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.749,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "context_setup",
+        "connects_to_segments": [],
+        "builds_on": "Demonstration of trading concept"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.85,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 16,
+      "timestamp": "11:00",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Demonstration of trading concept"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 66,
+        "matched_skill_name": "Candle 4 Expansion (TTrades)",
+        "similarity": 0.75,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "context_setup",
+        "connects_to_segments": [],
+        "builds_on": "Demonstration of trading concept"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 4 Expansion (TTrades)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.85,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 17,
+      "timestamp": "11:30",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Demonstration of trading concept"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 66,
+        "matched_skill_name": "Candle 4 Expansion (TTrades)",
+        "similarity": 0.759,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "context_setup",
+        "connects_to_segments": [],
+        "builds_on": "Demonstration of trading concept"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 4 Expansion (TTrades)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.85,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    },
+    {
+      "segment_index": 18,
+      "timestamp": "12:30",
+      "observation": {
+        "visual": "Chart shows price chart",
+        "concept": "Demonstration of trading concept"
+      },
+      "skill_correlation": {
+        "matched_skill_id": 64,
+        "matched_skill_name": "Candle 2 Closure (Reversal)",
+        "similarity": 0.828,
+        "delta": "Covers similar concepts",
+        "is_new_skill": false
+      },
+      "context_role": {
+        "role": "context_setup",
+        "connects_to_segments": [],
+        "builds_on": "Demonstration of trading concept"
+      },
+      "evaluation": {
+        "pros": [
+          "Matches known skill: Candle 2 Closure (Reversal)"
+        ],
+        "cons": [
+          "May need market condition filters",
+          "Backtesting required"
+        ]
+      },
+      "reflection": {
+        "confidence": 0.87,
+        "open_questions": [
+          "What timeframe is this applicable to?",
+          "Where should stop loss be placed?",
+          "What is the target/take profit?"
+        ]
+      },
+      "extracted_parameters": {}
+    }
+  ],
+  "accumulated_understanding": {
+    "strategy_flow": [
+      "context_setup",
+      "exit_rule",
+      "exit_rule",
+      "exit_rule",
+      "exit_rule",
+      "exit_rule",
+      "exit_rule",
+      "exit_rule",
+      "exit_rule",
+      "exit_rule",
+      "exit_rule",
+      "risk_management",
+      "context_setup",
+      "context_setup",
+      "context_setup",
+      "context_setup",
+      "context_setup",
+      "context_setup",
+      "context_setup"
+    ],
+    "matched_skills": [
+      64,
+      66,
+      65,
+      82
+    ],
+    "new_skills_needed": [],
+    "parameters": {},
+    "overall_confidence": 0.8583333333333332,
+    "open_questions": [
+      "What timeframe is this applicable to?",
+      "Where should stop loss be placed?",
+      "What is the target/take profit?"
+    ],
+    "context_summary": "context_setup \u2192 exit_rule \u2192 risk_management"
+  }
+}

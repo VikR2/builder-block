@@ -5,6 +5,11 @@
  *
  * Provides tools for searching and saving NinjaTrader trading skills.
  * Auto-loads relevant skills into Claude Code conversation context.
+ *
+ * Features:
+ * - Hybrid search: FTS5 keyword search + sqlite-vec vector similarity
+ * - Reciprocal Rank Fusion (RRF) for combining search results
+ * - Local embeddings via nomic-embed-text-v1.5
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -15,8 +20,17 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import Database from "better-sqlite3";
+import * as sqliteVec from "sqlite-vec";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import {
+  embed,
+  embedQuery,
+  embedBatch,
+  createSkillText,
+  embeddingToBuffer,
+  EMBEDDING_DIM,
+} from "./embeddings.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -102,6 +116,139 @@ interface Skill {
   complexity: string;
   nlp_keywords: string;
   common_combinations?: string;
+  embedding?: Buffer;
+}
+
+// Check if vector search is available
+let vectorSearchEnabled = false;
+
+/**
+ * Initialize database with sqlite-vec extension.
+ * Creates vec_skills table if it doesn't exist.
+ */
+function initVectorSearch(db: Database.Database): boolean {
+  try {
+    sqliteVec.load(db);
+
+    // Check if vec_skills table exists, create if not
+    const tableExists = db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='vec_skills'"
+      )
+      .get();
+
+    if (!tableExists) {
+      db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS vec_skills USING vec0(
+          skill_id INTEGER PRIMARY KEY,
+          embedding float[${EMBEDDING_DIM}]
+        )
+      `);
+      console.error("Created vec_skills virtual table");
+    }
+
+    // Verify sqlite-vec is working
+    const version = db.prepare("SELECT vec_version()").get() as {
+      "vec_version()": string;
+    };
+    console.error(`sqlite-vec loaded: v${version["vec_version()"]}`);
+
+    return true;
+  } catch (err) {
+    console.error("Failed to load sqlite-vec:", err);
+    return false;
+  }
+}
+
+/**
+ * Perform hybrid search using FTS5 and vector similarity.
+ * Combines results using Reciprocal Rank Fusion (RRF).
+ */
+async function hybridSearch(
+  db: Database.Database,
+  query: string,
+  limit: number = 10
+): Promise<Skill[]> {
+  // Generate query embedding
+  const queryEmbedding = await embedQuery(query);
+
+  // FTS5 keyword search
+  const ftsResults = db
+    .prepare(
+      `
+      SELECT s.id, row_number() OVER (ORDER BY rank) as rn
+      FROM skills s
+      JOIN skills_fts fts ON s.id = fts.rowid
+      WHERE skills_fts MATCH ?
+      LIMIT ?
+    `
+    )
+    .all(query, limit * 2) as { id: number; rn: number }[];
+
+  // Vector similarity search
+  let vecResults: { skill_id: number; distance: number }[] = [];
+  if (vectorSearchEnabled) {
+    try {
+      vecResults = db
+        .prepare(
+          `
+          SELECT skill_id, distance
+          FROM vec_skills
+          WHERE embedding MATCH ?
+          ORDER BY distance
+          LIMIT ?
+        `
+        )
+        .all(queryEmbedding.buffer, limit * 2) as {
+        skill_id: number;
+        distance: number;
+      }[];
+    } catch (err) {
+      console.error("Vector search failed, falling back to FTS only:", err);
+    }
+  }
+
+  // Combine with RRF (k=60)
+  const k = 60;
+  const scores = new Map<number, { score: number; sources: string[] }>();
+
+  // Add FTS scores
+  ftsResults.forEach(({ id, rn }) => {
+    const existing = scores.get(id) || { score: 0, sources: [] };
+    existing.score += 1 / (k + rn);
+    existing.sources.push("fts");
+    scores.set(id, existing);
+  });
+
+  // Add vector scores
+  vecResults.forEach(({ skill_id, distance }, idx) => {
+    const existing = scores.get(skill_id) || { score: 0, sources: [] };
+    existing.score += 1 / (k + idx + 1);
+    existing.sources.push("vec");
+    scores.set(skill_id, existing);
+  });
+
+  // Sort by combined score
+  const sortedIds = Array.from(scores.entries())
+    .sort((a, b) => b[1].score - a[1].score)
+    .slice(0, limit)
+    .map(([id]) => id);
+
+  if (sortedIds.length === 0) {
+    return [];
+  }
+
+  // Fetch full skill records
+  const placeholders = sortedIds.map(() => "?").join(",");
+  const skills = db
+    .prepare(
+      `SELECT * FROM skills WHERE id IN (${placeholders})`
+    )
+    .all(...sortedIds) as Skill[];
+
+  // Maintain RRF order
+  const skillMap = new Map(skills.map((s) => [s.id, s]));
+  return sortedIds.map((id) => skillMap.get(id)!).filter(Boolean);
 }
 
 // Define available tools
@@ -380,21 +527,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const query = args.query as string;
         const limit = (args.limit as number) || 10;
 
-        // Use FTS5 search for relevant skills
-        const skills = db
-          .prepare(
+        // Initialize vector search for this connection
+        vectorSearchEnabled = initVectorSearch(db);
+
+        // Use hybrid search (FTS5 + vector similarity with RRF)
+        let skills: Skill[];
+        try {
+          skills = await hybridSearch(db, query, limit);
+        } catch (err) {
+          // Fallback to FTS-only if hybrid fails
+          console.error("Hybrid search failed, using FTS fallback:", err);
+          skills = db
+            .prepare(
+              `
+              SELECT s.*
+              FROM skills s
+              JOIN skills_fts fts ON s.id = fts.rowid
+              WHERE skills_fts MATCH ?
+              ORDER BY rank
+              LIMIT ?
             `
-          SELECT s.*
-          FROM skills s
-          JOIN skills_fts fts ON s.id = fts.rowid
-          WHERE skills_fts MATCH ?
-          ORDER BY rank
-          LIMIT ?
-        `
-          )
-          .all(query, limit);
+            )
+            .all(query, limit) as Skill[];
+        }
 
         if (skills.length === 0) {
+          db.close();
           return {
             content: [
               {
@@ -406,7 +564,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         // Format results
-        const formattedSkills = skills.map((skill: any) => ({
+        const formattedSkills = skills.map((skill: Skill) => ({
+          id: skill.id,
           name: skill.name,
           category: skill.category,
           subcategory: skill.subcategory,
@@ -416,16 +575,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           variables: JSON.parse(skill.variables_required || "[]"),
           dependencies: JSON.parse(skill.dependencies || "[]"),
           keywords: JSON.parse(skill.nlp_keywords || "[]"),
+          has_embedding: !!skill.embedding,
         }));
+
+        db.close();
 
         return {
           content: [
             {
               type: "text",
-              text: `Found ${skills.length} relevant skill(s):\n\n${formattedSkills
+              text: `Found ${skills.length} relevant skill(s) using ${vectorSearchEnabled ? "hybrid" : "FTS"} search:\n\n${formattedSkills
                 .map(
                   (s, i) =>
-                    `${i + 1}. **${s.name}** (${s.category}${s.subcategory ? ` → ${s.subcategory}` : ""})\n   ${s.description}\n   Complexity: ${s.complexity}\n   Variables: ${s.variables.join(", ")}\n\n   \`\`\`csharp\n   ${s.code_snippet.substring(0, 300)}${s.code_snippet.length > 300 ? "..." : ""}\n   \`\`\``
+                    `${i + 1}. **${s.name}** [#${s.id}] (${s.category}${s.subcategory ? ` -> ${s.subcategory}` : ""})\n   ${s.description}\n   Complexity: ${s.complexity}\n   Variables: ${s.variables.join(", ")}\n\n   \`\`\`csharp\n   ${(s.code_snippet || "").substring(0, 300)}${(s.code_snippet || "").length > 300 ? "..." : ""}\n   \`\`\``
                 )
                 .join("\n\n")}`,
             },
@@ -434,7 +596,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "save_skill": {
-        const name = args.name as string;
+        const skillName = args.name as string;
         const category = args.category as string;
         const subcategory = (args.subcategory as string) || null;
         const description = args.description as string;
@@ -444,21 +606,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const complexity = (args.complexity as string) || "medium";
         const dependencies = (args.dependencies as string[]) || [];
 
-        const slug = slugify(name);
+        const slug = slugify(skillName);
 
-        // Insert skill
+        // Generate embedding for the skill
+        const textToEmbed = createSkillText(skillName, description, keywords);
+        let embeddingBuffer: Buffer | null = null;
+        let vectorInserted = false;
+
+        try {
+          const embeddingArray = await embed(textToEmbed);
+          embeddingBuffer = embeddingToBuffer(embeddingArray);
+        } catch (err) {
+          console.error("Failed to generate embedding:", err);
+          // Continue without embedding
+        }
+
+        // Initialize vector search
+        vectorSearchEnabled = initVectorSearch(db);
+
+        // Insert skill with embedding
         const result = db
           .prepare(
             `
-          INSERT INTO skills (
-            name, slug, category, subcategory, description,
-            code_snippet, variables_required, dependencies,
-            complexity, nlp_keywords
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `
+            INSERT INTO skills (
+              name, slug, category, subcategory, description,
+              code_snippet, variables_required, dependencies,
+              complexity, nlp_keywords, embedding
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `
           )
           .run(
-            name,
+            skillName,
             slug,
             category,
             subcategory,
@@ -467,8 +645,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             JSON.stringify(variables),
             JSON.stringify(dependencies),
             complexity,
-            JSON.stringify(keywords)
+            JSON.stringify(keywords),
+            embeddingBuffer
           );
+
+        const skillId = result.lastInsertRowid as number;
+
+        // Also insert into vector table if we have an embedding
+        if (embeddingBuffer && vectorSearchEnabled) {
+          try {
+            db.prepare(
+              "INSERT INTO vec_skills (skill_id, embedding) VALUES (?, ?)"
+            ).run(skillId, embeddingBuffer);
+            vectorInserted = true;
+          } catch (err) {
+            console.error("Failed to insert into vec_skills:", err);
+          }
+        }
 
         db.close();
 
@@ -476,7 +669,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: "text",
-              text: `✅ Skill "${name}" saved successfully!\n\nID: ${result.lastInsertRowid}\nSlug: ${slug}\nCategory: ${category}\nComplexity: ${complexity}\n\nYou can now search for this skill using keywords: ${keywords.join(", ")}`,
+              text: `Skill "${skillName}" saved successfully!\n\nID: ${skillId}\nSlug: ${slug}\nCategory: ${category}\nComplexity: ${complexity}\nEmbedding: ${embeddingBuffer ? "generated" : "skipped"}\nVector index: ${vectorInserted ? "indexed" : "not indexed"}\n\nYou can now search for this skill using keywords: ${keywords.join(", ")}`,
             },
           ],
         };
@@ -1078,13 +1271,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const slug = slugify(skillName);
 
+        // Generate embedding for the skill
+        const textToEmbed = createSkillText(skillName, description, keywords);
+        let embeddingBuffer: Buffer | null = null;
+        let vectorInserted = false;
+
+        try {
+          const embeddingArray = await embed(textToEmbed);
+          embeddingBuffer = embeddingToBuffer(embeddingArray);
+        } catch (err) {
+          console.error("Failed to generate embedding:", err);
+          // Continue without embedding
+        }
+
+        // Initialize vector search
+        vectorSearchEnabled = initVectorSearch(db);
+
         // Use transaction to ensure atomicity
         const insertSkill = db.prepare(`
           INSERT INTO skills (
             name, slug, category, subcategory, description,
             code_snippet, variables_required, dependencies,
-            complexity, nlp_keywords
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            complexity, nlp_keywords, embedding
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         const insertSource = db.prepare(`
@@ -1094,12 +1303,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ) VALUES (?, ?, ?, ?, ?, datetime('now'))
         `);
 
+        const insertVec = db.prepare(
+          "INSERT INTO vec_skills (skill_id, embedding) VALUES (?, ?)"
+        );
+
         let skillId: number;
         let sourceId: number;
 
         try {
           const transaction = db.transaction(() => {
-            // Insert skill
+            // Insert skill with embedding
             const skillResult = insertSkill.run(
               skillName,
               slug,
@@ -1110,7 +1323,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               JSON.stringify(variables),
               JSON.stringify(dependencies),
               complexity,
-              JSON.stringify(keywords)
+              JSON.stringify(keywords),
+              embeddingBuffer
             );
 
             skillId = skillResult.lastInsertRowid as number;
@@ -1125,6 +1339,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             );
 
             sourceId = sourceResult.lastInsertRowid as number;
+
+            // Insert into vector table if we have an embedding
+            if (embeddingBuffer && vectorSearchEnabled) {
+              try {
+                insertVec.run(skillId, embeddingBuffer);
+                vectorInserted = true;
+              } catch (err) {
+                console.error("Failed to insert into vec_skills:", err);
+              }
+            }
           });
 
           transaction();
@@ -1152,6 +1376,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     source_type: sourceType,
                     source_url: sourceUrl,
                     keywords,
+                    embedding_generated: !!embeddingBuffer,
+                    vector_indexed: vectorInserted,
                   },
                 },
                 null,
