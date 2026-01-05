@@ -1,205 +1,141 @@
 ---
 name: implement-strategy
-description: Load Strategy Architecture Document and generate NinjaTrader code with changelog
+description: Generate NinjaTrader code from a Model (skill_combinations) or Strategy Architecture Document
 ---
 
 # Implement Strategy Skill
 
-Generate high-quality NinjaTrader code from a Strategy Architecture Document (SAD).
+Generate high-quality NinjaTrader code from a complete trading model or Strategy Architecture Document (SAD).
 
 ## Usage
 
+**Model-first (recommended):**
+```bash
+python scripts/implement_strategy.py --model-id <id> --output-name <ClassName>
+```
+
+**SAD-based (legacy):**
 ```
 /implement-strategy <sad-name>
 ```
 
-Example:
+## Model-First Approach (Recommended)
+
+The model-first approach generates strategies from complete models stored in `skill_combinations`. This produces code that reflects the **model's intent**, not just concatenated skill snippets.
+
+### Why Model-First?
+
+| SAD-based (old) | Model-first (new) |
+|-----------------|-------------------|
+| Parse markdown manually | Query structured database |
+| Skills as individual snippets | Skills in model context |
+| Generic state machine | State machine from model spec |
+| Magic number parameters | Parameters from skill_contexts |
+
+### What's in a Model?
+
+The `skill_combinations` table stores:
+- **trade_flow_rules** - Phase sequencing (bias → setup → confirmation → entry)
+- **state_machine_spec** - All states and transitions
+- **skill_contexts** - How each skill fits (phase, order, required flag)
+- **context_annotations** - Timeframes, sessions, constraints
+
+### Model-First Generation
+
+```bash
+# Generate from Model #5 (TTrades 4H PO3)
+python scripts/implement_strategy.py --model-id 5 --output-name TTrades4HPO3Strategy
+
+# List available models
+python scripts/implement_strategy.py --list-models
 ```
-/implement-strategy seven-forty-reversal
+
+**Output:**
+- `scripts-output/Strategies/<ClassName>.cs` - Strategy code
+- `scripts-output/Strategies/<ClassName>_changelog.md` - Skills by phase
+
+## How It Works
+
+### Step 1: Load Complete Model
+
+```python
+# From skill_combinations
+SELECT trade_flow_rules, state_machine_spec, skill_contexts, context_annotations
+FROM skill_combinations WHERE id = ?
 ```
 
-## Prerequisites
+### Step 2: Generate State Machine from Model
 
-1. SAD file exists at `data/architectures/<sad-name>.md`
-2. SAD has been reviewed and approved (or user accepts as-is)
-3. Referenced skills exist in the skills library
+The state machine comes directly from `state_machine_spec`:
+- All states defined (not simplified)
+- Transitions with model-defined triggers
+- Guards from model constraints
 
-## Workflow
+### Step 3: Generate Phase Logic
+
+For each phase in `trade_flow_rules`:
+1. Identify skills for that phase from `skill_contexts`
+2. Load skill code with model context applied
+3. Generate phase block with proper sequencing
+
+### Step 4: Apply Constraints as Guards
+
+Model constraints become code guards:
+- "Entry REQUIRES CISD" → `if (!cisd_confirmed) return;`
+- "Don't hold past 4H close" → session close check
+
+### Step 5: Output with Traceability
+
+The changelog tracks:
+- Model ID and name
+- Skills organized by phase
+- Which skills are required vs optional
+- Constraints applied
+
+## SAD-Based Workflow (Legacy)
+
+For strategies without a model in `skill_combinations`, use the SAD approach:
 
 ### Step 1: Load and Parse SAD
-
-1. Read `data/architectures/<sad-name>.md`
-2. Extract metadata (name, type, complexity)
-3. Parse skill references and their usage types
-4. Identify any novel synthesis requirements
-5. Show summary to user:
 
 ```
 Loading SAD: seven-forty-reversal
 
 Type: Strategy
-Complexity: Complex
 Skills to compose: 8
-  - 6 direct use
-  - 1 adaptation needed
-  - 1 novel synthesis
-
-Proceed with code generation? [Y/n]
+Proceed? [Y/n]
 ```
 
 ### Step 2: Compose Skills
 
-For each skill reference in the SAD:
+- **Direct use (>85% match):** Copy snippet, adapt variable names
+- **Adaptation (70-85%):** Modify per SAD requirements
+- **Novel synthesis (<70%):** Ask user for examples
 
-**Direct use (score > 0.85):**
-- Copy code snippet from skill library
-- Adapt variable names to match SAD naming
-- Place in appropriate section of strategy
+### Step 3: Generate Draft
 
-**Adaptation needed (0.7-0.85):**
-- Start with skill snippet as base
-- Modify logic per SAD requirements
-- Document changes in changelog
-
-**Novel synthesis (< 0.7):**
-- Pause and ask user:
-```
-The SAD requires "Multi-timeframe POC bias" which isn't in the skill library.
-
-Please provide:
-a) Example code you've used before, OR
-b) Detailed description of the logic
-
-[User input]
-```
-- Generate code following 740.cs patterns
-- Document synthesis in changelog
-
-### Step 3: Generate Full Draft
-
-Use template at `scripts/templates/strategy_template.cs`.
-
-Fill sections in order:
-1. `#region Enums` - State enums from SAD
-2. `#region Variables` - All state variables from composed skills
-3. `OnStateChange()` - Default parameters from SAD
-4. `OnBarUpdate()` - Main logic:
-   - Time window calculations
-   - Bias logic (from SAD section 2)
-   - Setup logic (from SAD section 3)
-   - Entry scenarios (from SAD section 4)
-5. Helper methods:
-   - Risk management (from SAD section 5)
-   - Daily reset (from SAD section 8)
-6. `#region Properties` - All configurable parameters
+Fill template sections:
+1. Enums from SAD
+2. Variables from composed skills
+3. OnBarUpdate with bias/setup/entry logic
+4. Helper methods
 
 ### Step 4: Quality Check
 
-Before outputting, verify:
-- [ ] No placeholder conditions (`longCondition = false`)
+- [ ] No placeholder conditions
 - [ ] All state variables declared
-- [ ] All time windows functional
 - [ ] Entry conditions complete
-- [ ] Exit conditions cover all scenarios
 - [ ] Daily reset clears all state
 
 ### Step 5: Output
 
-Write two files:
-
-**1. Strategy Code:**
-`scripts-output/Strategies/<ClassName>.cs`
-
-**2. Changelog:**
-`scripts-output/Strategies/<ClassName>_changelog.md`
-
-```markdown
-# <ClassName> - Generation Changelog
-
-**Source:** data/architectures/<sad-name>.md
-**Generated:** <date>
-**LOC:** <line count>
-
-## Composed Skills (direct)
-- `skill-slug` -> Lines X-Y
-...
-
-## Adapted Skills
-- `skill-slug` -> Modified for <reason> (Lines X-Y)
-...
-
-## Novel Synthesis
-- `concept-name` -> Based on user input: "<summary>"
-  - Lines X-Y
-...
-
-## User Refinements
-(Added during iteration)
-...
-```
-
-### Step 6: Insert into Database
-
-After generating the code, insert into the database so it appears in the web UI.
-
-**Ask user for project:**
-```
-Strategy generated! Which project should this belong to?
-
-Existing projects:
-1. SevenFortyBias V6 (slug: sevenforten-bias-v6)
-2. Daily Framework (slug: daily-framework)
-3. [Create new project]
-
-Enter project slug or name for new project:
-```
-
-**SQL to execute:**
-```sql
--- If creating new project:
-INSERT INTO projects (name, slug, description, status)
-VALUES ('<name>', '<slug>', '<description from SAD>', 'active');
-
--- Insert the strategy:
-INSERT INTO scripts (project_id, name, file_path, description)
-VALUES (
-  (SELECT id FROM projects WHERE slug='<project-slug>'),
-  '<ClassName>',
-  '<absolute-path-to-cs-file>',
-  '<description from SAD>'
-);
-```
-
-**Execute with:**
-```bash
-sqlite3 /home/satvik/repos/builder-block/data/builder.db "<SQL>"
-```
-
-## Checkpoints
-
-Only pause for user input when:
-- Novel synthesis needed (ask for examples)
-- Ambiguous SAD instruction found
-- Multiple valid interpretations possible
-- Choosing project for DB insert
-
-Otherwise: Generate -> Output -> Insert -> Let user request changes
-
-## Iteration
-
-After initial output, user can request refinements:
-- "Change breakeven from 80 to 60 ticks"
-- "Add a second entry scenario for breakouts"
-- "Make the stop loss dynamic based on ATR"
-
-Each refinement:
-1. Apply change to code
-2. Add entry to changelog under "User Refinements"
-3. Re-output updated file
+Files:
+- `scripts-output/Strategies/<ClassName>.cs`
+- `scripts-output/Strategies/<ClassName>_changelog.md`
 
 ## Quality Reference
 
-All generated code should match `scripts-output/740.cs` patterns:
+Generated code should match production patterns:
 - State machine architecture
 - Time window awareness
 - Complete entry/exit logic
@@ -208,6 +144,8 @@ All generated code should match `scripts-output/740.cs` patterns:
 
 ## Files
 
+- Script: `scripts/implement_strategy.py`
 - Template: `scripts/templates/strategy_template.cs`
-- SAD location: `data/architectures/`
+- Models: `skill_combinations` table
+- SADs: `data/architectures/`
 - Output: `scripts-output/Strategies/`
