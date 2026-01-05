@@ -25,17 +25,18 @@ using NinjaTrader.NinjaScript.DrawingTools;
 namespace NinjaTrader.NinjaScript.Strategies
 {
     /// <summary>
-    /// TTrades Fractal Model 2026 - V6
+    /// TTrades Fractal Model 2026 - V7
     ///
-    /// V6 Changes from V5:
-    /// - Fixed CISD tracking: Now tracks opposing series DURING approach to POI
-    /// - Added breakeven stop at 1R to lock in MFE gains
-    /// - Entry quality filters: Minimum 2 candles in opposing series
+    /// V7 Changes from V6:
+    /// - FIXED: Protected swing now uses CISD series extreme (not approach series)
+    ///   Per TTrades: stop at "level where trade idea is proven wrong"
+    /// - Added max CISD series length (5 candles) - per TTrades 2-5 candles
+    /// - Entry alignment filter: entry candle must match bias direction
     ///
     /// Timeframe Flow:
     /// Daily (Bias + HTF POI) -> H1 (C2/C3 + CISD) -> M5 (Entry OB)
     /// </summary>
-    public class TTradesFractalModelV6 : Strategy
+    public class TTradesFractalModelV7 : Strategy
     {
         #region Enums
 
@@ -102,11 +103,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int opposingSeriesStartBar;
         private bool cisdActive = false;
 
+        // V7: Track CISD series extreme for proper protected swing (TTrades Skill #63, #73)
+        private double cisdSeriesExtreme;  // Low for bullish (bearish candles), High for bearish
+
         // C2/C3 Tracking
         private bool c2c3Detected = false;
         private int barsAtPOI = 0;
         private const int MinBarsAtPOI = 1;  // At least 1 bar touching POI
         private const int MinApproachSeriesCandles = 2;  // V6: Require 2+ candles in approach series
+        private const int MaxCISDSeriesCandles = 5;  // V7: Max CISD series (TTrades = 2-5 candles)
 
         // V6: Breakeven Stop
         private bool breakevenSet = false;
@@ -309,8 +314,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (State == State.SetDefaults)
             {
-                Description = @"TTrades Fractal Model V6 - Fixed CISD + Breakeven Stop";
-                Name = "TTradesFractalModelV6";
+                Description = @"TTrades Fractal Model V7 - Fixed Protected Swing Stop Placement";
+                Name = "TTradesFractalModelV7";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.AllEntries;
@@ -387,8 +392,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (DebugMode)
                 {
-                    Print($"[V6 INIT] Bias={BiasTimeframe}, Confirm={ConfirmTimeframe}, Entry={EntryTimeframe}");
-                    Print($"[V6 INIT] Mapped: Bias=[{biasBarsIndex}], Confirm=[{confirmBarsIndex}], Entry=[{entryBarsIndex}]");
+                    Print($"[V7 INIT] Bias={BiasTimeframe}, Confirm={ConfirmTimeframe}, Entry={EntryTimeframe}");
+                    Print($"[V7 INIT] Mapped: Bias=[{biasBarsIndex}], Confirm=[{confirmBarsIndex}], Entry=[{entryBarsIndex}]");
                 }
             }
         }
@@ -890,7 +895,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// V6: Reset C2C3 state when timing out or price leaving zone
+        /// V7: Reset C2C3 state when timing out or price leaving zone
         /// </summary>
         private void ResetC2C3State()
         {
@@ -899,6 +904,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             c2c3Detected = false;
             cisdActive = false;
             cisdReferencePrice = 0;
+            cisdSeriesExtreme = 0;  // V7: Reset CISD series extreme
             opposingSeriesCount = 0;
             ResetApproachSeries();
         }
@@ -931,30 +937,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                     activePOI = poi;
                     barsAtPOI = 1;
 
-                    // V6: Copy approach series data to CISD tracking
+                    // V7: Copy approach series data to CISD tracking
+                    // Protected swing will be set from CISD series extreme when CISD confirms
                     if (approachSeriesActive && approachSeriesCount >= MinApproachSeriesCandles)
                     {
                         cisdActive = true;
                         cisdReferencePrice = approachSeriesOpen;
                         opposingSeriesCount = approachSeriesCount;
-
-                        // Protected swing from approach series extreme
-                        protectedSwing = dailyBias == BiasDirection.Bullish ?
-                                        approachSeriesExtreme - (5 * TickSize) :
-                                        approachSeriesExtreme + (5 * TickSize);
+                        // V7: Initialize CISD series extreme from approach - will be refined as CISD builds
+                        cisdSeriesExtreme = approachSeriesExtreme;
 
                         if (DebugMode)
-                            Print($"[POI-TOUCH] {Times[confirmBarsIndex][0]} | {poi.Description} at {poi.Level:F2} | Approach series: {approachSeriesCount} candles, ref: {cisdReferencePrice:F2}");
+                            Print($"[POI-TOUCH] {Times[confirmBarsIndex][0]} | {poi.Description} at {poi.Level:F2} | Approach series: {approachSeriesCount} candles, ref: {cisdReferencePrice:F2}, extreme: {cisdSeriesExtreme:F2}");
                     }
                     else
                     {
-                        // No valid approach series - still touch POI but need to build series
-                        protectedSwing = dailyBias == BiasDirection.Bullish ?
-                                        low - (10 * TickSize) :
-                                        high + (10 * TickSize);
-
+                        // V7: No valid approach series - CISD will build from scratch at POI
+                        // Protected swing will be set when CISD confirms
                         if (DebugMode)
-                            Print($"[POI-TOUCH] {Times[confirmBarsIndex][0]} | {poi.Description} at {poi.Level:F2} | No approach series yet");
+                            Print($"[POI-TOUCH] {Times[confirmBarsIndex][0]} | {poi.Description} at {poi.Level:F2} | No approach series, CISD will build at POI");
                     }
 
                     TransitionState(StrategyState.C2C3Forming);
@@ -999,34 +1000,52 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bool isBearishCandle = close < open;
                 bool isBullishCandle = close > open;
 
-                // V6: If we don't have a valid approach series, continue tracking at POI
+                // V7: Check max CISD series length (TTrades = 2-5 candles max)
+                if (cisdActive && opposingSeriesCount > MaxCISDSeriesCandles)
+                {
+                    if (DebugMode)
+                        Print($"[CISD] Series too long ({opposingSeriesCount} candles > {MaxCISDSeriesCandles}), resetting");
+                    ResetC2C3State();
+                    TransitionState(StrategyState.WaitingForPOI);
+                    return;
+                }
+
+                // V7: If we don't have a valid CISD series, start tracking at POI
                 if (!cisdActive)
                 {
                     if (isBearishCandle)
                     {
                         cisdActive = true;
                         cisdReferencePrice = open;
+                        cisdSeriesExtreme = low;  // V7: Track lowest low of bearish series
                         opposingSeriesCount = 1;
 
                         if (DebugMode)
-                            Print($"[CISD] Building series at POI, ref: {cisdReferencePrice:F2}");
+                            Print($"[CISD] Building series at POI, ref: {cisdReferencePrice:F2}, extreme: {cisdSeriesExtreme:F2}");
                     }
                 }
                 else if (isBearishCandle)
                 {
                     // Continue building series
                     opposingSeriesCount++;
+                    cisdSeriesExtreme = Math.Min(cisdSeriesExtreme, low);  // V7: Track lowest low
+
+                    if (DebugMode)
+                        Print($"[CISD] Series count: {opposingSeriesCount}, extreme: {cisdSeriesExtreme:F2}");
                 }
                 else if (isBullishCandle)
                 {
-                    // V6: C2 + CISD: Bullish candle closing above series opening
+                    // V7: C2 + CISD: Bullish candle closing above series opening
                     // Must have MinApproachSeriesCandles
                     if (cisdActive && opposingSeriesCount >= MinApproachSeriesCandles)
                     {
                         if (close > cisdReferencePrice)
                         {
+                            // V7: Set protected swing from CISD series extreme (TTrades Skill #63, #73)
+                            protectedSwing = cisdSeriesExtreme;
+
                             if (DebugMode)
-                                Print($"[C2+CISD] BULLISH CONFIRMED! Close {close:F2} > Ref {cisdReferencePrice:F2} | Series: {opposingSeriesCount}");
+                                Print($"[C2+CISD] BULLISH CONFIRMED! Close {close:F2} > Ref {cisdReferencePrice:F2} | Series: {opposingSeriesCount} | ProtectedSwing: {protectedSwing:F2}");
 
                             cisdActive = false;
                             c2c3Detected = true;
@@ -1042,7 +1061,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (DebugMode)
                             Print($"[C2C3] Bullish close {close:F2} failed to break ref {cisdReferencePrice:F2}, reset");
                         cisdActive = false;
-                        cisdReferencePrice = 0;  // V6 FIX: Full CISD state reset
+                        cisdReferencePrice = 0;
+                        cisdSeriesExtreme = 0;  // V7: Reset extreme
                         opposingSeriesCount = 0;
                     }
                 }
@@ -1061,32 +1081,50 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bool isBullishCandle = close > open;
                 bool isBearishCandle = close < open;
 
-                // V6: If we don't have a valid approach series, continue tracking at POI
+                // V7: Check max CISD series length
+                if (cisdActive && opposingSeriesCount > MaxCISDSeriesCandles)
+                {
+                    if (DebugMode)
+                        Print($"[CISD] Series too long ({opposingSeriesCount} candles > {MaxCISDSeriesCandles}), resetting");
+                    ResetC2C3State();
+                    TransitionState(StrategyState.WaitingForPOI);
+                    return;
+                }
+
+                // V7: If we don't have a valid CISD series, start tracking at POI
                 if (!cisdActive)
                 {
                     if (isBullishCandle)
                     {
                         cisdActive = true;
                         cisdReferencePrice = open;
+                        cisdSeriesExtreme = high;  // V7: Track highest high of bullish series
                         opposingSeriesCount = 1;
 
                         if (DebugMode)
-                            Print($"[CISD] Building series at POI, ref: {cisdReferencePrice:F2}");
+                            Print($"[CISD] Building series at POI, ref: {cisdReferencePrice:F2}, extreme: {cisdSeriesExtreme:F2}");
                     }
                 }
                 else if (isBullishCandle)
                 {
                     opposingSeriesCount++;
+                    cisdSeriesExtreme = Math.Max(cisdSeriesExtreme, high);  // V7: Track highest high
+
+                    if (DebugMode)
+                        Print($"[CISD] Series count: {opposingSeriesCount}, extreme: {cisdSeriesExtreme:F2}");
                 }
                 else if (isBearishCandle)
                 {
-                    // V6: C2 + CISD: Bearish candle closing below series opening
+                    // V7: C2 + CISD: Bearish candle closing below series opening
                     if (cisdActive && opposingSeriesCount >= MinApproachSeriesCandles)
                     {
                         if (close < cisdReferencePrice)
                         {
+                            // V7: Set protected swing from CISD series extreme (TTrades Skill #63, #73)
+                            protectedSwing = cisdSeriesExtreme;
+
                             if (DebugMode)
-                                Print($"[C2+CISD] BEARISH CONFIRMED! Close {close:F2} < Ref {cisdReferencePrice:F2} | Series: {opposingSeriesCount}");
+                                Print($"[C2+CISD] BEARISH CONFIRMED! Close {close:F2} < Ref {cisdReferencePrice:F2} | Series: {opposingSeriesCount} | ProtectedSwing: {protectedSwing:F2}");
 
                             cisdActive = false;
                             c2c3Detected = true;
@@ -1100,7 +1138,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (DebugMode)
                             Print($"[C2C3] Bearish close failed to break ref, reset");
                         cisdActive = false;
-                        cisdReferencePrice = 0;  // V6 FIX: Full CISD state reset
+                        cisdReferencePrice = 0;
+                        cisdSeriesExtreme = 0;  // V7: Reset extreme
                         opposingSeriesCount = 0;
                     }
                 }
@@ -1109,7 +1148,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (DebugMode)
                         Print($"[C2C3] Timeout at POI, resetting");
-                    ResetC2C3State();  // V6 FIX: Use consistent reset method
+                    ResetC2C3State();
                     TransitionState(StrategyState.WaitingForPOI);
                 }
             }
@@ -1400,6 +1439,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            // V7: Entry alignment filter - entry candle must match bias direction
+            double entryClose = Closes[entryBarsIndex][0];
+            double entryOpen = Opens[entryBarsIndex][0];
+            bool entryAligned = (dailyBias == BiasDirection.Bullish && entryClose > entryOpen) ||
+                                (dailyBias == BiasDirection.Bearish && entryClose < entryOpen);
+            if (!entryAligned)
+            {
+                if (DebugMode)
+                    Print($"[ENTRY] Skipped - entry candle (O:{entryOpen:F2} C:{entryClose:F2}) not aligned with {dailyBias} bias");
+                return;
+            }
+
             entryPrice = Closes[entryBarsIndex][0];
             entryContracts = Contracts;
             partialExitTaken = false;
@@ -1467,7 +1518,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     targetPrice = pdl;
             }
 
-            lastEntryName = dailyBias == BiasDirection.Bullish ? "FractalLongV6" : "FractalShortV6";
+            lastEntryName = dailyBias == BiasDirection.Bullish ? "FractalLongV7" : "FractalShortV7";
 
             if (dailyBias == BiasDirection.Bullish)
             {
@@ -1572,9 +1623,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             c2c3Detected = false;
             cisdActive = false;
             cisdReferencePrice = 0;
+            cisdSeriesExtreme = 0;  // V7: Reset CISD series extreme
             opposingSeriesCount = 0;
             ResetOrderBlock();
-            ResetApproachSeries();  // V6 FIX: Must reset approach series to prevent contamination
+            ResetApproachSeries();
         }
 
         private void ResetState()
@@ -1587,12 +1639,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             protectedSwing = 0;
             cisdActive = false;
             cisdReferencePrice = 0;
+            cisdSeriesExtreme = 0;  // V7: Reset CISD series extreme
             opposingSeriesCount = 0;
             ResetOrderBlock();
             consecutiveLosses = 0;
             partialExitTaken = false;
-            breakevenSet = false;  // V6: Reset breakeven flag
-            ResetApproachSeries();  // V6: Reset approach series
+            breakevenSet = false;
+            ResetApproachSeries();
         }
 
         #endregion
