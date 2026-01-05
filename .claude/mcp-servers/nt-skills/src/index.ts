@@ -22,7 +22,8 @@ import {
 import Database from "better-sqlite3";
 import * as sqliteVec from "sqlite-vec";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { dirname, join, resolve } from "path";
+import { readFileSync, existsSync } from "fs";
 import {
   embed,
   embedQuery,
@@ -84,6 +85,23 @@ function nameSimilarity(a: string, b: string): number {
   if (maxLen === 0) return 1;
   const distance = levenshteinDistance(a, b);
   return 1 - distance / maxLen;
+}
+
+// Helper function to extract YouTube video ID from URL
+function extractVideoId(url: string): string | null {
+  // Handle youtu.be/VIDEO_ID
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (shortMatch) return shortMatch[1];
+
+  // Handle youtube.com/watch?v=VIDEO_ID
+  const longMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (longMatch) return longMatch[1];
+
+  // Handle youtube.com/embed/VIDEO_ID
+  const embedMatch = url.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
+  if (embedMatch) return embedMatch[1];
+
+  return null;
 }
 
 // Helper function for Jaccard similarity (keyword overlap)
@@ -482,6 +500,289 @@ const TOOLS: Tool[] = [
       ],
     },
   },
+  {
+    name: "save_model",
+    description:
+      "Create or update a complete trading model with full metadata. Use this when extracting complete trading models from videos or creating strategy specifications.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Model name (e.g., 'LumiTraders Liquidity Sweep V5')",
+        },
+        description: {
+          type: "string",
+          description: "Description of what this model does and when to use it",
+        },
+        skill_ids: {
+          type: "array",
+          items: { type: "number" },
+          description: "Array of skill IDs that make up this model",
+        },
+        skill_contexts: {
+          type: "object",
+          description:
+            "Per-skill context within this model: {skill_id: {phase, order, conditions, notes}}",
+        },
+        trade_flow_rules: {
+          type: "object",
+          description:
+            "Trade flow specification: {pre_market, entry: {trigger, confirmations, filters}, exit: {targets, stops}}",
+        },
+        context_annotations: {
+          type: "object",
+          description:
+            "Context annotations: {htf_timeframes, session_restrictions, edge_cases}",
+        },
+        state_machine_spec: {
+          type: "object",
+          description:
+            "State machine specification for code generation: {initial_state, states: [...]}",
+        },
+        source_video_url: {
+          type: "string",
+          description: "YouTube URL if extracted from video",
+        },
+        source_video_title: {
+          type: "string",
+          description: "Title of source video",
+        },
+        extraction_confidence: {
+          type: "number",
+          description: "Confidence score (0-1) of the extraction quality",
+        },
+        variant_of: {
+          type: "number",
+          description: "Parent model ID if this is a variant",
+        },
+        typical_use_case: {
+          type: "string",
+          description: "When to use this model",
+        },
+        complexity: {
+          type: "string",
+          enum: ["simple", "medium", "complex"],
+          description: "Model complexity level",
+          default: "medium",
+        },
+      },
+      required: ["name", "description", "skill_ids"],
+    },
+  },
+  {
+    name: "get_model",
+    description:
+      "Fetch a complete trading model with all metadata, optionally including iterations and variants.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        model_id: {
+          type: "number",
+          description: "ID of the model to fetch",
+        },
+        model_name: {
+          type: "string",
+          description: "Name of the model to fetch (alternative to model_id)",
+        },
+        include_iterations: {
+          type: "boolean",
+          description: "Include iteration history from model_iterations table",
+          default: false,
+        },
+        include_variants: {
+          type: "boolean",
+          description: "Include variant models derived from this model",
+          default: false,
+        },
+      },
+    },
+  },
+  {
+    name: "update_model_after_iteration",
+    description:
+      "Record iteration insights after analyzing backtest results. Creates a model_iterations record and updates the model's iteration_log.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        model_id: {
+          type: "number",
+          description: "ID of the model being iterated on",
+        },
+        iteration_insight: {
+          type: "object",
+          description:
+            "Insight captured: {problem_pattern, solution_applied, conditions, generalizable, suggested_rule}",
+        },
+        problems_detected: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              pattern: { type: "string" },
+              severity: { type: "string" },
+              impact: { type: "number" },
+              trades_affected: { type: "number" },
+            },
+          },
+          description: "Problems detected in backtest analysis",
+        },
+        solution_applied: {
+          type: "string",
+          description: "Description of the fix applied",
+        },
+        impact_prediction: {
+          type: "number",
+          description: "Expected dollar improvement from this change",
+        },
+        backtest_csv_path: {
+          type: "string",
+          description: "Path to the analyzed backtest CSV file",
+        },
+        trades_analyzed: {
+          type: "number",
+          description: "Number of trades analyzed",
+        },
+        skills_added: {
+          type: "array",
+          items: { type: "number" },
+          description: "Skill IDs added in this iteration",
+        },
+        skills_removed: {
+          type: "array",
+          items: { type: "number" },
+          description: "Skill IDs removed in this iteration",
+        },
+        parameters_changed: {
+          type: "object",
+          description: "Parameters changed: {param: {before, after}}",
+        },
+        trade_flow_changes: {
+          type: "string",
+          description: "Description of trade flow changes",
+        },
+        insight_confidence: {
+          type: "number",
+          description: "Confidence in the insight (0-1)",
+        },
+      },
+      required: ["model_id", "solution_applied"],
+    },
+  },
+  {
+    name: "search_models",
+    description:
+      "Search for trading models by criteria including text query, status, source, and problem patterns.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Text search query for model name/description",
+        },
+        filter_by_status: {
+          type: "string",
+          enum: ["draft", "backtested", "validated", "production"],
+          description: "Filter by model status",
+        },
+        filter_by_source: {
+          type: "string",
+          enum: ["youtube", "iteration", "manual"],
+          description: "Filter by how the model was created",
+        },
+        has_iteration_for_problem: {
+          type: "string",
+          description:
+            "Find models that have iterations addressing a specific problem pattern (e.g., 'mfe_reversal')",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum number of results (default: 10)",
+          default: 10,
+        },
+      },
+    },
+  },
+  {
+    name: "suggest_model_variants",
+    description:
+      "Recommend model variants or parameter changes based on backtest patterns and historical learnings.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        model_id: {
+          type: "number",
+          description: "ID of the model to suggest variants for",
+        },
+        problem_pattern: {
+          type: "string",
+          enum: [
+            "mfe_reversal",
+            "early_exit",
+            "late_entry",
+            "false_breakout",
+            "range_fade",
+            "session_leak",
+            "stop_hunt",
+            "overtrading",
+          ],
+          description: "The problem pattern detected in backtest",
+        },
+        backtest_summary: {
+          type: "object",
+          description:
+            "Summary of backtest results: {win_rate, profit_factor, avg_mfe, avg_mae, total_trades}",
+        },
+      },
+      required: ["model_id", "problem_pattern"],
+    },
+  },
+  {
+    name: "get_visual_context",
+    description:
+      "Get visual frames from a video for contradiction detection during strategy iteration. Returns frames filtered by type (entry/exit/context) for visual analysis.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        video_id: {
+          type: "string",
+          description: "YouTube video ID (e.g., '9AL41xON3hA')",
+        },
+        context_type: {
+          type: "string",
+          enum: ["entry", "exit", "risk", "context", "all"],
+          description:
+            "Type of frames to retrieve: entry (entry setups), exit (take profit), risk (stop loss), context (market structure), or all",
+          default: "all",
+        },
+        contradiction_only: {
+          type: "boolean",
+          description:
+            "If true, only return frames marked as relevant for contradiction detection",
+          default: false,
+        },
+      },
+      required: ["video_id"],
+    },
+  },
+  {
+    name: "resolve_video_id",
+    description:
+      "Extract YouTube video_id from a URL or SAD file. Use this before get_visual_context when you only have a source_url. Supports youtu.be/X, youtube.com/watch?v=X, and youtube.com/embed/X formats.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        source_url: {
+          type: "string",
+          description: "YouTube URL (e.g., 'https://youtu.be/9AL41xON3hA' or 'https://youtube.com/watch?v=9AL41xON3hA')",
+        },
+        sad_path: {
+          type: "string",
+          description: "Path to SAD file - will parse ## Source section to find URL",
+        },
+      },
+    },
+  },
 ];
 
 // Create server
@@ -519,7 +820,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   try {
-    const writableTools = ["save_skill", "save_skill_with_source"];
+    const writableTools = ["save_skill", "save_skill_with_source", "save_model", "update_model_after_iteration"];
     const db = new Database(DB_PATH, { readonly: !writableTools.includes(name) });
 
     switch (name) {
@@ -1385,6 +1686,833 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               ),
             },
           ],
+        };
+      }
+
+      case "save_model": {
+        const modelName = args.name as string;
+        const description = args.description as string;
+        const skillIds = args.skill_ids as number[];
+        const skillContexts = args.skill_contexts as Record<string, unknown> | undefined;
+        const tradeFlowRules = args.trade_flow_rules as Record<string, unknown> | undefined;
+        const contextAnnotations = args.context_annotations as Record<string, unknown> | undefined;
+        const stateMachineSpec = args.state_machine_spec as Record<string, unknown> | undefined;
+        const sourceVideoUrl = (args.source_video_url as string) || null;
+        const sourceVideoTitle = (args.source_video_title as string) || null;
+        const extractionConfidence = (args.extraction_confidence as number) || null;
+        const variantOf = (args.variant_of as number) || null;
+        const typicalUseCase = (args.typical_use_case as string) || null;
+        const complexity = (args.complexity as string) || "medium";
+
+        // Determine created_from based on source
+        const createdFrom = sourceVideoUrl ? "youtube" : (variantOf ? "iteration" : "manual");
+
+        const insertModel = db.prepare(`
+          INSERT INTO skill_combinations (
+            name, description, skill_ids, skill_contexts,
+            trade_flow_rules, context_annotations, state_machine_spec,
+            source_video_url, source_video_title, extraction_confidence,
+            variant_of, typical_use_case, complexity,
+            model_type, status, created_from, version,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'complete_model', 'draft', ?, 1, datetime('now'), datetime('now'))
+        `);
+
+        let modelId: number;
+
+        try {
+          const result = insertModel.run(
+            modelName,
+            description,
+            JSON.stringify(skillIds),
+            skillContexts ? JSON.stringify(skillContexts) : null,
+            tradeFlowRules ? JSON.stringify(tradeFlowRules) : null,
+            contextAnnotations ? JSON.stringify(contextAnnotations) : null,
+            stateMachineSpec ? JSON.stringify(stateMachineSpec) : null,
+            sourceVideoUrl,
+            sourceVideoTitle,
+            extractionConfidence,
+            variantOf,
+            typicalUseCase,
+            complexity,
+            createdFrom
+          );
+          modelId = result.lastInsertRowid as number;
+        } catch (err) {
+          db.close();
+          throw err;
+        }
+
+        db.close();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  model_id: modelId,
+                  message: `Model "${modelName}" saved successfully`,
+                  details: {
+                    skill_count: skillIds.length,
+                    model_type: "complete_model",
+                    status: "draft",
+                    version: 1,
+                    created_from: createdFrom,
+                    has_trade_flow: !!tradeFlowRules,
+                    has_context_annotations: !!contextAnnotations,
+                    has_state_machine: !!stateMachineSpec,
+                    source_video_url: sourceVideoUrl,
+                    variant_of: variantOf,
+                  },
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "get_model": {
+        const modelId = args.model_id as number | undefined;
+        const modelName = args.model_name as string | undefined;
+        const includeIterations = (args.include_iterations as boolean) || false;
+        const includeVariants = (args.include_variants as boolean) || false;
+
+        if (!modelId && !modelName) {
+          db.close();
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Error: Either model_id or model_name must be provided",
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Fetch the model
+        let model: Record<string, unknown> | undefined;
+        if (modelId) {
+          model = db
+            .prepare("SELECT * FROM skill_combinations WHERE id = ? AND model_type = 'complete_model'")
+            .get(modelId) as Record<string, unknown> | undefined;
+        } else if (modelName) {
+          model = db
+            .prepare("SELECT * FROM skill_combinations WHERE name = ? AND model_type = 'complete_model'")
+            .get(modelName) as Record<string, unknown> | undefined;
+        }
+
+        if (!model) {
+          db.close();
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error: Model not found with ${modelId ? `id=${modelId}` : `name=${modelName}`}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Parse JSON fields
+        const parsedModel = {
+          ...model,
+          skill_ids: JSON.parse((model.skill_ids as string) || "[]"),
+          skill_contexts: model.skill_contexts ? JSON.parse(model.skill_contexts as string) : null,
+          trade_flow_rules: model.trade_flow_rules ? JSON.parse(model.trade_flow_rules as string) : null,
+          context_annotations: model.context_annotations ? JSON.parse(model.context_annotations as string) : null,
+          state_machine_spec: model.state_machine_spec ? JSON.parse(model.state_machine_spec as string) : null,
+          iteration_log: model.iteration_log ? JSON.parse(model.iteration_log as string) : [],
+          backtest_history: model.backtest_history ? JSON.parse(model.backtest_history as string) : [],
+        };
+
+        // Fetch iterations if requested
+        let iterations: Record<string, unknown>[] = [];
+        if (includeIterations) {
+          iterations = db
+            .prepare(`
+              SELECT * FROM model_iterations
+              WHERE model_id = ?
+              ORDER BY iteration_date DESC
+            `)
+            .all(model.id) as Record<string, unknown>[];
+
+          // Parse JSON fields in iterations
+          iterations = iterations.map((iter) => ({
+            ...iter,
+            problems_detected: iter.problems_detected ? JSON.parse(iter.problems_detected as string) : null,
+            skills_added: iter.skills_added ? JSON.parse(iter.skills_added as string) : null,
+            skills_removed: iter.skills_removed ? JSON.parse(iter.skills_removed as string) : null,
+            parameters_changed: iter.parameters_changed ? JSON.parse(iter.parameters_changed as string) : null,
+            insight_captured: iter.insight_captured ? JSON.parse(iter.insight_captured as string) : null,
+          }));
+        }
+
+        // Fetch variants if requested
+        let variants: Record<string, unknown>[] = [];
+        if (includeVariants) {
+          variants = db
+            .prepare(`
+              SELECT id, name, description, version, status, created_at
+              FROM skill_combinations
+              WHERE variant_of = ?
+              ORDER BY created_at DESC
+            `)
+            .all(model.id) as Record<string, unknown>[];
+        }
+
+        db.close();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  model: parsedModel,
+                  iterations: includeIterations ? iterations : undefined,
+                  variants: includeVariants ? variants : undefined,
+                  iteration_count: includeIterations ? iterations.length : undefined,
+                  variant_count: includeVariants ? variants.length : undefined,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "update_model_after_iteration": {
+        const modelId = args.model_id as number;
+        const iterationInsight = args.iteration_insight as Record<string, unknown> | undefined;
+        const problemsDetected = args.problems_detected as Array<Record<string, unknown>> | undefined;
+        const solutionApplied = args.solution_applied as string;
+        const impactPrediction = (args.impact_prediction as number) || null;
+        const backtestCsvPath = (args.backtest_csv_path as string) || null;
+        const tradesAnalyzed = (args.trades_analyzed as number) || null;
+        const skillsAdded = (args.skills_added as number[]) || null;
+        const skillsRemoved = (args.skills_removed as number[]) || null;
+        const parametersChanged = args.parameters_changed as Record<string, unknown> | undefined;
+        const tradeFlowChanges = (args.trade_flow_changes as string) || null;
+        const insightConfidence = (args.insight_confidence as number) || null;
+
+        // Get current model state
+        const currentModel = db
+          .prepare("SELECT * FROM skill_combinations WHERE id = ?")
+          .get(modelId) as Record<string, unknown> | undefined;
+
+        if (!currentModel) {
+          db.close();
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error: Model not found with id=${modelId}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const currentVersion = (currentModel.version as number) || 1;
+        const newVersion = currentVersion + 1;
+
+        // Parse existing iteration_log
+        let iterationLog: Array<Record<string, unknown>> = [];
+        try {
+          iterationLog = currentModel.iteration_log
+            ? JSON.parse(currentModel.iteration_log as string)
+            : [];
+        } catch {
+          iterationLog = [];
+        }
+
+        // Add new iteration entry to log
+        const newLogEntry = {
+          version: newVersion,
+          problem: problemsDetected?.[0]?.pattern || "unknown",
+          solution: solutionApplied,
+          impact: impactPrediction ? `+$${impactPrediction}` : "pending",
+          confidence: insightConfidence || 0.5,
+          date: new Date().toISOString(),
+        };
+        iterationLog.push(newLogEntry);
+
+        // Use transaction for atomicity
+        const insertIteration = db.prepare(`
+          INSERT INTO model_iterations (
+            model_id, version_before, version_after, iteration_date,
+            backtest_csv_path, trades_analyzed, problems_detected,
+            solution_applied, skills_added, skills_removed, parameters_changed,
+            trade_flow_changes, impact_prediction, insight_captured, insight_confidence
+          ) VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        const updateModel = db.prepare(`
+          UPDATE skill_combinations
+          SET version = ?,
+              iteration_log = ?,
+              updated_at = datetime('now')
+          WHERE id = ?
+        `);
+
+        let iterationId: number;
+
+        try {
+          const transaction = db.transaction(() => {
+            // Insert iteration record
+            const iterResult = insertIteration.run(
+              modelId,
+              currentVersion,
+              newVersion,
+              backtestCsvPath,
+              tradesAnalyzed,
+              problemsDetected ? JSON.stringify(problemsDetected) : null,
+              solutionApplied,
+              skillsAdded ? JSON.stringify(skillsAdded) : null,
+              skillsRemoved ? JSON.stringify(skillsRemoved) : null,
+              parametersChanged ? JSON.stringify(parametersChanged) : null,
+              tradeFlowChanges,
+              impactPrediction,
+              iterationInsight ? JSON.stringify(iterationInsight) : null,
+              insightConfidence
+            );
+            iterationId = iterResult.lastInsertRowid as number;
+
+            // Update model version and iteration_log
+            updateModel.run(newVersion, JSON.stringify(iterationLog), modelId);
+          });
+
+          transaction();
+        } catch (err) {
+          db.close();
+          throw err;
+        }
+
+        db.close();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  iteration_id: iterationId!,
+                  model_id: modelId,
+                  version_before: currentVersion,
+                  version_after: newVersion,
+                  message: `Model updated to version ${newVersion}`,
+                  details: {
+                    solution_applied: solutionApplied,
+                    problems_count: problemsDetected?.length || 0,
+                    impact_prediction: impactPrediction,
+                    trades_analyzed: tradesAnalyzed,
+                    skills_added: skillsAdded?.length || 0,
+                    skills_removed: skillsRemoved?.length || 0,
+                  },
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "search_models": {
+        const query = (args.query as string) || null;
+        const filterByStatus = (args.filter_by_status as string) || null;
+        const filterBySource = (args.filter_by_source as string) || null;
+        const hasIterationForProblem = (args.has_iteration_for_problem as string) || null;
+        const limit = (args.limit as number) || 10;
+
+        // Build query dynamically
+        let sql = `
+          SELECT sc.*,
+                 (SELECT COUNT(*) FROM model_iterations WHERE model_id = sc.id) as iteration_count
+          FROM skill_combinations sc
+          WHERE sc.model_type = 'complete_model'
+        `;
+        const params: (string | number)[] = [];
+
+        if (filterByStatus) {
+          sql += " AND sc.status = ?";
+          params.push(filterByStatus);
+        }
+
+        if (filterBySource) {
+          sql += " AND sc.created_from = ?";
+          params.push(filterBySource);
+        }
+
+        if (hasIterationForProblem) {
+          sql += `
+            AND EXISTS (
+              SELECT 1 FROM model_iterations mi
+              WHERE mi.model_id = sc.id
+              AND mi.problems_detected LIKE ?
+            )
+          `;
+          params.push(`%"pattern":"${hasIterationForProblem}"%`);
+        }
+
+        // Text search on name/description
+        if (query) {
+          sql += " AND (sc.name LIKE ? OR sc.description LIKE ?)";
+          params.push(`%${query}%`, `%${query}%`);
+        }
+
+        sql += " ORDER BY sc.updated_at DESC LIMIT ?";
+        params.push(limit);
+
+        const models = db.prepare(sql).all(...params) as Record<string, unknown>[];
+
+        // Parse JSON fields for each model
+        const parsedModels = models.map((model) => ({
+          id: model.id,
+          name: model.name,
+          description: model.description,
+          skill_ids: JSON.parse((model.skill_ids as string) || "[]"),
+          status: model.status,
+          version: model.version,
+          created_from: model.created_from,
+          source_video_url: model.source_video_url,
+          iteration_count: model.iteration_count,
+          complexity: model.complexity,
+          variant_of: model.variant_of,
+          created_at: model.created_at,
+          updated_at: model.updated_at,
+        }));
+
+        db.close();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  total: parsedModels.length,
+                  models: parsedModels,
+                  filters_applied: {
+                    query,
+                    status: filterByStatus,
+                    source: filterBySource,
+                    problem_pattern: hasIterationForProblem,
+                  },
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "suggest_model_variants": {
+        const modelId = args.model_id as number;
+        const problemPattern = args.problem_pattern as string;
+        const backtestSummary = args.backtest_summary as Record<string, unknown> | undefined;
+
+        // Get the model
+        const model = db
+          .prepare("SELECT * FROM skill_combinations WHERE id = ?")
+          .get(modelId) as Record<string, unknown> | undefined;
+
+        if (!model) {
+          db.close();
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error: Model not found with id=${modelId}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Look for iterations across ALL models that addressed this problem pattern
+        const similarIterations = db
+          .prepare(`
+            SELECT mi.*, sc.name as model_name
+            FROM model_iterations mi
+            JOIN skill_combinations sc ON mi.model_id = sc.id
+            WHERE mi.problems_detected LIKE ?
+            AND mi.impact_actual > 0
+            ORDER BY mi.impact_actual DESC
+            LIMIT 5
+          `)
+          .all(`%"pattern":"${problemPattern}"%`) as Record<string, unknown>[];
+
+        // Parse insights from found iterations
+        const historicalSolutions: Array<{
+          model_name: string;
+          solution: string;
+          impact: number;
+          insight: Record<string, unknown> | null;
+        }> = [];
+
+        for (const iter of similarIterations) {
+          const insight = iter.insight_captured
+            ? JSON.parse(iter.insight_captured as string)
+            : null;
+          historicalSolutions.push({
+            model_name: iter.model_name as string,
+            solution: iter.solution_applied as string,
+            impact: iter.impact_actual as number,
+            insight,
+          });
+        }
+
+        // Suggest based on problem pattern
+        const suggestions: Array<{
+          type: string;
+          description: string;
+          confidence: number;
+          source?: string;
+        }> = [];
+
+        // Problem-specific suggestions
+        const problemSuggestions: Record<string, Array<{ type: string; description: string; confidence: number }>> = {
+          mfe_reversal: [
+            { type: "parameter_change", description: "Add partial profits at 1R (take 50%)", confidence: 0.85 },
+            { type: "skill_addition", description: "Add trailing stop skill activated at 1R", confidence: 0.75 },
+            { type: "filter_addition", description: "Add session filter to avoid PM session", confidence: 0.65 },
+          ],
+          early_exit: [
+            { type: "parameter_change", description: "Widen initial stop by 20%", confidence: 0.7 },
+            { type: "skill_addition", description: "Add protected swing stop skill", confidence: 0.75 },
+            { type: "flow_change", description: "Wait for swing low protection before stop placement", confidence: 0.65 },
+          ],
+          late_entry: [
+            { type: "parameter_change", description: "Reduce confirmation wait time", confidence: 0.7 },
+            { type: "skill_removal", description: "Remove secondary confirmation requirement", confidence: 0.6 },
+            { type: "filter_addition", description: "Add momentum threshold to skip weak setups", confidence: 0.65 },
+          ],
+          false_breakout: [
+            { type: "skill_addition", description: "Add liquidity sweep detection before entry", confidence: 0.8 },
+            { type: "filter_addition", description: "Require HTF structure alignment", confidence: 0.75 },
+            { type: "parameter_change", description: "Wait for close above/below level", confidence: 0.7 },
+          ],
+          range_fade: [
+            { type: "filter_addition", description: "Add range size threshold (min/max ticks)", confidence: 0.75 },
+            { type: "skill_addition", description: "Add range maturity detection", confidence: 0.7 },
+            { type: "flow_change", description: "Only trade first break of session range", confidence: 0.65 },
+          ],
+          session_leak: [
+            { type: "filter_addition", description: "Hard stop trading after 2:30 PM ET", confidence: 0.85 },
+            { type: "parameter_change", description: "Reduce position size 50% after 1 PM", confidence: 0.7 },
+            { type: "flow_change", description: "Close all positions before 3 PM", confidence: 0.75 },
+          ],
+          stop_hunt: [
+            { type: "parameter_change", description: "Place stops beyond sweep levels", confidence: 0.8 },
+            { type: "skill_addition", description: "Add sweep detection to adjust stops dynamically", confidence: 0.75 },
+            { type: "flow_change", description: "Wait for sweep completion before entry", confidence: 0.7 },
+          ],
+          overtrading: [
+            { type: "filter_addition", description: "Max 3 trades per day limit", confidence: 0.85 },
+            { type: "parameter_change", description: "Require 30 minute cooldown after loss", confidence: 0.75 },
+            { type: "flow_change", description: "Stop trading after 2 consecutive losses", confidence: 0.7 },
+          ],
+        };
+
+        // Add pattern-specific suggestions
+        if (problemSuggestions[problemPattern]) {
+          suggestions.push(...problemSuggestions[problemPattern]);
+        }
+
+        // Add suggestions from historical solutions
+        for (const hist of historicalSolutions) {
+          if (hist.insight?.generalizable) {
+            suggestions.push({
+              type: "historical_learning",
+              description: `${hist.insight.suggested_rule || hist.solution} (from ${hist.model_name})`,
+              confidence: Math.min((hist.impact / 1000) * 0.1 + 0.5, 0.9),
+              source: hist.model_name,
+            });
+          }
+        }
+
+        // Sort by confidence
+        suggestions.sort((a, b) => b.confidence - a.confidence);
+
+        // Get skills that might help
+        const skillSuggestions = db
+          .prepare(`
+            SELECT id, name, category, description
+            FROM skills
+            WHERE (
+              category LIKE '%risk%'
+              OR category LIKE '%management%'
+              OR category LIKE '%filter%'
+            )
+            AND id NOT IN (
+              SELECT json_each.value
+              FROM skill_combinations, json_each(skill_ids)
+              WHERE skill_combinations.id = ?
+            )
+            LIMIT 5
+          `)
+          .all(modelId) as Record<string, unknown>[];
+
+        db.close();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  model_id: modelId,
+                  model_name: model.name,
+                  problem_pattern: problemPattern,
+                  backtest_summary: backtestSummary,
+                  suggestions: suggestions.slice(0, 5),
+                  historical_solutions: historicalSolutions,
+                  available_skills: skillSuggestions.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    category: s.category,
+                    description: s.description,
+                  })),
+                  recommendation:
+                    suggestions.length > 0
+                      ? `Top suggestion: ${suggestions[0].description} (confidence: ${Math.round(suggestions[0].confidence * 100)}%)`
+                      : "No specific suggestions available. Consider creating a variant with manual adjustments.",
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "get_visual_context": {
+        const videoId = args.video_id as string;
+        const contextType = (args.context_type as string) || "all";
+        const contradictionOnly = args.contradiction_only as boolean || false;
+
+        // Build query based on filters
+        let query = `
+          SELECT
+            video_id, frame_filename, frame_index, timestamp_sec, timestamp_str,
+            frame_type, sad_section, categories, is_contradiction_relevant,
+            transcript_segment, sad_path
+          FROM video_frames
+          WHERE video_id = ?
+        `;
+        const params: (string | number)[] = [videoId];
+
+        if (contextType !== "all") {
+          query += " AND frame_type = ?";
+          params.push(contextType);
+        }
+
+        if (contradictionOnly) {
+          query += " AND is_contradiction_relevant = 1";
+        }
+
+        query += " ORDER BY timestamp_sec ASC";
+
+        const frames = db.prepare(query).all(...params) as Record<string, unknown>[];
+
+        if (frames.length === 0) {
+          db.close();
+          return {
+            content: [
+              {
+                type: "text",
+                text: `No frames found for video_id="${videoId}" with context_type="${contextType}". ` +
+                  `Make sure frames were persisted with --persist-frames flag during /youtube extraction.`,
+              },
+            ],
+          };
+        }
+
+        // Build the frame paths (relative to project root)
+        const frameData = frames.map((f) => {
+          const categories = f.categories ? JSON.parse(f.categories as string) : [];
+          return {
+            video_id: f.video_id,
+            filename: f.frame_filename,
+            // Construct the absolute path for Claude to read
+            path: `data/video-frames/${f.video_id}/frames/${f.frame_filename}`,
+            timestamp: f.timestamp_str,
+            timestamp_sec: f.timestamp_sec,
+            frame_type: f.frame_type,
+            sad_section: f.sad_section,
+            categories,
+            is_contradiction_relevant: f.is_contradiction_relevant === 1,
+            transcript_context: f.transcript_segment,
+          };
+        });
+
+        // Group by frame type for summary
+        const typeCounts: Record<string, number> = {};
+        for (const f of frameData) {
+          typeCounts[f.frame_type as string] = (typeCounts[f.frame_type as string] || 0) + 1;
+        }
+
+        db.close();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  video_id: videoId,
+                  filter: { context_type: contextType, contradiction_only: contradictionOnly },
+                  frame_count: frames.length,
+                  type_summary: typeCounts,
+                  frames: frameData,
+                  usage_hint: "Use the Read tool with frame paths to view images for visual analysis",
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "resolve_video_id": {
+        const sourceUrl = args.source_url as string | undefined;
+        const sadPath = args.sad_path as string | undefined;
+
+        // Option 1: Direct URL provided
+        if (sourceUrl) {
+          const videoId = extractVideoId(sourceUrl);
+          if (videoId) {
+            // Check if we have frames for this video
+            const frameCount = db.prepare(
+              "SELECT COUNT(*) as count FROM video_frames WHERE video_id = ?"
+            ).get(videoId) as { count: number };
+
+            db.close();
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    video_id: videoId,
+                    source: "url",
+                    source_url: sourceUrl,
+                    has_persisted_frames: frameCount.count > 0,
+                    frame_count: frameCount.count,
+                  }, null, 2),
+                },
+              ],
+            };
+          }
+          db.close();
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Could not extract video_id from URL: ${sourceUrl}. Expected formats: youtu.be/X, youtube.com/watch?v=X, or youtube.com/embed/X`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Option 2: Parse SAD file for source_url
+        if (sadPath) {
+          // Resolve path relative to project root
+          const projectRoot = join(__dirname, "../../../..");
+          const fullPath = sadPath.startsWith("/") || sadPath.includes(":")
+            ? sadPath
+            : resolve(projectRoot, sadPath);
+
+          if (!existsSync(fullPath)) {
+            db.close();
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `SAD file not found: ${fullPath}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          const content = readFileSync(fullPath, "utf-8");
+
+          // Look for URL in ## Source section or anywhere
+          const urlPatterns = [
+            /URL:\s*(https?:\/\/[^\s\n]+)/i,
+            /\*\*URL:\*\*\s*(https?:\/\/[^\s\n]+)/i,
+            /(https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)[^\s\n]+)/i,
+          ];
+
+          let foundUrl: string | null = null;
+          for (const pattern of urlPatterns) {
+            const match = content.match(pattern);
+            if (match) {
+              foundUrl = match[1];
+              break;
+            }
+          }
+
+          if (foundUrl) {
+            const videoId = extractVideoId(foundUrl);
+            if (videoId) {
+              // Check if we have frames for this video
+              const frameCount = db.prepare(
+                "SELECT COUNT(*) as count FROM video_frames WHERE video_id = ?"
+              ).get(videoId) as { count: number };
+
+              db.close();
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify({
+                      video_id: videoId,
+                      source: "sad",
+                      sad_path: sadPath,
+                      source_url: foundUrl,
+                      has_persisted_frames: frameCount.count > 0,
+                      frame_count: frameCount.count,
+                    }, null, 2),
+                  },
+                ],
+              };
+            }
+          }
+
+          db.close();
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Could not find YouTube URL in SAD file: ${sadPath}. Expected ## Source section with URL.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        db.close();
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Must provide either source_url or sad_path parameter",
+            },
+          ],
+          isError: true,
         };
       }
 

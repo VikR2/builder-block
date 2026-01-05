@@ -1,29 +1,37 @@
 {
+  "youtube": {
+    "triggers": [
+      "youtube extraction",
+      "extract from youtube",
+      "youtube video",
+      "/youtube"
+    ],
+    "patterns": [
+      "\\bhttps?://(?:www\\.)?youtube\\.com/watch\\?v=[\\w-]+",
+      "\\bhttps?://youtu\\.be/[\\w-]+",
+      "/youtube"
+    ],
+    "description": "Orchestrated YouTube extraction with model detection and checkpoints (primary)"
+  },
   "generate-from-youtube": {
     "triggers": [
-      "youtube",
       "generate from youtube",
       "convert this video",
       "from this youtube",
-      "youtube.com/watch",
-      "youtu.be/",
       "learn from this video",
       "create from video",
-      "extract from youtube",
       "youtube strategy",
       "youtube indicator",
       "trading video"
     ],
     "patterns": [
-      "\\bhttps?://(?:www\\.)?youtube\\.com/watch\\?v=[\\w-]+",
-      "\\bhttps?://youtu\\.be/[\\w-]+",
       "generate.*youtube",
       "youtube.*strategy",
       "youtube.*indicator",
       "convert.*video",
       "from.*youtube"
     ],
-    "description": "Automatically invoke when user mentions YouTube URLs or video generation for trading tutorials"
+    "description": "Legacy YouTube extraction - prefer /youtube for new extractions"
   },
   "implement-strategy": {
     "triggers": [
@@ -42,5 +50,41 @@
       "/implement-strategy"
     ],
     "description": "Generate NinjaTrader code from a Strategy Architecture Document (SAD)"
+  },
+  "extract-nt-skills": {
+    "triggers": [
+      "extract skills",
+      "extract from script",
+      "parse ninjatrader",
+      "extract nt skills",
+      "skill extraction"
+    ],
+    "patterns": [
+      "extract.*skills.*from",
+      "parse.*ninjatrader",
+      "/extract-nt-skills"
+    ],
+    "description": "Extract reusable skills from existing NinjaTrader scripts"
+  },
+  "strategy-iterator": {
+    "triggers": [
+      "iterate strategy",
+      "iterate",
+      "run iteration",
+      "analyze backtest",
+      "optimize strategy",
+      "improve performance",
+      "next version",
+      "/iterate"
+    ],
+    "patterns": [
+      "iterate.*strategy",
+      "analyze.*backtest",
+      "optimize.*strategy",
+      "improve.*performance",
+      "/iterate",
+      "/strategy-iterator"
+    ],
+    "description": "Run V1-to-V5 iteration loop: analyze backtest, find problems, apply skills, document changes"
   }
 }

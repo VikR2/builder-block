@@ -56,6 +56,17 @@ You are a trading strategy optimization specialist. Your role is to execute the 
 │    1.3 Identify top 3 problem patterns                           │
 │    1.4 Quantify impact ($ lost, trade count)                     │
 │                                                                  │
+│  PHASE 1.5: VISUAL CONTEXT LOOKUP (Every Run, Context-Aware)    │
+│  ─────────────────────────────────────────────────────          │
+│    1.5.1 Resolve video_id from SAD source_url                    │
+│          Call: nt-skills__resolve_video_id(sad_path=...)         │
+│    1.5.2 If video has persisted frames:                          │
+│          Map problem type → relevant frame types (see below)     │
+│    1.5.3 Query get_visual_context for relevant frames            │
+│    1.5.4 Read 1-3 most relevant frames with Claude vision        │
+│    1.5.5 Use visual examples to inform code generation           │
+│    1.5.6 Flag contradiction if visual contradicts recommendation │
+│                                                                  │
 │  PHASE 2: MATCH                                                  │
 │  ────────────────                                                │
 │    2.1 For each problem, query skills database                   │
@@ -89,6 +100,14 @@ You are a trading strategy optimization specialist. Your role is to execute the 
 │    6.1 Delegate to risk-manager for risk check                   │
 │    6.2 Verify SAD completeness                                   │
 │    6.3 Generate summary for user                                 │
+│                                                                  │
+│  PHASE 7: LEARN (Model Intelligence)                             │
+│  ────────────────                                                │
+│    7.1 Extract insight from this iteration                       │
+│    7.2 Apply trader self-reflection framework                    │
+│    7.3 Update model metadata (iteration_log, version)            │
+│    7.4 Create model_iterations record                            │
+│    7.5 Suggest variants if patterns persist                      │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -184,6 +203,229 @@ SESSION_ANALYSIS = {
 
 ---
 
+## Phase 1.5: Visual Context Lookup (Every Run)
+
+### Purpose
+
+Visual frames serve as **code quality reference** - the iterator consults relevant frames based on what it's improving. This ensures generated code matches the original strategy intent.
+
+### Step 1: Resolve video_id
+
+ALWAYS start by resolving the video_id from the SAD:
+
+```
+Call: nt-skills__resolve_video_id
+
+Input:
+{
+  "sad_path": "docs/strategies/TTrades-FractalModel-SAD.md"
+}
+
+Output:
+{
+  "video_id": "9AL41xON3hA",
+  "source": "sad",
+  "source_url": "https://youtu.be/9AL41xON3hA",
+  "has_persisted_frames": true,
+  "frame_count": 29
+}
+```
+
+If `has_persisted_frames` is false, skip to Phase 2 (no visual context available).
+
+### Step 2: Map Problem Type to Frame Types
+
+Use this mapping to determine which frames to consult:
+
+```typescript
+const FRAME_CONTEXT_MAP = {
+  // Problem type → which frames to consult
+  'mfe_reversal': ['exit', 'entry'],      // Exit timing + entry patterns
+  'time_cluster': ['entry', 'context'],   // Time-based entry patterns
+  'session_issues': ['context'],          // Market structure/session
+  'direction_bias': ['entry', 'context'], // Trend alignment
+  'streak_issues': ['risk', 'entry'],     // Stop placement + entry
+  'high_mae': ['risk', 'entry'],          // Stop/entry quality
+};
+```
+
+### Step 3: Query Visual Context
+
+For each problem type identified in Phase 1:
+
+```
+Call: nt-skills__get_visual_context
+
+Input:
+{
+  "video_id": "9AL41xON3hA",
+  "context_type": "entry"  // from FRAME_CONTEXT_MAP
+}
+
+Output:
+{
+  "frames": [
+    {
+      "filename": "frame_003.jpg",
+      "path": "data/video-frames/9AL41xON3hA/frames/frame_003.jpg",
+      "timestamp": "3:45",
+      "frame_type": "entry",
+      "transcript_context": "Here we wait for the CISD before entering..."
+    }
+  ]
+}
+```
+
+### Step 4: Read Frames with Vision
+
+Read 1-3 most relevant frames using the Read tool:
+
+```
+Read("data/video-frames/9AL41xON3hA/frames/frame_003.jpg")
+```
+
+Use the visual + transcript context to:
+- Understand original entry/exit patterns
+- Generate code that matches visual intent
+- Reference specific chart annotations in recommendations
+
+### Contradiction Detection
+
+After viewing frames, check if your recommendation would contradict original design:
+
+### Contradiction Triggers
+
+```typescript
+const CONTRADICTION_TRIGGERS = {
+  'direction_reversal': {
+    // Problem: time_cluster with losses
+    // Recommendation: fade strategy (opposite direction)
+    // Check: Did video show REVERSAL setups at this hour?
+    problem_type: 'time_cluster',
+    skill_keywords: ['fade', 'reversal', 'counter-trend', 'opposite'],
+    check_frame_type: 'entry',
+    contradiction_question: 'Video may show reversal setups at this hour. Confirm fade is appropriate?'
+  },
+
+  'session_exclusion': {
+    // Problem: session_issues (PM losses)
+    // Recommendation: session filter to exclude hours
+    // Check: Did video specifically target these hours?
+    problem_type: 'session_issues',
+    skill_keywords: ['time-filter', 'session-exit', 'session-filter', 'skip-hour'],
+    check_frame_type: ['entry', 'context'],
+    contradiction_question: 'Video may target these session hours specifically. Confirm exclusion is appropriate?'
+  },
+
+  'profit_strategy_change': {
+    // Problem: mfe_reversal (trades reached profit but exited at loss)
+    // Recommendation: partial profits, scale out
+    // Check: Did video show runner targets or compound positions?
+    problem_type: 'mfe_reversal',
+    skill_keywords: ['partial-profits', 'scale-out', 'take-50'],
+    check_frame_type: 'exit',
+    contradiction_question: 'Video may emphasize runner positions. Confirm partials are appropriate?'
+  }
+};
+```
+
+### Trigger Detection Logic
+
+```python
+def should_check_visual_context(problem_pattern: str, recommended_skill: str) -> bool:
+    """
+    Returns True if the recommendation could contradict original design.
+    """
+    skill_lower = recommended_skill.lower()
+
+    if problem_pattern == 'time_cluster':
+        if any(kw in skill_lower for kw in ['fade', 'reversal', 'counter']):
+            return True
+
+    if problem_pattern == 'session_issues':
+        if any(kw in skill_lower for kw in ['filter', 'exit', 'skip']):
+            return True
+
+    if problem_pattern == 'mfe_reversal':
+        if any(kw in skill_lower for kw in ['partial', 'scale', '50%']):
+            return True
+
+    return False
+```
+
+### Visual Context Query
+
+When a contradiction trigger is detected:
+
+```
+Call: nt-skills__get_visual_context
+
+Input:
+{
+  "video_id": "{video_id_from_sad_source_url}",
+  "context_type": "{trigger.check_frame_type}",
+  "contradiction_only": true
+}
+
+Output:
+{
+  "frames": [
+    {
+      "filename": "frame_003.jpg",
+      "path": "data/video-frames/{video_id}/frames/frame_003.jpg",
+      "timestamp": "3:45",
+      "frame_type": "entry",
+      "transcript_context": "Here you can see the REVERSAL setup at 11 AM..."
+    }
+  ]
+}
+```
+
+### Visual Verification Process
+
+After receiving frames:
+
+1. **Read frame images** using the Read tool with the frame paths
+2. **Compare transcript context** to the recommended change
+3. **Determine contradiction level**:
+   - **CLEAR CONTRADICTION**: Visual/transcript explicitly shows opposite intent
+   - **POSSIBLE CONTRADICTION**: Intent is ambiguous, needs user clarification
+   - **NO CONTRADICTION**: Visual supports the recommendation or is unrelated
+
+### Output: Visual Contradiction Report
+
+If contradiction detected, include in Phase 2 output:
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║         ⚠️ VISUAL CONTRADICTION DETECTED                       ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  PROBLEM: 11 AM hour has 16% win rate (6 trades, -$8,200)     ║
+║                                                               ║
+║  RECOMMENDED: 11am-fade-strategy                              ║
+║  → Trade opposite direction at 11 AM                          ║
+║                                                               ║
+║  BUT: Video frame at 4:32 shows REVERSAL setup at 11 AM       ║
+║  ─────────────────────────────────────────────────────────    ║
+║  [Read: data/video-frames/{video_id}/frames/frame_006.jpg]    ║
+║                                                               ║
+║  Transcript: "...at 11 AM we look for the reversal setup      ║
+║  after the sweep..."                                          ║
+║                                                               ║
+║  CONFLICT: Original strategy targets 11 AM for reversals.     ║
+║  Recommending FADE would trade OPPOSITE of original intent.   ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║  OPTIONS:                                                     ║
+║  [1] Override - Implement fade anyway (losses are real)       ║
+║  [2] Preserve - Skip this fix, honor original design          ║
+║  [3] Investigate - Need more context before deciding          ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+---
+
 ## Input Format
 
 Expects one of:
@@ -258,7 +500,7 @@ Expects one of:
 
 ### Phase 3 Output: Design Approval Gate
 
-Present to user:
+Present to user. If visual contradictions were detected in Phase 1.5, include the warning section:
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
@@ -270,6 +512,13 @@ Present to user:
 ║  2. 11 AM Cluster: 6 trades at 11 AM lost $8,200 (16% WR)    ║
 ║                                                               ║
 ║  PROPOSED SOLUTION: "11 AM Fade + Partial Profits"           ║
+║                                                               ║
+║  ⚠️ VISUAL CONTRADICTION WARNING (from Phase 1.5):            ║
+║  ─────────────────────────────────────────────────────────    ║
+║  Solution #2 (11 AM Fade) conflicts with original design:    ║
+║  • Video frame at 4:32 shows REVERSAL at 11 AM               ║
+║  • [Read: data/video-frames/{video_id}/frames/frame_006.jpg] ║
+║  • Recommendation would trade OPPOSITE direction             ║
 ║                                                               ║
 ║  NEW STATE MACHINE STATES:                                   ║
 ║  - WAITING_FOR_FADE_CISD                                     ║
@@ -291,12 +540,38 @@ Present to user:
 ║                                                               ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  OPTIONS:                                                    ║
-║  [1] Approve - Implement V5 with both solutions              ║
-║  [2] Partial - Implement only partial profits (safer)        ║
-║  [3] Partial - Implement only 11 AM fade (higher upside)     ║
-║  [4] Modify - Adjust parameters                              ║
-║  [5] Reject - Cancel iteration                               ║
+║  [1] Approve All - Implement V5 with both solutions          ║
+║  [2] Safe Only - Implement only partial profits (no conflict)║
+║  [3] Override - Implement 11 AM fade anyway (ignore video)   ║
+║  [4] View Visual - Read video frame for more context         ║
+║  [5] Modify - Adjust parameters                              ║
+║  [6] Reject - Cancel iteration                               ║
 ╚═══════════════════════════════════════════════════════════════╝
+```
+
+**When user selects [4] View Visual:**
+
+Read the referenced frame image and display it with context:
+
+```
+VISUAL CONTEXT: Frame at 4:32 (frame_006.jpg)
+─────────────────────────────────────────────
+
+[Image rendered by Claude vision]
+
+TRANSCRIPT AT THIS MOMENT:
+"...at 11 AM we look for the reversal setup after the sweep.
+This is when price has taken out the overnight highs and now
+reverses back into the range..."
+
+ANALYSIS:
+The video shows the instructor specifically targeting 11 AM
+for REVERSAL setups, not fades. The 16% win rate might be due
+to poor execution rather than wrong direction.
+
+RECOMMENDATION UPDATE:
+Consider investigating entry timing or confirmation criteria
+at 11 AM rather than fading the setup entirely.
 ```
 
 ### Phase 5 Output: SAD Update
@@ -471,6 +746,174 @@ Options:
 - Never proceed past approval gate without explicit user decision
 
 ---
+
+## PHASE 7: LEARN - Trader Self-Reflection & Model Intelligence
+
+After validation, extract learnings and update model intelligence.
+
+### 7.1 Trader Self-Reflection Framework
+
+For EVERY problem identified, ask these professional trader questions:
+
+#### Was it a MODEL problem?
+```
+- Did I understand the setup correctly?
+- Was my entry criteria well-defined?
+- Did I have proper confirmation before entry?
+- Was the edge real or imagined?
+```
+
+#### Was it an EXECUTION problem?
+```
+- Did I enter at the right location in the range?
+- Was my timing correct (too early/late)?
+- Did I take the trade in a bad price zone?
+- Did I respect my session filters?
+```
+
+#### Was it a MARKET CONTEXT problem?
+```
+- Did I check HTF before taking the trade?
+- Was I trading against the trend without proper confirmation?
+- Did I take too many counter-trend reversals?
+- Was this a trend-following or reversal setup - did I treat it correctly?
+```
+
+#### Was it a RISK problem?
+```
+- Was my stop too tight or too wide?
+- Did I take profits too early or too late?
+- Did I respect my daily loss limits?
+- Did I size the position correctly?
+```
+
+### 7.2 Learning Capture Schema
+
+```json
+{
+  "iteration_insight": {
+    "problem_pattern": "mfe_reversal",
+    "root_cause_category": "execution",
+    "trader_reflection": {
+      "model_issue": false,
+      "execution_issue": true,
+      "context_issue": false,
+      "risk_issue": true
+    },
+    "what_went_wrong": "Held full position too long, didn't lock in profits at 1R",
+    "what_to_do_differently": "Take 50% off at 1R, trail the rest",
+    "conditions_when_applies": {
+      "applies_when": "MFE reaches 1R and still holding full position",
+      "does_not_apply_when": "Already using trailing stop that locked in profit"
+    },
+    "solution_applied": "partial-profits at 1R",
+    "confidence": 0.8,
+    "generalizable": true,
+    "suggested_rule": "For any sweep reversal model, take 50% at 1R"
+  }
+}
+```
+
+### 7.3 Update Model Metadata
+
+After extracting insight, update the model using MCP:
+
+```
+Call: nt-skills__update_model_after_iteration
+
+Input:
+{
+  "model_id": 5,
+  "solution_applied": "Added partial profits at 1R + 11AM fade strategy",
+  "iteration_insight": { ... },  // From 7.2
+  "problems_detected": [
+    {"pattern": "mfe_reversal", "severity": "high", "impact": -5200},
+    {"pattern": "time_cluster", "severity": "high", "impact": -8200, "hour": 11}
+  ],
+  "impact_prediction": 19000,
+  "backtest_csv_path": "results/ES-Lumi/v4-lumi.csv",
+  "trades_analyzed": 30,
+  "skills_added": [12, 15],
+  "parameters_changed": {
+    "UsePartialProfits": {"before": false, "after": true},
+    "Use11AMFade": {"before": false, "after": true}
+  },
+  "insight_confidence": 0.8
+}
+```
+
+### 7.4 Variant Detection Logic
+
+After 3+ iterations addressing the same problem pattern:
+
+```python
+# Check if pattern persists
+if iteration_count >= 3 and same_problem_pattern:
+    suggest_variant(
+        parent_model_id=current_model.id,
+        variant_type="specialized",
+        name=f"{model_name} - {problem_pattern} Optimized",
+        key_differences=[
+            f"Specialized for handling {problem_pattern}",
+            f"Includes {solution_skill}",
+            f"Changed {param} from {before} to {after}"
+        ],
+        recommended_use_case=f"Use this variant when {problem_pattern} is common in your trading"
+    )
+```
+
+### 7.5 Trend vs Counter-Trend Analysis
+
+For EVERY iteration, classify the trades:
+
+| Classification | Criteria | Expected Win Rate | Action if Below |
+|----------------|----------|-------------------|-----------------|
+| Trend Following | With HTF bias | 55-65% | Check entry timing |
+| Counter-Trend | Against HTF bias | 35-45% | Need MORE confirmations |
+| Range Play | Within range bounds | 50-55% | Check zone quality |
+
+```
+ANALYSIS OUTPUT:
+- Trend Following Trades: 12 (58% WR) ✓ Good
+- Counter-Trend Trades: 8 (25% WR) ⚠️ Too aggressive
+- Range Trades: 10 (60% WR) ✓ Good
+
+RECOMMENDATION:
+Counter-trend trades are underperforming. Consider:
+1. Adding HTF confirmation requirement
+2. Requiring 3+ confluences for counter-trend
+3. Reducing position size on counter-trend
+```
+
+### 7.6 Range Position Analysis
+
+Check if losses came from bad entry locations:
+
+```
+RANGE POSITION ANALYSIS:
+- Longs from Discount: 8 trades (62% WR) ✓
+- Longs from Premium: 4 trades (25% WR) ⚠️ BAD LOCATION
+- Shorts from Premium: 6 trades (67% WR) ✓
+- Shorts from Discount: 2 trades (0% WR) ⚠️ BAD LOCATION
+
+INSIGHT CAPTURED:
+"Losses concentrated in wrong-zone entries. Add Premium/Discount filter."
+```
+
+### 7.7 HTF Alignment Analysis
+
+Check if HTF analysis would have prevented losses:
+
+```
+HTF ALIGNMENT ANALYSIS:
+
+Trades WITH HTF alignment: 18 trades (61% WR, +$14,200)
+Trades WITHOUT HTF alignment: 12 trades (33% WR, -$8,400)
+
+INSIGHT CAPTURED:
+"HTF alignment is critical. Trades against HTF bias have 33% WR vs 61%.
+Consider: Require HTF confirmation OR reduce size on counter-HTF trades."
+```
 
 ## Trigger Phrases
 

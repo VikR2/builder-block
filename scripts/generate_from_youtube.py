@@ -33,6 +33,7 @@ USAGE:
         [--frame-interval 45]         # Seconds between frames (default: 45)
         [--max-frames 15]             # Max frames to extract (default: 15)
         [--keep-frames]               # Don't delete frames after processing
+        [--persist-frames]            # Save frames to data/video-frames/ for strategy-iterator
         [--extract-skills | --no-extract-skills] \\
         [--auto-confirm]              # CAUTION: Bypass skill confirmation QA gate
         [--skip-generation] \\
@@ -76,6 +77,12 @@ MULTIMODAL WORKFLOW:
     4. Saves to data/temp-frames/{video_id}/
     5. Claude Code can then read these frames for visual analysis
     6. Frames are deleted after processing (unless --keep-frames)
+
+    When using --persist-frames (requires --with-frames):
+    - Frames are copied to data/video-frames/{video_id}/ for permanent storage
+    - Each frame is classified by transcript content (entry/exit/risk/context)
+    - Creates frame_index.json with metadata for strategy-iterator lookups
+    - Enables visual contradiction detection in /strategy-iterator workflow
 """
 
 import argparse
@@ -127,6 +134,7 @@ DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "scripts-output"
 ARCHITECTURES_DIR = PROJECT_ROOT / "data" / "architectures"
 SAD_TEMPLATE_PATH = PROJECT_ROOT / "scripts" / "templates" / "sad_template.md"
 TEMP_FRAMES_DIR = PROJECT_ROOT / "data" / "temp-frames"
+PERSISTENT_FRAMES_DIR = PROJECT_ROOT / "data" / "video-frames"
 
 # Maximum transcript length to process (chars)
 MAX_TRANSCRIPT_LENGTH = 50000
@@ -599,6 +607,229 @@ def cleanup_frames(video_id: str) -> None:
     if frames_dir.exists():
         shutil.rmtree(frames_dir, ignore_errors=True)
         print(f"  Cleaned up frames for {video_id}")
+
+
+def persist_video_frames(
+    video_id: str,
+    frames_dir: Path,
+    video_url: str,
+    sad_path: Path = None,
+) -> Path:
+    """
+    Persist all video frames to permanent storage for strategy-iterator visual context.
+
+    Uses manifest.json to classify frames based on transcript content.
+
+    Args:
+        video_id: YouTube video ID
+        frames_dir: Path to temporary frames directory
+        video_url: Source YouTube URL
+        sad_path: Path to generated SAD (optional, for linking)
+
+    Returns:
+        Path to persistent frames directory
+    """
+    print(f"\n[PERSIST] Saving video frames for visual context...")
+
+    # Create persistent directory
+    persist_dir = PERSISTENT_FRAMES_DIR / video_id
+    persist_dir.mkdir(parents=True, exist_ok=True)
+    frames_subdir = persist_dir / "frames"
+    frames_subdir.mkdir(exist_ok=True)
+
+    # Load manifest
+    manifest_path = frames_dir / "manifest.json"
+    if not manifest_path.exists():
+        print(f"  Warning: No manifest.json found, cannot persist frames")
+        return None
+
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except json.JSONDecodeError:
+        print(f"  Warning: Invalid manifest.json, cannot persist frames")
+        return None
+
+    # Category keywords for frame classification
+    FRAME_CATEGORY_KEYWORDS = {
+        "entry": ["entry", "enter", "get in", "trigger", "signal", "long", "short", "buy", "sell", "order block", "sweep"],
+        "exit": ["exit", "get out", "take profit", "target", "close", "tp", "profit"],
+        "risk": ["stop", "risk", "invalidation", "protect", "loss", "stop loss", "stoploss"],
+        "context": ["bias", "trend", "session", "range", "setup", "structure", "market structure", "htf", "higher timeframe"],
+    }
+
+    def classify_frame_transcript(text: str) -> tuple:
+        """Classify frame based on transcript content."""
+        text_lower = text.lower()
+        categories = []
+
+        for category, keywords in FRAME_CATEGORY_KEYWORDS.items():
+            if any(kw in text_lower for kw in keywords):
+                categories.append(category)
+
+        # Determine primary frame_type
+        if "entry" in categories:
+            frame_type = "entry"
+            sad_section = "Entry Scenarios"
+        elif "exit" in categories:
+            frame_type = "exit"
+            sad_section = "Risk Management"
+        elif "risk" in categories:
+            frame_type = "risk"
+            sad_section = "Risk Management"
+        elif "context" in categories:
+            frame_type = "context"
+            sad_section = "Market Context"
+        else:
+            frame_type = "general"
+            sad_section = "Overview"
+
+        return frame_type, sad_section, categories
+
+    # Build frame index
+    frame_index = {
+        "video_id": video_id,
+        "video_url": video_url,
+        "video_title": manifest.get("video_title", ""),
+        "sad_path": str(sad_path) if sad_path else None,
+        "created_at": datetime.now().isoformat(),
+        "frame_count": 0,
+        "frames": [],
+    }
+
+    # Process each frame from manifest
+    for i, frame_data in enumerate(manifest.get("frames", [])):
+        frame_filename = frame_data.get("file", f"frame_{i+1:03d}.jpg")
+        src_path = frames_dir / frame_filename
+
+        if not src_path.exists():
+            continue
+
+        # Get transcript segment for classification
+        transcript_segment = frame_data.get("transcript_segment", "")
+        frame_type, sad_section, categories = classify_frame_transcript(transcript_segment)
+
+        # Determine if this frame is relevant for contradiction detection
+        is_contradiction_relevant = frame_type in ["entry", "exit", "context"]
+
+        # Copy frame to persistent location
+        dest_path = frames_subdir / frame_filename
+        shutil.copy2(src_path, dest_path)
+
+        # Add to frame index
+        timestamp_sec = frame_data.get("timestamp_sec", 0)
+        frame_index["frames"].append({
+            "filename": frame_filename,
+            "timestamp_sec": timestamp_sec,
+            "timestamp_str": frame_data.get("timestamp_str", f"{int(timestamp_sec // 60)}:{int(timestamp_sec % 60):02d}"),
+            "frame_type": frame_type,
+            "sad_section": sad_section,
+            "categories": categories,
+            "is_contradiction_relevant": is_contradiction_relevant,
+            "transcript_segment": transcript_segment[:500],  # Limit length
+            "frame_index": i,
+        })
+
+    frame_index["frame_count"] = len(frame_index["frames"])
+
+    # Save frame index
+    index_path = persist_dir / "frame_index.json"
+    index_path.write_text(json.dumps(frame_index, indent=2), encoding="utf-8")
+
+    # Copy original manifest for reference
+    shutil.copy2(manifest_path, persist_dir / "manifest.json")
+
+    print(f"  Persisted {frame_index['frame_count']} frames to {persist_dir}")
+    print(f"  Frame index: {index_path}")
+
+    # Print classification summary
+    type_counts = {}
+    for f in frame_index["frames"]:
+        t = f["frame_type"]
+        type_counts[t] = type_counts.get(t, 0) + 1
+    if type_counts:
+        print(f"  Classifications: {', '.join(f'{k}={v}' for k, v in type_counts.items())}")
+
+    # Insert frames into database for MCP tool queries
+    try:
+        import sqlite3
+        db_path = PROJECT_ROOT / "data" / "builder.db"
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # Delete existing frames for this video (if re-processing)
+        cursor.execute("DELETE FROM video_frames WHERE video_id = ?", (video_id,))
+
+        # Insert new frames
+        for f in frame_index["frames"]:
+            cursor.execute("""
+                INSERT INTO video_frames (
+                    video_id, frame_filename, frame_index, timestamp_sec, timestamp_str,
+                    frame_type, sad_section, categories, is_contradiction_relevant,
+                    transcript_segment, sad_path
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                video_id,
+                f["filename"],
+                f.get("frame_index", 0),
+                f["timestamp_sec"],
+                f["timestamp_str"],
+                f["frame_type"],
+                f["sad_section"],
+                json.dumps(f["categories"]),
+                1 if f["is_contradiction_relevant"] else 0,
+                f["transcript_segment"],
+                str(sad_path) if sad_path else None,
+            ))
+
+        conn.commit()
+        conn.close()
+        print(f"  Inserted {len(frame_index['frames'])} frames into database")
+    except Exception as e:
+        print(f"  Warning: Could not insert frames into database: {e}")
+
+    # Update SAD file with visual references table (if SAD exists)
+    if sad_path and Path(sad_path).exists():
+        try:
+            sad_content = Path(sad_path).read_text(encoding="utf-8")
+
+            # Build frame table rows
+            frame_rows = []
+            for f in frame_index["frames"][:10]:  # Limit to 10 rows for readability
+                context = f["transcript_segment"][:50] + "..." if len(f["transcript_segment"]) > 50 else f["transcript_segment"]
+                frame_rows.append(
+                    f"| `{f['filename']}` | {f['timestamp_str']} | {f['frame_type']} | {context} |"
+                )
+
+            if len(frame_index["frames"]) > 10:
+                frame_rows.append(f"| ... | | | *({len(frame_index['frames']) - 10} more frames in frame_index.json)* |")
+
+            frame_table = "\n".join(frame_rows) if frame_rows else "| *No frames extracted* | | | |"
+
+            # Replace placeholder in SAD
+            old_visual_section = """| Frame | Timestamp | Type | Context |
+|-------|-----------|------|---------|
+| *Frames will be populated when using --persist-frames* | | | |"""
+
+            new_visual_section = f"""| Frame | Timestamp | Type | Context |
+|-------|-----------|------|---------|
+{frame_table}"""
+
+            if old_visual_section in sad_content:
+                sad_content = sad_content.replace(old_visual_section, new_visual_section)
+
+                # Also update the video_id placeholder
+                sad_content = sad_content.replace(
+                    "**Video Frames:** `data/video-frames/{video_id}/` (if --persist-frames used)",
+                    f"**Video Frames:** `data/video-frames/{video_id}/`"
+                )
+
+                Path(sad_path).write_text(sad_content, encoding="utf-8")
+                print(f"  Updated SAD with visual references: {sad_path}")
+
+        except Exception as e:
+            print(f"  Warning: Could not update SAD with visual references: {e}")
+
+    return persist_dir
 
 
 # =============================================================================
@@ -1228,6 +1459,19 @@ def generate_architecture_document(
 
 ### Key Passages
 {transcript_excerpts}
+
+---
+
+## 13. Visual References
+
+**Video Frames:** `data/video-frames/{video_id}/` (if --persist-frames used)
+
+| Frame | Timestamp | Type | Context |
+|-------|-----------|------|---------|
+| *Frames will be populated when using --persist-frames* | | | |
+
+> **Note:** These frames can be read by Claude for visual context when iterating on the strategy.
+> Use strategy-iterator with visual lookup to consult frames when recommendations may conflict with original design.
 
 ---
 
@@ -2932,6 +3176,12 @@ Examples:
         default=False,
         help="Keep frames after processing (don't delete temp-frames)",
     )
+    parser.add_argument(
+        "--persist-frames",
+        action="store_true",
+        default=False,
+        help="Persist all segment frames to data/video-frames/ for strategy-iterator visual context",
+    )
 
     args = parser.parse_args()
 
@@ -2947,6 +3197,8 @@ Examples:
         mode = "Strategy Architecture Document (SAD)"
     if args.with_frames:
         mode += " + Frame extraction"
+    if args.persist_frames:
+        mode += " + Frame persistence"
     print(f"Mode: {mode}")
     print("=" * 60)
 
@@ -3303,6 +3555,18 @@ Examples:
                 print("  2. Fill in TODOs and answer User Questions")
                 print("  3. Run /implement-strategy when ready")
             print()
+
+        # Persist frames for strategy-iterator visual context (if enabled)
+        if args.persist_frames and frames_dir and video_id:
+            try:
+                persist_video_frames(
+                    video_id=video_id,
+                    frames_dir=frames_dir,
+                    video_url=args.url,
+                    sad_path=sad_path if 'sad_path' in dir() else None,
+                )
+            except Exception as e:
+                print(f"  Warning: Frame persistence failed: {e}")
 
         # Cleanup frames (unless --keep-frames)
         if frames_dir and video_id and not args.keep_frames:

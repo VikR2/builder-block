@@ -233,7 +233,7 @@ CREATE INDEX IF NOT EXISTS idx_skill_sources_skill ON skill_sources(skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_sources_type ON skill_sources(source_type);
 CREATE INDEX IF NOT EXISTS idx_skill_sources_url ON skill_sources(source_url);
 
--- Track commonly used skill combinations
+-- Track commonly used skill combinations (enhanced for full model intelligence)
 CREATE TABLE IF NOT EXISTS skill_combinations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -253,11 +253,123 @@ CREATE TABLE IF NOT EXISTS skill_combinations (
   complexity TEXT DEFAULT 'medium',    -- simple, medium, complex
 
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  -- ============================================================================
+  -- MODEL INTELLIGENCE FIELDS (v2.0)
+  -- ============================================================================
+
+  -- Model type and source
+  model_type TEXT DEFAULT 'combination',    -- 'combination' | 'complete_model'
+  source_video_url TEXT,                    -- YouTube URL if extracted from video
+  source_video_title TEXT,                  -- Video title for reference
+  extraction_confidence REAL,               -- 0.0-1.0 confidence score
+
+  -- Trade flow specification (JSON)
+  trade_flow_rules TEXT,                    -- Entry/exit conditional logic
+  -- Schema: {
+  --   "pre_market": [{"skill": "slug", "output": "var_name"}],
+  --   "entry": {"trigger": "skill", "confirmations": [...], "filters": [...]},
+  --   "exit": {"targets": [...], "stops": [...]}
+  -- }
+
+  context_annotations TEXT,                 -- HTF, sessions, edge cases
+  -- Schema: {
+  --   "htf_timeframes": {"bias": "D1", "structure": "H1", "entry": "M5"},
+  --   "session_restrictions": {"allowed": [...], "forbidden": [...], "reason": "..."},
+  --   "edge_cases": {"11am_window": "Consider fading - historically losers"}
+  -- }
+
+  state_machine_spec TEXT,                  -- State transitions for code generation
+  -- Schema: {
+  --   "initial_state": "WAITING_FOR_SESSION",
+  --   "states": [{"name": "...", "skill_ids": [...], "transitions": [...]}]
+  -- }
+
+  -- Per-skill context within this model
+  skill_contexts TEXT,                      -- JSON: {skill_id: {phase, order, conditions, notes}}
+  -- Schema: {
+  --   "3": {"phase": "entry", "order": 1, "conditions": "After range forms", "notes": "..."},
+  --   "7": {"phase": "risk", "order": 1, "conditions": "At 1R profit", "notes": "..."}
+  -- }
+
+  -- Iteration tracking
+  iteration_log TEXT,                       -- JSON array of iteration insights
+  -- Schema: [
+  --   {"version": 5, "problem": "mfe_reversal", "solution": "Added partials", "impact": "+$2600", "confidence": 0.8}
+  -- ]
+
+  backtest_history TEXT,                    -- JSON array of backtest results
+  -- Schema: [
+  --   {"date": "2024-01-15", "csv_path": "...", "trades": 45, "win_rate": 65, "pf": 2.1}
+  -- ]
+
+  variant_of INTEGER,                       -- Parent model ID if this is a variant
+
+  -- Versioning
+  version INTEGER DEFAULT 1,                -- Model version number
+  status TEXT DEFAULT 'draft',              -- draft, backtested, validated, production
+  created_from TEXT                         -- youtube, iteration, manual
+
+  -- Note: FOREIGN KEY for variant_of not enforced to allow flexibility
 );
 
 CREATE INDEX IF NOT EXISTS idx_skill_combinations_name ON skill_combinations(name);
 CREATE INDEX IF NOT EXISTS idx_skill_combinations_usage ON skill_combinations(usage_count DESC);
+CREATE INDEX IF NOT EXISTS idx_skill_combinations_model_type ON skill_combinations(model_type);
+CREATE INDEX IF NOT EXISTS idx_skill_combinations_status ON skill_combinations(status);
+CREATE INDEX IF NOT EXISTS idx_skill_combinations_source_url ON skill_combinations(source_video_url);
+CREATE INDEX IF NOT EXISTS idx_skill_combinations_variant ON skill_combinations(variant_of);
+
+-- ============================================================================
+-- MODEL ITERATIONS (Track optimization cycles for model learning)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS model_iterations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  model_id INTEGER NOT NULL,              -- References skill_combinations(id)
+
+  -- Version tracking
+  version_before INTEGER NOT NULL,        -- Model version before this iteration
+  version_after INTEGER NOT NULL,         -- Model version after this iteration
+  iteration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  -- Analysis context
+  backtest_csv_path TEXT,                 -- Path to analyzed backtest CSV
+  trades_analyzed INTEGER,                -- Number of trades in analysis
+  problems_detected TEXT,                 -- JSON: [{pattern, severity, impact, trades_affected}]
+  -- Schema: [
+  --   {"pattern": "mfe_reversal", "severity": "high", "impact": -5200, "trades_affected": 4}
+  -- ]
+
+  -- Changes made
+  solution_applied TEXT NOT NULL,         -- Description of the fix
+  skills_added TEXT,                      -- JSON: [skill_ids added]
+  skills_removed TEXT,                    -- JSON: [skill_ids removed]
+  parameters_changed TEXT,                -- JSON: {param: {before, after}}
+  trade_flow_changes TEXT,                -- JSON: description of flow changes
+
+  -- Results
+  impact_prediction REAL,                 -- Expected $ improvement
+  impact_actual REAL,                     -- Actual $ improvement (filled after next backtest)
+
+  -- Learning capture
+  insight_captured TEXT,                  -- What we learned from this iteration
+  -- Schema: {
+  --   "problem_pattern": "mfe_reversal",
+  --   "solution_applied": "partial-profits at 1R",
+  --   "conditions": {"applies_when": "...", "does_not_apply_when": "..."},
+  --   "generalizable": true,
+  --   "suggested_rule": "For any sweep reversal model, take 50% at 1R"
+  -- }
+  insight_confidence REAL,                -- 0.0-1.0 confidence in the insight
+
+  FOREIGN KEY (model_id) REFERENCES skill_combinations(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_model_iterations_model ON model_iterations(model_id);
+CREATE INDEX IF NOT EXISTS idx_model_iterations_date ON model_iterations(iteration_date);
+CREATE INDEX IF NOT EXISTS idx_model_iterations_version ON model_iterations(version_after);
 
 -- Track processed YouTube videos to prevent duplicates
 CREATE TABLE IF NOT EXISTS processed_videos (
@@ -293,6 +405,48 @@ CREATE INDEX IF NOT EXISTS idx_processed_videos_url ON processed_videos(url);
 CREATE INDEX IF NOT EXISTS idx_processed_videos_video_id ON processed_videos(video_id);
 CREATE INDEX IF NOT EXISTS idx_processed_videos_channel ON processed_videos(channel_name);
 CREATE INDEX IF NOT EXISTS idx_processed_videos_date ON processed_videos(processed_at);
+
+-- ============================================================================
+-- VIDEO FRAMES (Visual context for strategy-iterator)
+-- ============================================================================
+
+-- Track persisted video frames for visual contradiction detection
+CREATE TABLE IF NOT EXISTS video_frames (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  video_id TEXT NOT NULL,                -- YouTube video ID
+
+  -- Frame identification
+  frame_filename TEXT NOT NULL,          -- e.g., "frame_001.jpg"
+  frame_index INTEGER,                   -- 0-based index within video
+
+  -- Temporal context
+  timestamp_sec INTEGER,                 -- Seconds into video
+  timestamp_str TEXT,                    -- Human-readable "MM:SS"
+
+  -- Classification
+  frame_type TEXT,                       -- 'entry' | 'exit' | 'risk' | 'context' | 'general'
+  sad_section TEXT,                      -- Which SAD section this frame illustrates
+  categories TEXT,                       -- JSON: ["entry", "context"] - all matching categories
+
+  -- Contradiction detection support
+  is_contradiction_relevant INTEGER DEFAULT 0,  -- 1 if frame relevant for contradiction checks
+
+  -- Transcript context
+  transcript_segment TEXT,               -- First 500 chars of transcript around this frame
+
+  -- Linking
+  sad_path TEXT,                         -- Path to associated SAD file
+
+  -- Metadata
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (video_id) REFERENCES processed_videos(video_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_video_frames_video_id ON video_frames(video_id);
+CREATE INDEX IF NOT EXISTS idx_video_frames_type ON video_frames(frame_type);
+CREATE INDEX IF NOT EXISTS idx_video_frames_contradiction ON video_frames(is_contradiction_relevant);
+CREATE INDEX IF NOT EXISTS idx_video_frames_section ON video_frames(sad_section);
 
 -- ============================================================================
 -- TRIGGERS FOR MAINTENANCE

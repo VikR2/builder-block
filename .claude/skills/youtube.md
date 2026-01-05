@@ -132,7 +132,126 @@ This pipeline:
 - `{StrategyName}_segments.json` - Detected segments
 - `{StrategyName}_analysis.json` - Full reflective analysis
 
-### Step 5a: Understanding Checkpoint (reflective mode only)
+### Step 5a: CHECKPOINT 1a - Model Detection (for complete_strategy)
+
+**YOU MUST USE AskUserQuestion HERE IF COMPLETE MODEL DETECTED - DO NOT SKIP**
+
+When intent is `complete_strategy`, analyze the accumulated understanding with a **professional trader mindset**:
+
+**Model Detection Criteria:**
+- Does it have a complete trade flow? (entry → management → exit)
+- Does it specify conditional logic? (if HTF bullish THEN..., if sweep detected THEN...)
+- Does it describe context requirements? (timeframes, sessions, confirmations)
+- Does it address risk management?
+- Does it address when NOT to trade?
+
+**If criteria are met (3+ of 5), this is a COMPLETE MODEL:**
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║           MODEL DETECTION: Complete Trading Model Found        ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  This video describes a COMPLETE TRADING MODEL:               ║
+║                                                               ║
+║  Trade Flow Detected:                                         ║
+║  ├── Pre-Market: Daily bias via SMA                          ║
+║  ├── Setup: Wait for session range to form                   ║
+║  ├── Entry: Sweep detection + CISD confirmation              ║
+║  ├── Management: Move to BE at 1R, trail protected swings    ║
+║  └── Exit: Target at opposing FVG or session extreme         ║
+║                                                               ║
+║  Conditional Logic Detected:                                  ║
+║  • "Only take longs if daily bias is bullish"                ║
+║  • "Skip trades in premium zone for longs"                   ║
+║  • "Fade setups at 11 AM instead of following"               ║
+║                                                               ║
+║  Context Requirements:                                        ║
+║  • HTF: Daily for bias, H1 for structure, M5 for entry       ║
+║  • Sessions: London and NY AM only                            ║
+║  • Confirmations: Sweep + CISD + OB return                   ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  How should this be extracted?                                ║
+║                                                               ║
+║  [1] COMPLETE MODEL                                           ║
+║      Save to skill_combinations with:                         ║
+║      - trade_flow_rules (conditional logic)                   ║
+║      - context_annotations (HTF, sessions, edge cases)        ║
+║      - skill_contexts (how each skill is used)                ║
+║      - Links to skills database                               ║
+║                                                               ║
+║  [2] INDIVIDUAL SKILLS ONLY                                   ║
+║      Extract skills without model structure                   ║
+║      (miss the nuance of how they work together)              ║
+║                                                               ║
+║  [3] CANCEL                                                   ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+**If user selects COMPLETE MODEL:**
+- Set `model_extraction_mode = true`
+- Continue to Step 5b to capture model details
+
+**If user selects INDIVIDUAL SKILLS:**
+- Set `model_extraction_mode = false`
+- Skip Step 5b, proceed to normal flow
+
+### Step 5b: Model Specification Capture (if model_extraction_mode = true)
+
+Capture the professional trader nuances:
+
+**Trade Flow Rules (Conditional Logic):**
+```json
+{
+  "trade_flow_rules": {
+    "pre_market": [{"skill": "daily-bias-sma", "output": "bias_direction"}],
+    "entry": {
+      "trigger": "liquidity-sweep-detection",
+      "confirmations": [{"skill": "cisd-pattern", "required": true}],
+      "filters": [{"condition": "bias_direction == sweep_direction", "action": "proceed"}]
+    },
+    "exit": {
+      "targets": [{"type": "dynamic", "skill": "opposing-fvg-target"}],
+      "stops": [{"type": "trailing", "skill": "protected-swings"}]
+    }
+  }
+}
+```
+
+**Context Annotations (Trader Wisdom):**
+```json
+{
+  "context_annotations": {
+    "htf_timeframes": {"bias": "Daily", "structure": "H1", "entry": "M5"},
+    "session_restrictions": {"allowed": ["london", "ny_am"], "reason": "Volume required"},
+    "trade_type": "reversal",
+    "edge_cases": {"11am": "Consider fading - historically losers"},
+    "common_mistakes": {"chasing": "Don't enter after price extended from sweep"}
+  }
+}
+```
+
+**Skill Contexts (How Each Skill is Used in THIS Model):**
+```json
+{
+  "skill_contexts": {
+    "12": {"phase": "entry", "order": 1, "notes": "Primary trigger - sweep detection"},
+    "45": {"phase": "confirmation", "order": 2, "conditions": "Must occur within 5 bars"},
+    "7": {"phase": "risk", "order": 1, "conditions": "Move to BE at 1R profit"}
+  }
+}
+```
+
+**Trader Reflection Questions:**
+- Is this trend-following or counter-trend?
+- Where in the range should entries occur?
+- What HTF confirmation is required?
+- When should you NOT take this trade?
+
+### Step 5c: Understanding Checkpoint (reflective mode only)
 
 **YOU MUST USE AskUserQuestion HERE - DO NOT SKIP**
 
@@ -217,16 +336,115 @@ Ask:
 
 For each approved NEW skill:
 ```
-Tool: skills-library__add_skill
+Tool: nt-skills__save_skill_with_source
 Params: {
   "name": "<skill_name>",
   "category": "<category>",
   "description": "<description>",
-  "source_video": "<youtube_url>"
+  "keywords": ["<keyword1>", "<keyword2>"],
+  "source_type": "youtube",
+  "source_url": "<youtube_url>",
+  "source_title": "<video_title>",
+  "extraction_confidence": 0.85
 }
 ```
 
 For EXISTING skills, link the video as additional source.
+
+### Step 7a: CHECKPOINT 2a - Model Specification Review (if model_extraction_mode = true)
+
+**YOU MUST USE AskUserQuestion HERE - DO NOT SKIP**
+
+Present the complete model specification for review:
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║        MODEL SPECIFICATION REVIEW                              ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  Model Name: LumiTraders Liquidity Sweep                      ║
+║  Trade Type: Reversal                                         ║
+║  Complexity: Complex                                          ║
+║                                                               ║
+║  TRADE FLOW RULES:                                            ║
+║  ┌────────────────────────────────────────────────────────┐   ║
+║  │ Pre-Market: Check Daily bias via SMA comparison        │   ║
+║  │     ↓                                                  │   ║
+║  │ Setup: Wait for session range to form                  │   ║
+║  │     ↓                                                  │   ║
+║  │ Entry Trigger: Liquidity sweep detected                │   ║
+║  │     ↓                                                  │   ║
+║  │ Confirmation: CISD pattern within 5 bars               │   ║
+║  │     ↓                                                  │   ║
+║  │ Filter: Only if sweep direction == bias direction      │   ║
+║  │     ↓                                                  │   ║
+║  │ Entry: Market order after confirmation                 │   ║
+║  │     ↓                                                  │   ║
+║  │ Stop: Below sweep level                                │   ║
+║  │     ↓                                                  │   ║
+║  │ Target: Opposing FVG or 2R, whichever first            │   ║
+║  └────────────────────────────────────────────────────────┘   ║
+║                                                               ║
+║  CONTEXT ANNOTATIONS:                                         ║
+║  • HTF Timeframes: Daily (bias) → H1 (structure) → M5 (entry)║
+║  • Sessions: London, NY AM only                               ║
+║  • Edge Cases:                                                ║
+║    - 11 AM window: Consider fading setups                    ║
+║    - Double sweep: Higher probability                        ║
+║  • Common Mistakes:                                           ║
+║    - Don't chase after price extended from sweep             ║
+║    - Don't long from premium zone                            ║
+║                                                               ║
+║  SKILL CONTEXTS:                                              ║
+║  • #12 Sweep Detection: Entry trigger (phase: entry, order 1)║
+║  • #45 CISD Pattern: Confirmation (phase: confirm, order 2)  ║
+║  • #7 Breakeven Stop: Risk (activate at 1R profit)           ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║  OPTIONS:                                                    ║
+║  [1] Approve - Save model to database                        ║
+║  [2] Edit specifications - Modify before saving              ║
+║  [3] Link as variant - This is a variant of existing model   ║
+║  [4] Cancel - Don't save model                               ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+**If user selects "Link as variant":**
+- Ask which existing model this is a variant of
+- Set `variant_of` to parent model ID
+
+### Step 7b: Save Model to Database (if model_extraction_mode = true and approved)
+
+```
+Tool: nt-skills__save_model
+Params: {
+  "name": "<model_name>",
+  "description": "<model_description>",
+  "skill_ids": [12, 45, 7, ...],
+  "skill_contexts": {
+    "12": {"phase": "entry", "order": 1, "notes": "Primary trigger"},
+    "45": {"phase": "confirmation", "order": 2, "conditions": "Within 5 bars"},
+    ...
+  },
+  "trade_flow_rules": { ... },
+  "context_annotations": { ... },
+  "source_video_url": "<youtube_url>",
+  "source_video_title": "<video_title>",
+  "extraction_confidence": 0.85,
+  "complexity": "complex",
+  "variant_of": null  // or parent model ID
+}
+```
+
+Report:
+```
+✓ Model saved: LumiTraders Liquidity Sweep
+  ID: #5
+  Skills linked: 3
+  Trade flow rules: Captured
+  Context annotations: Captured
+  Source: YouTube (https://youtu.be/...)
+```
 
 ### Step 8: CHECKPOINT 3 - Generation (MANDATORY for complete_strategy)
 

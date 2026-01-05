@@ -200,6 +200,19 @@ confidence: {confidence}
 
 ---
 
+## 13. Visual References
+
+**Video Frames:** `data/video-frames/{video_id}/`
+
+| Frame | Timestamp | Type | Context |
+|-------|-----------|------|---------|
+{visual_references_table}
+
+> **Note:** These frames can be read by Claude for visual context when iterating on the strategy.
+> Use `/strategy-iterator --check-visual` to consult frames when recommendations conflict with original design.
+
+---
+
 ## Appendix: Full Skill Code References
 
 {skill_appendix}

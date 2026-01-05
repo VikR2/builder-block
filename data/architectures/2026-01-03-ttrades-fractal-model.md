@@ -237,3 +237,63 @@ Transitions:
 | Date | Version | Changes |
 |------|---------|---------|
 | 2026-01-03 | 1.0 | Initial extraction from YouTube video |
+| 2026-01-04 | 4.0 | V4 major rewrite with true ICT mechanics (see below) |
+
+---
+
+## V4 Implementation Details
+
+### New State Machine (10 states)
+```
+Idle → BiasSet → ERLIdentified → ERLSwept → POIFound → CISDConfirmed → OBFormed → EntryWait → InTrade
+                                                                                              ↓
+                                                                                           Paused (circuit breaker)
+```
+
+### Key V4 Enhancements
+
+**1. True CISD Detection:**
+- Tracks series of opposite-colored candles (1-5)
+- CISD = closing above opening price of opposing series
+- Configurable via `CISDMinCandles` parameter
+
+**2. Order Block Detection:**
+- Finds last opposite candle before displacement
+- Prioritizes FVG-creating OBs
+- Entry at FVG touch or OB 50% level (limit order)
+
+**3. ERL→IRL Flow:**
+- ERL sources: equal H/L, PDH/PDL, structure swings
+- Must sweep ERL before targeting IRL
+- Enforces proper liquidity sequence
+
+**4. Risk Management:**
+- Partial exits: 50% at 1R, stop to BE
+- Circuit breaker: 2 losses → pause for session
+- OB-based stops (configurable: OBWick, OBBody, ProtectedSwing)
+
+**5. Session Filtering:**
+- NY, London, Asia sessions (all enabled by default)
+- Configurable start/end hours per session
+
+### V4 Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| CISDMinCandles | 2 | Min candles in opposing series |
+| ERLTolerance | 3 ticks | For equal H/L detection |
+| OBStopType | OBWick | Stop placement method |
+| MaxConsecutiveLosses | 2 | Circuit breaker threshold |
+| EnablePartialExit | true | 50% at 1R |
+| PartialExitRR | 1.0 | R-multiple for partial |
+| EnableNYSession | true | NY session filter |
+| EnableLondonSession | true | London session filter |
+| EnableAsiaSession | true | Asia session filter |
+
+### Expected V4 Outcomes
+
+| Metric | V3 | V4 Target |
+|--------|-----|-----------|
+| Max Drawdown | ~$48,000 | < $25,000 |
+| Consecutive Losses | 5-7 | ≤ 2 |
+| Monthly Volatility | High | Reduced |
