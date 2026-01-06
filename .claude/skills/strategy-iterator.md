@@ -29,6 +29,27 @@ Parse backtest CSV using `scripts/backtest_analyzer.py`, identify top 3 problems
 - **Session issues** - AM vs PM performance disparities
 - **Loss streaks** - Consecutive losing trades indicating systemic issues
 
+### Debug Output Analysis (V19+)
+
+If debug output file exists in results folder, parse for state transition bottlenecks:
+
+| Metric | How to Calculate | Healthy Threshold |
+|--------|------------------|-------------------|
+| POI detection rate | POI detected / Days with bias | > 50% |
+| POI invalidation rate | POI invalidated / POI detected | < 50% |
+| CISD confirmation rate | CISD confirmed / H1 confirmed | > 20% |
+| Entry skip rate (stop wide) | Skipped / CISD confirmed | < 30% |
+
+**Debug Signature Patterns:**
+
+| Problem Pattern | Debug Signature | Root Cause |
+|-----------------|-----------------|------------|
+| POI starvation | "bias is set but POI never detected" | Detection only on HTF |
+| Confirmation gap | Many H1 CONFIRMED, few CISD | State race condition |
+| Filter rejection | Many "SKIP - stop too wide" | Zone sizing too large / wrong stop reference |
+| State dead-end | State X reached but never exits | Missing transition logic |
+| Invalidation churn | High POI invalidated count | Cooldown too short |
+
 ### PHASE 2: MATCH
 Query skills database for solutions:
 - Rank by relevance and expected impact
@@ -150,3 +171,98 @@ Invoke this skill when you need to:
 - Iterate a strategy from V(n) to V(n+1)
 - Document iteration changes in SAD
 - Capture learnings for future reference
+
+---
+
+## Video Analysis Process for Stop/Entry Logic
+
+When backtest analysis shows consistent losses despite "correct" patterns, the implementation may misinterpret the original video's intent. Use this process to verify entry/stop logic against actual trades shown in source videos.
+
+### Step 1: Extract Video Frames
+
+```bash
+# Download video and extract frames every 2 seconds
+yt-dlp -f best "https://youtu.be/VIDEO_ID" -o "data/video-frames/VIDEO_ID/video.mp4"
+cd data/video-frames/VIDEO_ID
+ffmpeg -i video.mp4 -vf "fps=0.5" -q:v 2 frame_%04d.jpg
+```
+
+### Step 2: Find Frames with Actual Trades
+
+Look for frames showing:
+- Position info boxes (Entry, Stop, Target values)
+- Order execution markers
+- Highlighted zones with price levels visible
+
+Key data to extract:
+- Entry price (e.g., 6480.00)
+- Stop price (e.g., 6476.75)
+- Stop distance in ticks (e.g., 13 ticks)
+
+### Step 3: Calculate Stop Reference
+
+Given Entry and Stop, calculate the difference:
+```
+Stop Distance = |Entry - Stop| / TickSize
+Example: |6480.00 - 6476.75| / 0.25 = 13 ticks
+```
+
+This tells you the stop SIZE. Now identify the REFERENCE:
+
+### Step 4: Identify Stop Reference Point
+
+Check each possibility and match to the measured stop:
+
+| Reference | Calculate | Does It Match Stop? |
+|-----------|-----------|---------------------|
+| FVG Bottom | FVG zone bottom price | Usually too far |
+| OB Wick Low | Lowest price of OB candle | Common but wider |
+| **OB Body Low** | Lower of Open/Close | **Often correct - tighter** |
+| Sweep Low | The liquidity sweep low | Usually too far |
+| Protected Swing | Prior swing low | Variable |
+
+### Step 5: Cross-Reference with SAD Document
+
+Check the Strategy Architecture Document for stop rules:
+- "Place beyond protected swing (body high/low of entry candle)"
+- "Below M5 order block body (for longs)"
+
+Match the video measurement to the documented rule.
+
+### Step 6: Verify with Visual Diagram
+
+Draw the trade setup to confirm:
+
+```
+EXAMPLE from TTFM Video Analysis:
+
+Given:
+- Entry: ~6480
+- Stop: ~6476.75 (13 ticks below entry)
+- Yellow FVG zone: 6475-6478
+- OB candle body: ~6477-6480
+
+Analysis:
+- Stop (6476.75) is NOT at FVG bottom (6475) ❌
+- Stop (6476.75) IS just below OB body (6477) ✅
+- Conclusion: Stop reference = OB BODY low, not FVG
+```
+
+### Key Lesson
+
+**Don't assume stop placement from zone names. MEASURE the actual stop distance from video trades and identify which price level it corresponds to.**
+
+Common mistakes to avoid:
+- Assuming stop is below FVG (often too wide)
+- Using OB wick instead of OB body (different by 5-10 ticks)
+- Entering at OB 50% when video shows entry at OB close
+- Skipping the "price must enter FVG" gate check
+
+### When to Apply This Process
+
+Use video analysis when:
+1. Backtest shows consistent losses despite matching "patterns"
+2. Stop distances seem too wide compared to video examples
+3. Win rate is below expected (34%+ for 2R system)
+4. Multiple iterations haven't improved performance
+5. User reports "strategy doesn't match what I see in videos"
