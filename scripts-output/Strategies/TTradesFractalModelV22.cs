@@ -342,7 +342,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Defaults
                 MinRiskReward = 2.0;
-                MaxStopTicks = 20;
+                MaxStopTicks = 28;  // V22: Increased from 20 for ES
                 StopBufferTicks = 3;
                 MaxConsecutiveLosses = 3;
                 EnableBreakeven = true;
@@ -1154,15 +1154,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             double close = Closes[IDX_ENTRY][0];
             double extremeBuffer = 50 * TickSize;  // Simple fixed buffer
 
-            if (h1FvgDirection == BiasDirection.Bullish && close < h1PoiBottom - extremeBuffer)
+            // V22 FIX: Corrected invalidation direction
+            // Bullish setup: price should be BELOW POI (waiting to retrace UP) - invalidate if goes TOO HIGH
+            // Bearish setup: price should be ABOVE POI (waiting to retrace DOWN) - invalidate if goes TOO LOW
+            if (h1FvgDirection == BiasDirection.Bullish && close > h1PoiTop + extremeBuffer)
             {
-                if (DebugMode) Print($"[V22 POI] Extreme break below POI ({close:F2} < {h1PoiBottom - extremeBuffer:F2}) - invalidating");
+                if (DebugMode) Print($"[V22 POI] Price too high for bullish retrace ({close:F2} > {h1PoiTop + extremeBuffer:F2}) - invalidating");
                 poiInvalidatedCount++;
                 InvalidatePOI();
             }
-            else if (h1FvgDirection == BiasDirection.Bearish && close > h1PoiTop + extremeBuffer)
+            else if (h1FvgDirection == BiasDirection.Bearish && close < h1PoiBottom - extremeBuffer)
             {
-                if (DebugMode) Print($"[V22 POI] Extreme break above POI ({close:F2} > {h1PoiTop + extremeBuffer:F2}) - invalidating");
+                if (DebugMode) Print($"[V22 POI] Price too low for bearish retrace ({close:F2} < {h1PoiBottom - extremeBuffer:F2}) - invalidating");
                 poiInvalidatedCount++;
                 InvalidatePOI();
             }
