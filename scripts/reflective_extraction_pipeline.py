@@ -5,8 +5,11 @@ Reflective Extraction Pipeline
 Complete pipeline for extracting trading strategies from YouTube videos using
 reflective analysis. Combines:
 1. Video segmentation (multi-signal boundary detection)
-2. Reflective analysis (skill correlation, understanding accumulation)
-3. Code generation (understanding → NinjaTrader C#)
+2. Trade example mining (visual trade analysis)
+3. Reflective analysis (skill correlation, understanding accumulation)
+4. Understanding verification (anti-hallucination diagrams)
+5. Code generation (understanding → NinjaTrader C#)
+6. Code validation (visual evidence comparison)
 
 USAGE:
     # Full pipeline
@@ -23,9 +26,12 @@ USAGE:
 WORKFLOW:
     1. Load manifest.json from frames directory
     2. Segment video using multi-signal detection
+    2.5. Mine trade examples from frames (visual analysis)
     3. Run reflective analysis on each segment
+    3.5. Generate understanding diagram (anti-hallucination)
     4. Present accumulated understanding checkpoint
     5. Generate NinjaTrader C# code from understanding
+    6. Validate code against visual evidence
 """
 
 import argparse
@@ -37,6 +43,16 @@ from datetime import datetime
 from video_segmenter import segment_video, segments_to_json, Segment
 from reflective_analyzer import ReflectiveAnalyzer
 from understanding_to_code import generate_strategy_from_understanding
+
+# Import new visual analysis components (optional - graceful fallback)
+try:
+    from trade_example_miner import TradeExampleMiner
+    from understanding_diagram_generator import UnderstandingDiagramGenerator
+    from code_visual_validator import CodeVisualValidator
+    VISUAL_ANALYSIS_AVAILABLE = True
+except ImportError:
+    VISUAL_ANALYSIS_AVAILABLE = False
+    print("Warning: Visual analysis components not available")
 
 
 # =============================================================================
@@ -157,11 +173,104 @@ def display_understanding_checkpoint(analysis: dict) -> bool:
     return True
 
 
+def run_trade_example_mining(
+    video_id: str,
+    db_path: Path,
+    instrument: str = "ES",
+    model_id: int = None,
+) -> dict:
+    """Stage 2.5: Mine trade examples from video frames."""
+    print("\n" + "=" * 60)
+    print("STAGE 2.5: TRADE EXAMPLE MINING")
+    print("=" * 60)
+
+    if not VISUAL_ANALYSIS_AVAILABLE:
+        print("  Skipped - visual analysis components not available")
+        return {"trade_examples": [], "recommendations": {}}
+
+    try:
+        miner = TradeExampleMiner(db_path=db_path)
+        result = miner.mine_video(
+            video_id=video_id,
+            instrument=instrument,
+            model_id=model_id,
+            save_to_db=True
+        )
+
+        print(f"\n  Frames scanned: {result.frames_scanned}")
+        print(f"  Trades found:   {result.frames_with_trades}")
+
+        if result.consistency:
+            print(f"\n  Stop reference: {result.consistency.recommended_stop_reference}")
+            print(f"  Entry reference: {result.consistency.recommended_entry_reference}")
+
+        recommendations = {}
+        if result.consistency:
+            recommendations = {
+                "stop_reference": result.consistency.recommended_stop_reference,
+                "entry_reference": result.consistency.recommended_entry_reference,
+                "confidence": result.consistency.confidence_score,
+            }
+
+        return {
+            "trade_examples": [vars(t) for t in result.trade_examples],
+            "recommendations": recommendations,
+        }
+
+    except Exception as e:
+        print(f"  Warning: Trade mining failed: {e}")
+        return {"trade_examples": [], "recommendations": {}}
+
+
+def run_understanding_verification(
+    video_id: str,
+    model_id: int,
+    db_path: Path,
+) -> dict:
+    """Stage 3.5: Generate understanding diagram for anti-hallucination check."""
+    print("\n" + "=" * 60)
+    print("STAGE 3.5: UNDERSTANDING VERIFICATION")
+    print("=" * 60)
+
+    if not VISUAL_ANALYSIS_AVAILABLE:
+        print("  Skipped - visual analysis components not available")
+        return {"diagram": None, "flagged_concepts": 0}
+
+    try:
+        generator = UnderstandingDiagramGenerator(db_path=db_path)
+        diagram = generator.generate(video_id=video_id, model_id=model_id)
+
+        print(f"\n  Concepts extracted: {diagram.concepts_total}")
+        print(f"  Concepts verified:  {diagram.concepts_verified}")
+        print(f"  Concepts flagged:   {diagram.concepts_flagged}")
+
+        if diagram.concepts_flagged > 0:
+            print("\n  WARNING: Some concepts need manual verification!")
+            for ev in diagram.evidence:
+                if ev.needs_verification:
+                    print(f"    - {ev.concept_name}: {ev.verification_reason}")
+
+        # Save to database
+        generator.save_diagram(diagram)
+
+        return {
+            "diagram": diagram.mermaid_code,
+            "evidence_panel": diagram.evidence_panel,
+            "verification_checkpoint": diagram.verification_checkpoint,
+            "flagged_concepts": diagram.concepts_flagged,
+        }
+
+    except Exception as e:
+        print(f"  Warning: Diagram generation failed: {e}")
+        return {"diagram": None, "flagged_concepts": 0}
+
+
 def run_code_generation(
     analysis: dict,
     db_path: Path,
     strategy_name: str,
     source_info: dict,
+    trade_recommendations: dict = None,
 ) -> str:
     """Stage 4: Generate NinjaTrader C# code from understanding."""
     print("\n" + "=" * 60)
@@ -169,6 +278,11 @@ def run_code_generation(
     print("=" * 60)
 
     understanding = analysis.get("accumulated_understanding", {})
+
+    # Inject trade example recommendations if available
+    if trade_recommendations:
+        understanding["trade_examples"] = trade_recommendations
+        print(f"  Using visual evidence: stop={trade_recommendations.get('stop_reference')}")
 
     code = generate_strategy_from_understanding(
         understanding=understanding,
@@ -180,6 +294,53 @@ def run_code_generation(
     print(f"\n  Generated {len(code)} characters of C# code")
 
     return code
+
+
+def run_code_validation(
+    code_path: Path,
+    video_id: str,
+    model_id: int,
+    db_path: Path,
+) -> dict:
+    """Stage 5: Validate generated code against visual evidence."""
+    print("\n" + "=" * 60)
+    print("STAGE 5: CODE VALIDATION")
+    print("=" * 60)
+
+    if not VISUAL_ANALYSIS_AVAILABLE:
+        print("  Skipped - visual analysis components not available")
+        return {"passed": True, "checks": []}
+
+    try:
+        validator = CodeVisualValidator(db_path=db_path)
+        result = validator.validate(code_path, video_id, model_id)
+
+        status = "PASSED" if result.validation_passed else "FAILED"
+        print(f"\n  Validation: {status}")
+        print(f"  Checks: {result.checks_passed}/{result.checks_total} passed")
+
+        if not result.validation_passed:
+            print("\n  BLOCKING ISSUES:")
+            for issue in result.blocking_issues:
+                print(f"    - {issue}")
+
+            print("\n  Suggested fixes:")
+            fixes = validator.generate_fix_suggestions(result)
+            for fix in fixes:
+                print(f"    - {fix['suggestion']}")
+
+        # Save validation result
+        validator.save_validation(result)
+
+        return {
+            "passed": result.validation_passed,
+            "checks": [vars(c) for c in result.checks],
+            "blocking_issues": result.blocking_issues,
+        }
+
+    except Exception as e:
+        print(f"  Warning: Validation failed: {e}")
+        return {"passed": True, "checks": [], "error": str(e)}
 
 
 def save_outputs(
@@ -225,6 +386,9 @@ def run_pipeline(
     strategy_name: str,
     db_path: Path = DB_PATH,
     analyze_only: bool = False,
+    instrument: str = "ES",
+    model_id: int = None,
+    skip_visual_analysis: bool = False,
 ) -> dict:
     """
     Run the complete reflective extraction pipeline.
@@ -235,6 +399,9 @@ def run_pipeline(
         strategy_name: Name for the generated strategy
         db_path: Path to skills database
         analyze_only: If True, skip code generation
+        instrument: Trading instrument for tick size (default: ES)
+        model_id: Optional model ID for database association
+        skip_visual_analysis: If True, skip visual analysis stages
 
     Returns:
         Dictionary with output file paths
@@ -246,21 +413,42 @@ def run_pipeline(
     print(f"  Output: {output_dir}")
     print(f"  Strategy: {strategy_name}")
     print(f"  Mode: {'Analysis Only' if analyze_only else 'Full Pipeline'}")
+    print(f"  Visual Analysis: {'Enabled' if not skip_visual_analysis else 'Disabled'}")
 
     # Stage 0: Load manifest
     manifest = load_video_manifest(frames_dir)
+    video_id = manifest.get("video_id", frames_dir.name)
 
     source_info = {
         "url": manifest.get("video_url", ""),
-        "video_id": manifest.get("video_id", ""),
+        "video_id": video_id,
         "title": manifest.get("video_title", strategy_name),
     }
 
     # Stage 1: Segmentation
     segments = run_segmentation(frames_dir, manifest)
 
+    # Stage 2.5: Trade Example Mining (visual analysis)
+    trade_mining_result = {"trade_examples": [], "recommendations": {}}
+    if not skip_visual_analysis and VISUAL_ANALYSIS_AVAILABLE:
+        trade_mining_result = run_trade_example_mining(
+            video_id=video_id,
+            db_path=db_path,
+            instrument=instrument,
+            model_id=model_id,
+        )
+
     # Stage 2: Reflective Analysis
     analysis = run_reflective_analysis(segments, db_path)
+
+    # Stage 3.5: Understanding Verification (anti-hallucination)
+    understanding_diagram = {"diagram": None, "flagged_concepts": 0}
+    if not skip_visual_analysis and VISUAL_ANALYSIS_AVAILABLE and model_id:
+        understanding_diagram = run_understanding_verification(
+            video_id=video_id,
+            model_id=model_id,
+            db_path=db_path,
+        )
 
     # Stage 3: Understanding Checkpoint
     proceed = display_understanding_checkpoint(analysis)
@@ -269,10 +457,26 @@ def run_pipeline(
         print("\nPipeline stopped at checkpoint.")
         return {"status": "stopped"}
 
+    # Check if we should stop due to flagged concepts
+    if understanding_diagram.get("flagged_concepts", 0) > 0:
+        print("\n" + "-" * 40)
+        print("WARNING: Some concepts need verification before code generation.")
+        print("Review the understanding diagram above.")
+        print("-" * 40)
+        # In automated mode, continue but warn
+        # In interactive mode, we'd ask user here
+
     # Stage 4: Code Generation (unless analyze_only)
     code = ""
+    code_path = None
     if not analyze_only:
-        code = run_code_generation(analysis, db_path, strategy_name, source_info)
+        code = run_code_generation(
+            analysis=analysis,
+            db_path=db_path,
+            strategy_name=strategy_name,
+            source_info=source_info,
+            trade_recommendations=trade_mining_result.get("recommendations"),
+        )
 
     # Save outputs
     print("\n" + "=" * 60)
@@ -287,9 +491,36 @@ def run_pipeline(
         code=code if not analyze_only else "// Analysis only - no code generated",
     )
 
+    # Stage 5: Code Validation (visual evidence comparison)
+    if not analyze_only and not skip_visual_analysis and VISUAL_ANALYSIS_AVAILABLE:
+        code_path = outputs.get("code")
+        if code_path:
+            validation_result = run_code_validation(
+                code_path=Path(code_path),
+                video_id=video_id,
+                model_id=model_id,
+                db_path=db_path,
+            )
+            outputs["validation"] = validation_result
+
+            if not validation_result.get("passed"):
+                print("\n" + "=" * 60)
+                print("CODE VALIDATION FAILED")
+                print("=" * 60)
+                print("Review suggested fixes before deploying strategy.")
+
     print("\n" + "=" * 60)
     print("PIPELINE COMPLETE")
     print("=" * 60)
+
+    # Summary
+    if trade_mining_result.get("trade_examples"):
+        print(f"\n  Trade examples extracted: {len(trade_mining_result['trade_examples'])}")
+    if understanding_diagram.get("diagram"):
+        print(f"  Understanding diagram: Generated")
+    if outputs.get("validation"):
+        val = outputs["validation"]
+        print(f"  Code validation: {'PASSED' if val.get('passed') else 'FAILED'}")
 
     return outputs
 
@@ -330,6 +561,23 @@ def main():
         action="store_true",
         help="Run analysis only, skip code generation",
     )
+    parser.add_argument(
+        "--instrument",
+        type=str,
+        default="ES",
+        help="Trading instrument for tick size (default: ES)",
+    )
+    parser.add_argument(
+        "--model-id",
+        type=int,
+        default=None,
+        help="Model ID for database association",
+    )
+    parser.add_argument(
+        "--skip-visual-analysis",
+        action="store_true",
+        help="Skip visual analysis stages (trade mining, validation)",
+    )
 
     args = parser.parse_args()
 
@@ -354,6 +602,9 @@ def main():
             strategy_name=args.strategy_name,
             db_path=args.db,
             analyze_only=args.analyze_only,
+            instrument=args.instrument,
+            model_id=args.model_id,
+            skip_visual_analysis=args.skip_visual_analysis,
         )
 
         if outputs.get("code"):

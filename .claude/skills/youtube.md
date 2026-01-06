@@ -251,7 +251,79 @@ Capture the professional trader nuances:
 - What HTF confirmation is required?
 - When should you NOT take this trade?
 
-### Step 5c: Understanding Checkpoint (reflective mode only)
+### Step 5c: Trade Example Mining (reflective mode only)
+
+**Visual Trade Analysis Phase - Extracts stop/entry references from frames**
+
+The pipeline now includes visual trade analysis that:
+1. Scans video frames for actual trade examples
+2. Extracts measured stop/entry reference points
+3. Identifies patterns across multiple trades
+
+This solves the transcript-to-code gap (e.g., "stop below order block" → which level exactly?).
+
+**Output includes:**
+- `stop_reference_point`: The measured reference (CISD_CANDLE_LOW, OB_BODY_LOW, etc.)
+- `entry_reference_point`: The measured entry reference
+- Consistency scores across trade examples
+
+### Step 5d: CHECKPOINT 1b - Trade Example Review (MANDATORY)
+
+**YOU MUST USE AskUserQuestion HERE IF TRADE EXAMPLES FOUND - DO NOT SKIP**
+
+If trade examples were mined from video frames, present for review:
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║           TRADE EXAMPLES REVIEW                                ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  Trade Examples Found: 3                                      ║
+║                                                               ║
+║  TRADE 1 (frame_008.jpg @ 7:00):                             ║
+║    Direction: SHORT                                           ║
+║    Entry: 6480.00                                             ║
+║    Stop: 6483.25 (13 ticks)                                  ║
+║    Stop Reference: CISD_CANDLE_HIGH + 3 ticks                ║
+║                                                               ║
+║  TRADE 2 (frame_012.jpg @ 11:00):                            ║
+║    Direction: LONG                                            ║
+║    Entry: 6076.50                                             ║
+║    Stop: 6073.25 (13 ticks)                                  ║
+║    Stop Reference: CISD_CANDLE_LOW - 3 ticks                 ║
+║                                                               ║
+║  CONSISTENCY ANALYSIS:                                        ║
+║    Stop Reference: CISD_CANDLE (100% consistent)             ║
+║    Entry Reference: OB_CLOSE (67% consistent)                ║
+║                                                               ║
+║  RECOMMENDED for code generation:                             ║
+║    stop_reference_point = "CISD_CANDLE_LOW"                  ║
+║    entry_reference_point = "OB_CLOSE"                        ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║  OPTIONS:                                                     ║
+║  [1] Use these references - Proceed with visual evidence      ║
+║  [2] Override - Use different references                      ║
+║  [3] Skip visual analysis - Fall back to transcript           ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+**If user selects "Override" → ask for custom references**
+**If user selects "Skip" → warn that code may use incorrect references**
+
+### Step 5e: Understanding Diagram Generation (reflective mode only)
+
+**Anti-Hallucination Check - Links concepts to evidence**
+
+Generates a Mermaid diagram showing:
+1. Trade flow (HTF → LTF vertical structure)
+2. Each concept with source evidence (frame + transcript)
+3. Confidence indicators
+4. Flagged concepts needing verification
+
+This prevents hallucinated understanding by making extraction TRACEABLE.
+
+### Step 5f: Understanding Checkpoint (reflective mode only)
 
 **YOU MUST USE AskUserQuestion HERE - DO NOT SKIP**
 
@@ -485,6 +557,64 @@ This generates code using:
 - Generate indicator files to `scripts-output/Indicators/`
 - Generate strategy file to `scripts-output/Strategies/`
 - Uses template-based generation with keyword extraction
+
+### Step 9a: CHECKPOINT 4 - Code Validation (MANDATORY for reflective mode)
+
+**YOU MUST USE AskUserQuestion HERE IF VALIDATION FAILS - DO NOT SKIP**
+
+After code generation, validate against visual evidence:
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║           CODE VALIDATION: TTradesFractalModelV20.cs           ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  Result: FAILED (1 critical issue)                            ║
+║                                                               ║
+║  CHECK 1: Stop Placement                                      ║
+║    Status: FAIL                                               ║
+║    Code uses:  m5OBBodyLow                                    ║
+║    Video shows: CISD_CANDLE_LOW                               ║
+║    >> Stop reference mismatch!                                ║
+║                                                               ║
+║  CHECK 2: Entry Placement                                     ║
+║    Status: PASS                                               ║
+║    Code uses:  obClose                                        ║
+║    Video shows: OB_CLOSE                                      ║
+║                                                               ║
+║  CHECK 3: Consistency Score                                   ║
+║    Status: PASS                                               ║
+║    Visual evidence: 100% consistent on stop reference         ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║  SUGGESTED FIX:                                               ║
+║    Change stop calculation from:                              ║
+║      stopPrice = m5OBBodyLow - (StopBufferTicks * TickSize)  ║
+║    To:                                                        ║
+║      stopPrice = cisdCandleLow - (StopBufferTicks * TickSize)║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║  OPTIONS:                                                     ║
+║  [1] Auto-fix - Apply suggested changes                       ║
+║  [2] Manual review - I'll fix it myself                       ║
+║  [3] Override - Deploy anyway (not recommended)               ║
+║  [4] Cancel - Don't deploy strategy                           ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+**If user selects "Auto-fix":**
+- Apply the suggested code changes
+- Re-run validation to confirm fix worked
+- Proceed if validation passes
+
+**If user selects "Override":**
+- Log the override reason
+- Warn about potential incorrect behavior
+- Proceed with deployment
+
+**If validation PASSES:**
+- No checkpoint needed
+- Proceed directly to summary
 
 ### Step 10: Report Summary
 
