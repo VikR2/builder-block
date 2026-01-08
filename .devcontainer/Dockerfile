@@ -26,13 +26,6 @@ ENV PATH="/root/.qlty/bin:$PATH"
 # Install Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
-# Clone and install Continuous-Claude-v2
-WORKDIR /tmp
-RUN git clone https://github.com/parcadei/Continuous-Claude-v2.git && \
-    cd Continuous-Claude-v2 && \
-    ./install-global.sh --yes && \
-    cd / && rm -rf /tmp/Continuous-Claude-v2
-
 # Setup for non-root user (node)
 USER node
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh

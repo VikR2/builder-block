@@ -1,151 +1,356 @@
 ---
 name: implement-strategy
-description: Generate NinjaTrader code from a Model (skill_combinations) or Strategy Architecture Document
+description: Generate NinjaTrader 8 strategy from model with frame-driven validation
+allowed-tools: [Read, Write, Edit, Bash, AskUserQuestion]
 ---
 
 # Implement Strategy Skill
 
-Generate high-quality NinjaTrader code from a complete trading model or Strategy Architecture Document (SAD).
+Generate high-quality NinjaTrader C# code from a complete trading model with **frame-driven validation**.
 
 ## Usage
 
-**Model-first (recommended):**
-```bash
-python scripts/implement_strategy.py --model-id <id> --output-name <ClassName>
+```
+/implement-strategy --model-id <id> --output-name <ClassName>
 ```
 
-**SAD-based (legacy):**
+**Example:**
 ```
-/implement-strategy <sad-name>
-```
-
-## Model-First Approach (Recommended)
-
-The model-first approach generates strategies from complete models stored in `skill_combinations`. This produces code that reflects the **model's intent**, not just concatenated skill snippets.
-
-### Why Model-First?
-
-| SAD-based (old) | Model-first (new) |
-|-----------------|-------------------|
-| Parse markdown manually | Query structured database |
-| Skills as individual snippets | Skills in model context |
-| Generic state machine | State machine from model spec |
-| Magic number parameters | Parameters from skill_contexts |
-
-### What's in a Model?
-
-The `skill_combinations` table stores:
-- **trade_flow_rules** - Phase sequencing (bias → setup → confirmation → entry)
-- **state_machine_spec** - All states and transitions
-- **skill_contexts** - How each skill fits (phase, order, required flag)
-- **context_annotations** - Timeframes, sessions, constraints
-
-### Model-First Generation
-
-```bash
-# Generate from Model #5 (TTrades 4H PO3)
-python scripts/implement_strategy.py --model-id 5 --output-name TTrades4HPO3Strategy
-
-# List available models
-python scripts/implement_strategy.py --list-models
+/implement-strategy --model-id 1 --output-name TTradesFractalModelV24
 ```
 
-**Output:**
-- `scripts-output/Strategies/<ClassName>.cs` - Strategy code
-- `scripts-output/Strategies/<ClassName>_changelog.md` - Skills by phase
+---
 
-## How It Works
+## MANDATORY WORKFLOW (Follow in order)
 
-### Step 1: Load Complete Model
+### Step 1: Load Model, Visual Context, and POI Rules
 
-```python
-# From skill_combinations
-SELECT trade_flow_rules, state_machine_spec, skill_contexts, context_annotations
-FROM skill_combinations WHERE id = ?
-```
-
-### Step 2: Generate State Machine from Model
-
-The state machine comes directly from `state_machine_spec`:
-- All states defined (not simplified)
-- Transitions with model-defined triggers
-- Guards from model constraints
-
-### Step 3: Generate Phase Logic
-
-For each phase in `trade_flow_rules`:
-1. Identify skills for that phase from `skill_contexts`
-2. Load skill code with model context applied
-3. Generate phase block with proper sequencing
-
-### Step 4: Apply Constraints as Guards
-
-Model constraints become code guards:
-- "Entry REQUIRES CISD" → `if (!cisd_confirmed) return;`
-- "Don't hold past 4H close" → session close check
-
-### Step 5: Output with Traceability
-
-The changelog tracks:
-- Model ID and name
-- Skills organized by phase
-- Which skills are required vs optional
-- Constraints applied
-
-## SAD-Based Workflow (Legacy)
-
-For strategies without a model in `skill_combinations`, use the SAD approach:
-
-### Step 1: Load and Parse SAD
+Query the model via MCP with visual interpretations:
 
 ```
-Loading SAD: seven-forty-reversal
-
-Type: Strategy
-Skills to compose: 8
-Proceed? [Y/n]
+Call: nt-skills/get_model
+Args: { model_id: <id>, include_skills: true }
 ```
 
-### Step 2: Compose Skills
+This returns:
+- **model** - Full model with trade_flow_rules, state_machine_spec, model_rules
+- **model.visual_context_path** - Path to video frames (e.g., data/video-frames/9AL41xON3hA)
+- **model.visual_interpretations** - Verified pattern interpretations (if exists)
+- **model.poi_type_rules** - POI-type-specific validation rules (if exists)
+- **skills** - All component skills with code_snippet
 
-- **Direct use (>85% match):** Copy snippet, adapt variable names
-- **Adaptation (70-85%):** Modify per SAD requirements
-- **Novel synthesis (<70%):** Ask user for examples
+**THEN** get POI-type-specific rules for code generation:
 
-### Step 3: Generate Draft
+```
+Call: nt-skills/get_poi_type_rules
+Args: { poi_type: "all" }
+```
 
-Fill template sections:
-1. Enums from SAD
-2. Variables from composed skills
-3. OnBarUpdate with bias/setup/entry logic
-4. Helper methods
+This returns code patterns for C1/C2, entry, and invalidation per POI type.
 
-### Step 4: Quality Check
+---
 
-- [ ] No placeholder conditions
-- [ ] All state variables declared
-- [ ] Entry conditions complete
+### Step 2: Frame-Driven Pattern Generation
+
+**FOR EACH** pattern in [poi_detection, c1c2_confirmation, cisd_pattern, entry_logic]:
+
+#### 2a. Check Existing Interpretation
+
+```
+IF model.visual_interpretations[pattern] exists AND verified_by_user = true:
+  USE stored interpretation
+  SKIP to step 2d
+```
+
+#### 2b. Load Frame Index and Read Relevant Frame
+
+First, load the frame index to find frame mappings:
+```
+Read: {model.visual_context_path}/frame_index.json
+```
+
+The frame_index.json contains:
+- `frames[]` with pattern_mappings per frame
+- `pattern_mappings[pattern_name].code_insight` for code generation hints
+
+**OR** use the pattern suggestion tool:
+```
+Call: nt-skills/suggest_pattern_mappings
+Args: { annotation_labels: ["C1", "C2", "FVG"], zones_shown: ["PDH", "OB zone"] }
+```
+
+Then read the relevant frame image:
+```
+Read: {model.visual_context_path}/frames/{frame_file}.jpg
+```
+
+#### 2c. Document & Verify Interpretation
+
+After reading frame, document what you see:
+
+```
+FRAME INTERPRETATION
+====================
+Frame: 9AL41xON3hA/frame_008.jpg (7:00)
+Pattern: CISD
+
+I see:
+- Series of 3+ down-close candles (opposing series)
+- Price sweeps low, then closes above first opposing candle's open
+- "CISD" label marks the close-through candle
+- OB reference appears to be the LAST opposing candle
+
+Code implication:
+- m5OBHigh = Highs[IDX_ENTRY][1] (last opposing, not reversal)
+- m5OBLow = Lows[IDX_ENTRY][1]
+- Entry trigger = close > first opposing candle open
+====================
+```
+
+**IF UNCERTAIN:**
+```
+STOP - Use AskUserQuestion tool:
+"I see X in frame Y. Does this mean [interpretation A] or [interpretation B]?"
+WAIT for user confirmation before proceeding.
+```
+
+#### 2d. Generate Code for Pattern
+
+Include frame reference comment in generated code:
+
+```csharp
+// ==========================================================
+// Pattern: CISD (Change In State Of Delivery)
+// Visual Reference: 9AL41xON3hA/frame_008.jpg (7:00)
+// Interpretation: OB = last opposing candle (index [1])
+// ==========================================================
+private void DetectCISD()
+{
+    // Code matching verified interpretation
+    m5OBHigh = Highs[IDX_ENTRY][1];  // Last opposing candle, NOT reversal
+    m5OBLow = Lows[IDX_ENTRY][1];
+    // ... rest of implementation
+}
+```
+
+---
+
+### Step 3: POI-Type-Specific Logic
+
+**CRITICAL:** Different POI types have different C1/C2 validation rules.
+
+| POI Type | C1/C2 Location Requirement | Invalidation Rule |
+|----------|---------------------------|-------------------|
+| **FVG** | Must print WITHIN zone (wick outside OK) | Close beyond + 6 consecutive bars |
+| **OB** | Outside signals invalidation | C1/C2 outside OB = consider invalid |
+| **Swing/HL** | More flexibility | Context-dependent |
+
+**BEFORE generating POI validation code:**
+
+```
+IF poi_type is unclear:
+  ASK USER: "Which POI type is primary for this model: FVG, OB, or Swing?"
+  WAIT for response
+```
+
+Generate POI-type-specific code:
+
+```csharp
+// POI Type: FVG
+// Rule: C1/C2 must print WITHIN zone (wick outside OK)
+private bool IsCandleInReactionZone(int barIdx)
+{
+    double candleLow = Lows[IDX_CONFIRMATION][barIdx];
+    double candleHigh = Highs[IDX_CONFIRMATION][barIdx];
+
+    // Reaction zone = expanded POI zone
+    double expansion = (h1PoiTop - h1PoiBottom) * (ReactionMultiplier - 1.0) / 2.0;
+    double reactionTop = h1PoiTop + expansion;
+    double reactionBottom = h1PoiBottom - expansion;
+
+    // FVG rule: ANY overlap counts (wick or body)
+    return (candleLow <= reactionTop && candleHigh >= reactionBottom);
+}
+
+// POI Invalidation
+// Rule: Bullish POI invalid on close BELOW zone (not above!)
+private void CheckPOIInvalidation()
+{
+    if (!h1PoiValid) return;
+
+    double close = Closes[IDX_ENTRY][0];
+    double buffer = (h1PoiTop - h1PoiBottom) * POIInvalidationBufferPercent;
+
+    bool outsideZone = false;
+
+    // CRITICAL: Direction check matches bias
+    if (h1FvgDirection == BiasDirection.Bullish)
+    {
+        // Bullish POI invalidated by closes BELOW zone
+        outsideZone = close < (h1PoiBottom - buffer);
+    }
+    else if (h1FvgDirection == BiasDirection.Bearish)
+    {
+        // Bearish POI invalidated by closes ABOVE zone
+        outsideZone = close > (h1PoiTop + buffer);
+    }
+
+    if (outsideZone)
+    {
+        invalidationCloseCount++;
+        if (invalidationCloseCount >= POIInvalidationThreshold)
+        {
+            InvalidatePOI();
+        }
+    }
+    else
+    {
+        invalidationCloseCount = 0;  // Reset on return to zone
+    }
+}
+```
+
+---
+
+### Step 4: Store New Interpretations
+
+After user verifies a new interpretation, store it in the database:
+
+```sql
+-- Store via MCP or direct SQL
+UPDATE skill_combinations
+SET visual_interpretations = json_set(
+  COALESCE(visual_interpretations, '{}'),
+  '$.{pattern_name}',
+  json('{
+    "frame_ref": "{frame_path}",
+    "interpretation": "{text}",
+    "code_implication": "{code_notes}",
+    "verified_by_user": true,
+    "verified_date": "{date}"
+  }')
+)
+WHERE id = {model_id};
+```
+
+---
+
+### Step 5: Generate Complete Strategy
+
+Generate production-quality NinjaTrader code:
+
+1. **State Machine** from `state_machine_spec`
+2. **Model Rules as Guards** from `model_rules`
+3. **Skip Conditions** from `failed_entry_conditions`
+4. **POI-Type-Specific Logic** (FVG vs OB vs Swing)
+5. **Helper Methods** with frame reference comments
+
+Output to: `scripts-output/Strategies/<ClassName>.cs`
+
+---
+
+### Step 6: Code Review Checklist
+
+Before delivering code, verify:
+
+- [ ] Each pattern has frame reference comment
+- [ ] POI types handled differently (FVG ≠ OB ≠ Swing)
+- [ ] C1/C2 location checks match POI type rules
+- [ ] CISD uses correct candle reference (index [1], not [0])
+- [ ] POI invalidation direction is correct (bullish = below)
+- [ ] Confirmation counting is CUMULATIVE (no reset on non-touch)
+- [ ] No placeholder conditions or TODOs
+- [ ] All state variables declared and initialized
 - [ ] Daily reset clears all state
 
-### Step 5: Output
+**Direction Logic (Multi-Timeframe):**
+- [ ] HTF direction stored in dedicated variable
+- [ ] LTF entry uses HTF direction variable (not derived from candle)
+- [ ] State reset called when new HTF signal detected
+- [ ] Cooldown between HTF detection and LTF entry
+- [ ] Direction assertions in entry methods (DEBUG mode)
 
-Files:
-- `scripts-output/Strategies/<ClassName>.cs`
-- `scripts-output/Strategies/<ClassName>_changelog.md`
+---
 
-## Quality Reference
+### Direction Assertion Template
 
-Generated code should match production patterns:
-- State machine architecture
-- Time window awareness
-- Complete entry/exit logic
-- Proper risk management
-- Debug output option
+For multi-timeframe strategies, include this assertion pattern in entry methods:
+
+```csharp
+private void SignalEntry(string source)
+{
+    // DIRECTION ASSERTION: Verify entry matches stored HTF direction
+    #if DEBUG
+    if (htfDirection == SignalDirection.None)
+    {
+        Print($"[ASSERTION FAIL] Entry signaled without HTF direction at bar {CurrentBars[0]}");
+        return;
+    }
+    #endif
+
+    // Debug output for verification (always include)
+    Print($"[{Time[0]}] Entry: {source} | HTF Direction: {htfDirection}");
+
+    // Entry logic uses htfDirection, not derived direction
+    if (htfDirection == SignalDirection.Long)
+    {
+        // Long entry setup
+    }
+    else if (htfDirection == SignalDirection.Short)
+    {
+        // Short entry setup
+    }
+}
+```
+
+---
+
+## FAILURE MODE: If Uncertain
+
+```
+STOP code generation
+ASK: "I'm unclear about [X]. In frame [Y], does [Z] mean [A] or [B]?"
+WAIT for user response
+STORE verified interpretation
+CONTINUE only after verification
+```
+
+**NEVER GUESS** ambiguous logic. Ask the user.
+
+---
+
+## POI Type Rules Reference
+
+### FVG (Fair Value Gap)
+
+```csharp
+// Detection: 3-candle gap pattern
+// C1/C2: Must be WITHIN zone (wick outside OK)
+// Invalidation: 6 consecutive closes beyond zone
+```
+
+### OB (Order Block)
+
+```csharp
+// Detection: Last opposing candle before CISD (index [1])
+// C1/C2: Outside = signals invalidation
+// Stop: Full structure (m5OBLow/High), NOT just body
+```
+
+### Swing/HL
+
+```csharp
+// Detection: Local extremes with confirmation
+// C1/C2: More flexibility than FVG/OB
+// Invalidation: Context-dependent
+```
+
+---
 
 ## Files
 
-- Script: `scripts/implement_strategy.py`
-- Template: `scripts/templates/strategy_template.cs`
-- Models: `skill_combinations` table
-- SADs: `data/architectures/`
+- Models: `skill_combinations` table (query via MCP)
+- Visual Interpretations: `skill_combinations.visual_interpretations` column
+- SADs: `data/architectures/` (reference documentation)
+- Video Frames: `data/video-frames/{video_id}/frames/`
 - Output: `scripts-output/Strategies/`

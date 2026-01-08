@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
 """
+DEPRECATED: Use the MCP `get_model` tool instead.
+
+This script produces skeleton code with TODOs (~300 lines).
+The MCP approach with Claude generates production code (~1,800 lines).
+
+New workflow:
+1. Call MCP tool: nt-skills/get_model with include_skills=true
+2. Claude generates complete strategy from model + skills JSON
+3. Output: production-ready NinjaTrader code
+
+See: .claude/skills/implement-strategy/SKILL.md
+
+---
+Legacy Documentation (for reference):
+
 Model-Aware Strategy Implementation Script
 
 Generates NinjaTrader 8 C# strategies from complete models (skill_combinations).
@@ -35,7 +50,9 @@ class ModelAwareGenerator:
             SELECT
                 id, name, description, skill_ids,
                 trade_flow_rules, state_machine_spec, skill_contexts,
-                context_annotations, typical_use_case, complexity
+                context_annotations, typical_use_case, complexity,
+                model_rules, failed_entry_conditions, model_intent,
+                visual_context_path
             FROM skill_combinations
             WHERE id = ?
         """, (model_id,))
@@ -48,12 +65,13 @@ class ModelAwareGenerator:
 
         # Parse JSON fields
         for field in ['skill_ids', 'trade_flow_rules', 'state_machine_spec',
-                      'skill_contexts', 'context_annotations']:
+                      'skill_contexts', 'context_annotations',
+                      'model_rules', 'failed_entry_conditions']:
             if model.get(field):
                 try:
                     model[field] = json.loads(model[field])
                 except json.JSONDecodeError:
-                    model[field] = {}
+                    model[field] = [] if field in ['model_rules', 'failed_entry_conditions'] else {}
 
         return model
 
@@ -191,6 +209,142 @@ class ModelAwareGenerator:
 
         return '\n            '.join(code_lines)
 
+    def generate_model_rules_guards(self, model_rules: List[str]) -> str:
+        """Generate C# guard conditions from model rules.
+
+        Model rules like "FVG touch MUST be followed by CISD" become guard conditions
+        that prevent entry if prerequisites aren't met.
+        """
+        if not model_rules:
+            return "// No model rules defined"
+
+        code_lines = []
+        code_lines.append("// MODEL RULES (guards from model specification)")
+        code_lines.append("// These rules define WHEN entry is allowed")
+        code_lines.append("")
+
+        for rule in model_rules:
+            rule_lower = rule.lower()
+
+            # Parse common rule patterns
+            if 'must' in rule_lower and 'cisd' in rule_lower:
+                code_lines.append(f"// Rule: {rule}")
+                code_lines.append("if (!cisd_confirmed)")
+                code_lines.append("{")
+                code_lines.append('    if (EnableDebug) Print("[RULE] Entry blocked - CISD not confirmed");')
+                code_lines.append("    return;")
+                code_lines.append("}")
+                code_lines.append("")
+
+            elif 'must' in rule_lower and 'bias' in rule_lower:
+                code_lines.append(f"// Rule: {rule}")
+                code_lines.append("if (!dailyBiasSet)")
+                code_lines.append("{")
+                code_lines.append('    if (EnableDebug) Print("[RULE] Entry blocked - Daily bias not set");')
+                code_lines.append("    return;")
+                code_lines.append("}")
+                code_lines.append("")
+
+            elif 'c2' in rule_lower and ('wait' in rule_lower or 'formation' in rule_lower):
+                code_lines.append(f"// Rule: {rule}")
+                code_lines.append("if (!c2_analyzed)")
+                code_lines.append("{")
+                code_lines.append('    if (EnableDebug) Print("[RULE] Waiting for C2 wick formation");')
+                code_lines.append("    return;")
+                code_lines.append("}")
+                code_lines.append("")
+
+            elif '4h close' in rule_lower or 'session end' in rule_lower:
+                code_lines.append(f"// Rule: {rule}")
+                code_lines.append("if (IsNear4HClose())")
+                code_lines.append("{")
+                code_lines.append('    if (EnableDebug) Print("[RULE] Entry blocked - Too close to 4H close");')
+                code_lines.append("    return;")
+                code_lines.append("}")
+                code_lines.append("")
+
+            elif 'stop' in rule_lower and 'body' in rule_lower:
+                code_lines.append(f"// Rule: {rule}")
+                code_lines.append("// Stop calculation uses OB BODY, not wick (see CalculateStop method)")
+                code_lines.append("")
+
+            else:
+                # Generic rule - add as comment for manual implementation
+                code_lines.append(f"// Rule: {rule}")
+                code_lines.append("// TODO: Implement this rule check")
+                code_lines.append("")
+
+        return '\n            '.join(code_lines)
+
+    def generate_skip_conditions(self, failed_entry_conditions: List[Dict]) -> str:
+        """Generate C# skip logic from failed entry conditions.
+
+        Failed entry conditions define when to SKIP a setup (red X patterns).
+        """
+        if not failed_entry_conditions:
+            return "// No skip conditions defined"
+
+        code_lines = []
+        code_lines.append("// SKIP CONDITIONS (failed entry patterns from model)")
+        code_lines.append("// These conditions define when to AVOID entry even if setup looks valid")
+        code_lines.append("")
+
+        for i, condition in enumerate(failed_entry_conditions):
+            if isinstance(condition, dict):
+                cond_expr = condition.get('condition', '')
+                reason = condition.get('reason', 'Unknown reason')
+                action = condition.get('action', 'SKIP')
+            else:
+                # Handle string conditions
+                cond_expr = str(condition)
+                reason = cond_expr
+                action = 'SKIP'
+
+            # Convert condition expression to C#
+            cs_condition = self._condition_expr_to_csharp(cond_expr)
+
+            if cs_condition:
+                code_lines.append(f"// Skip: {reason}")
+                code_lines.append(f"if ({cs_condition})")
+                code_lines.append("{")
+                if action == 'SKIP':
+                    code_lines.append(f'    if (EnableDebug) Print("[SKIP] {reason}");')
+                    code_lines.append("    skippedEntries++;")
+                    code_lines.append("    return;")
+                elif action == 'WAIT':
+                    code_lines.append(f'    if (EnableDebug) Print("[WAIT] {reason}");')
+                    code_lines.append("    return;")
+                code_lines.append("}")
+                code_lines.append("")
+
+        return '\n            '.join(code_lines)
+
+    def _condition_expr_to_csharp(self, expr: str) -> str:
+        """Convert condition expression to C# code."""
+        if not expr:
+            return ""
+
+        # Common condition mappings
+        mappings = {
+            'fvg_touched': 'fvgTouched',
+            '!cisd_confirmed': '!cisd_confirmed',
+            'cisd_confirmed': 'cisd_confirmed',
+            'against_daily_bias': 'IsAgainstDailyBias()',
+            'structure_broken_no_recovery': 'structureBroken && !structureRecovered',
+            'c2_incomplete': '!c2_analyzed',
+            'past_4h_close': 'IsNear4HClose()',
+        }
+
+        # Replace known patterns
+        result = expr
+        for pattern, replacement in mappings.items():
+            result = result.replace(pattern, replacement)
+
+        # Handle && operator
+        result = result.replace('&&', ' && ')
+
+        return result
+
     def generate_variables(self, skills: Dict, state_machine_spec: Dict) -> str:
         """Generate variable declarations from skills and model."""
         variables = []
@@ -228,6 +382,13 @@ class ModelAwareGenerator:
         variables.append("private double stopPrice;")
         variables.append("private double targetPrice;")
         variables.append("private bool positionOpen = false;")
+        variables.append("")
+
+        variables.append("// Skip Tracking (from model failed_entry_conditions)")
+        variables.append("private int skippedEntries = 0;")
+        variables.append("private bool fvgTouched = false;")
+        variables.append("private bool structureBroken = false;")
+        variables.append("private bool structureRecovered = false;")
 
         return '\n        '.join(variables)
 
@@ -239,18 +400,20 @@ class ModelAwareGenerator:
 
     def generate_strategy(self, model: Dict, output_name: str) -> Tuple[str, str]:
         """Generate complete strategy from model."""
-        skill_ids = model.get('skill_ids', [])
-        skill_contexts = model.get('skill_contexts', {})
-        state_machine = model.get('state_machine_spec', {})
-        trade_flow = model.get('trade_flow_rules', {})
-        context = model.get('context_annotations', {})
+        skill_ids = model.get('skill_ids') or []
+        skill_contexts = model.get('skill_contexts') or {}
+        state_machine = model.get('state_machine_spec') or {}
+        trade_flow = model.get('trade_flow_rules') or {}
+        context = model.get('context_annotations') or {}
+        model_rules = model.get('model_rules') or []
+        failed_entry_conditions = model.get('failed_entry_conditions') or []
 
         # Load skills with model context
         skills = self.load_skills_for_model(skill_ids, skill_contexts)
 
         # Build code sections
         class_name = output_name.replace(' ', '').replace('-', '')
-        description = model.get('description', 'Model-generated strategy')
+        description = model.get('model_intent') or model.get('description', 'Model-generated strategy')
 
         # Generate state enum
         state_enum = self.generate_state_enum(state_machine)
@@ -267,6 +430,10 @@ class ModelAwareGenerator:
 
         # Generate state transitions
         state_transitions = self.generate_state_transitions(state_machine)
+
+        # Generate MODEL-FIRST guards and skip conditions
+        model_rules_guards = self.generate_model_rules_guards(model_rules)
+        skip_conditions = self.generate_skip_conditions(failed_entry_conditions)
 
         # Session info from context_annotations
         sessions = context.get('session_restrictions', {})
@@ -286,6 +453,8 @@ class ModelAwareGenerator:
             entry_logic=entry_logic,
             exit_logic=exit_logic,
             state_transitions=state_transitions,
+            model_rules_guards=model_rules_guards,
+            skip_conditions=skip_conditions,
             sessions=sessions,
             htf_info=htf_info
         )
@@ -573,7 +742,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             "States from model:",
         ])
 
-        states = model.get('state_machine_spec', {}).get('states', [])
+        state_machine = model.get('state_machine_spec') or {}
+        states = state_machine.get('states', [])
         for state in states:
             lines.append(f"- {state}")
 
@@ -583,7 +753,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             "",
         ])
 
-        annotations = model.get('context_annotations', {})
+        annotations = model.get('context_annotations') or {}
         constraints = annotations.get('constraints', []) if isinstance(annotations, dict) else []
         for constraint in constraints:
             lines.append(f"- {constraint}")
@@ -632,7 +802,8 @@ def main():
 
             print(f"Generating strategy from model #{args.model_id}: {model['name']}")
             print(f"Skills: {len(model.get('skill_ids', []))}")
-            print(f"States: {len(model.get('state_machine_spec', {}).get('states', []))}")
+            state_machine = model.get('state_machine_spec') or {}
+            print(f"States: {len(state_machine.get('states', []))}")
 
             strategy_code, changelog = generator.generate_strategy(model, output_name)
             generator.save_output(strategy_code, changelog, output_name, args.output_dir)

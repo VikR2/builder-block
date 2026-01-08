@@ -1,16 +1,26 @@
 {
   "mcpServers": {
     "nt-skills": {
+      "type": "stdio",
       "command": "node",
       "args": [
-        "/workspace/.claude/mcp-servers/nt-skills/dist/index.js"
+        "$CLAUDE_PROJECT_DIR/.claude/mcp-servers/nt-skills/dist/index.js"
       ]
     },
     "youtube-transcript": {
+      "type": "stdio",
       "command": "node",
       "args": [
-        "/workspace/.claude/mcp-servers/youtube-transcript/index.js"
+        "$CLAUDE_PROJECT_DIR/.claude/mcp-servers/youtube-transcript/index.js"
       ]
+    },
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
     }
   }
 }

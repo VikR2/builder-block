@@ -1,0 +1,75 @@
+// C2C3 Zone Alerts - Interactive zone with C2 confirmation alerts
+// Based on LuxAlgo Candle 2 Closure concept
+
+//@version=6
+indicator('C2C3 Zone Alerts', overlay=true, max_boxes_count=10, max_labels_count=100)
+
+//---------------------------------------------------------------------------------------------------------------------
+// INPUTS
+//---------------------------------------------------------------------------------------------------------------------
+ZONE_GROUP = 'ALERT ZONE'
+zoneEnabled     = input.bool(true, 'Enable Zone Alert', group=ZONE_GROUP)
+zoneTop         = input.price(defval=0.0, title='Zone Top (click chart)', confirm=true, group=ZONE_GROUP)
+zoneBottom      = input.price(defval=0.0, title='Zone Bottom (click chart)', confirm=true, group=ZONE_GROUP)
+zoneColor       = input.color(color.new(color.blue, 80), 'Zone Color', group=ZONE_GROUP)
+zoneBorderColor = input.color(color.new(color.blue, 40), 'Zone Border', group=ZONE_GROUP)
+
+STYLE_GROUP = 'STYLE'
+bullishColor    = input.color(color.green, 'Bullish Color', group=STYLE_GROUP)
+bearishColor    = input.color(color.red, 'Bearish Color', group=STYLE_GROUP)
+showAllC2       = input.bool(false, 'Show All C2 (not just zone)', group=STYLE_GROUP)
+
+ALERTS_GROUP = 'ALERTS'
+alertC2InZone   = input.bool(true, 'Alert C2 in Zone', group=ALERTS_GROUP)
+
+//---------------------------------------------------------------------------------------------------------------------
+// ZONE BOX
+//---------------------------------------------------------------------------------------------------------------------
+var box zoneBox = na
+
+float actualTop = math.max(zoneTop, zoneBottom)
+float actualBottom = math.min(zoneTop, zoneBottom)
+
+if zoneEnabled and actualTop > 0 and actualBottom > 0
+    if na(zoneBox)
+        zoneBox := box.new(bar_index - 500, actualTop, bar_index + 50, actualBottom, bgcolor=zoneColor, border_color=zoneBorderColor, extend=extend.both)
+    else
+        box.set_top(zoneBox, actualTop)
+        box.set_bottom(zoneBox, actualBottom)
+
+//---------------------------------------------------------------------------------------------------------------------
+// C2 DETECTION (Reversal Pattern)
+//---------------------------------------------------------------------------------------------------------------------
+bullishC2 = barstate.isconfirmed and close[1] < open[1] and low < low[1] and close > low[1]
+bearishC2 = barstate.isconfirmed and close[1] > open[1] and high > high[1] and close < high[1]
+c2Reversal = bullishC2 or bearishC2
+
+//---------------------------------------------------------------------------------------------------------------------
+// ZONE CHECK
+//---------------------------------------------------------------------------------------------------------------------
+candleTouchesZone = zoneEnabled and actualTop > 0 and actualBottom > 0 and high >= actualBottom and low <= actualTop
+c2InZone = c2Reversal and candleTouchesZone
+
+//---------------------------------------------------------------------------------------------------------------------
+// VISUAL LABELS
+//---------------------------------------------------------------------------------------------------------------------
+if c2InZone
+    lbl_y = bullishC2 ? low : high
+    lbl_yloc = bullishC2 ? yloc.belowbar : yloc.abovebar
+    lbl_style = bullishC2 ? label.style_label_up : label.style_label_down
+    lbl_color = color.new(bullishC2 ? bullishColor : bearishColor, 20)
+    label.new(bar_index, lbl_y, '2', xloc.bar_index, lbl_yloc, lbl_color, lbl_style, color.white, size.normal)
+
+else if showAllC2 and c2Reversal
+    lbl_y = bullishC2 ? low : high
+    lbl_yloc = bullishC2 ? yloc.belowbar : yloc.abovebar
+    lbl_style = bullishC2 ? label.style_label_up : label.style_label_down
+    lbl_txtcolor = bullishC2 ? bullishColor : bearishColor
+    label.new(bar_index, lbl_y, '2', xloc.bar_index, lbl_yloc, color(na), lbl_style, lbl_txtcolor, size.small)
+
+//---------------------------------------------------------------------------------------------------------------------
+// ALERTS
+//---------------------------------------------------------------------------------------------------------------------
+if alertC2InZone and c2InZone
+    alertMsg = (bullishC2 ? 'BULLISH' : 'BEARISH') + ' C2 Confirmation in Zone @ ' + str.tostring(close)
+    alert(alertMsg, alert.freq_once_per_bar_close)

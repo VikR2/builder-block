@@ -612,6 +612,22 @@ Before presenting design for approval, verify:
 - [ ] Property Display names are descriptive (not strategy name)
 - [ ] All state variables have reset logic in ResetDailyState()
 
+### State Machine Validation (V19+)
+- [ ] Number of states <= documented states (no orphan states)
+- [ ] All states have clear entry AND exit transitions
+- [ ] No states defined but never transitioned to
+- [ ] State names match SAD documentation
+
+### Detection Frequency Validation (V19+)
+- [ ] Detection triggers on appropriate timeframe (not just HTF)
+- [ ] If HTF-only detection: document why or add LTF fallback
+- [ ] Expected detection frequency: X per day (not 24h gaps)
+
+### Parameter Scaling Validation (V19+)
+- [ ] Fixed tick parameters have ATR-based alternatives
+- [ ] Zone sizes scale with volatility (% of range, not fixed ticks)
+- [ ] MaxStopTicks accounts for instrument tick value
+
 ### Common Mistakes to Avoid
 | Mistake | Impact | Prevention |
 |---------|--------|------------|
@@ -619,6 +635,10 @@ Before presenting design for approval, verify:
 | Session high as target after sweep | Target already invalidated | Track "taken" state |
 | Same Display name for all properties | Optimizer shows gibberish | Unique property names |
 | Duplicate variable declarations | CS0102 compile error | Check before adding |
+| Extra intermediate states | Dead-end transitions, confusion | Keep state machine minimal |
+| Detection only on HTF bars | Waits 24h between checks | Also run on LTF |
+| Fixed tick parameters | Fails across instruments/volatility | Use ATR-based scaling |
+| Stop reference far from entry | Wide stops exceed MaxStopTicks | Use CISD candle for stop |
 
 ## Handoff to Code Generation
 

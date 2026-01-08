@@ -1,0 +1,313 @@
+[BIAS] 1/7/2025 Bearish - Close 6115.00 < Prev Low 6141.50
+[STATE] -> BiasEstablished
+[POI] 1/7/2025 DAILY PDH POI at 6229.00
+[BIAS] 1/8/2025 None - Close 6120.00 inside prev range
+[BIAS] 1/9/2025 None - Close 6120.00 inside prev range
+[BIAS] 1/10/2025 Bearish - Close 6027.00 < Prev Low 6090.00
+[BIAS] 1/13/2025 None - Close 6035.25 inside prev range
+[BIAS] 1/14/2025 None - Close 6043.00 inside prev range
+[BIAS] 1/15/2025 Bullish - Close 6149.75 > Prev High 6079.25
+[BIAS] 1/16/2025 None - Close 6136.25 inside prev range
+[BIAS] 1/17/2025 Bullish - Close 6194.25 > Prev High 6178.25
+[C1] 1/20/2025 10:00:00 AM C1 at 6228.50 - zone touched, waiting for PULLBACK
+[PULLBACK] 1/20/2025 11:00:00 AM Bearish pullback complete - low: 6203.75, waiting for C2 return
+[BIAS] 1/20/2025 Bullish - Close 6216.00 > Prev High 6212.25
+[C2] 1/20/2025 7:00:00 PM C2 at 6228.75 - opening filter PASSED (open: 6221.25 outside, close: 6228.75 inside), ready for CISD
+[CISD] 1/20/2025 7:05:00 PM CISD confirmed - OB: 6227.50 - 6229.00, Series: 3 candles
+[ENTRY] 1/20/2025 7:10:00 PM LONG at 6231.00, Stop: 6226.50, Target: 6240.00, Risk: 18.0 ticks
+[EXIT] 1/20/2025 7:20:00 PM Trade closed at 6226.00
+[STATE] Reset for next setup -> BiasEstablished
+[BIAS] 1/21/2025 Bullish - Close 6245.00 > Prev High 6239.00
+[POI] 1/21/2025 DAILY PDL POI at 6178.75
+[BIAS] 1/22/2025 Bullish - Close 6281.25 > Prev High 6254.00
+[BIAS] 1/23/2025 Bullish - Close 6312.75 > Prev High 6296.50
+[BIAS] 1/24/2025 None - Close 6294.00 inside prev range
+[C1] 1/27/2025 4:00:00 AM C1 at 6178.25 - zone touched, waiting for PULLBACK
+[PULLBACK] 1/27/2025 10:00:00 AM Bullish pullback complete - high: 6198.50, waiting for C2 return
+[C2] 1/27/2025 11:00:00 AM C2 at 6192.50 - opening filter PASSED (open: 6197.50 outside, close: 6192.50 inside), ready for CISD
+[BIAS] 1/27/2025 Bearish - Close 6207.50 < Prev Low 6282.75
+[CISD] 1/27/2025 6:15:00 PM CISD confirmed - OB: 6211.75 - 6220.25, Series: 3 candles
+[ENTRY] 1/27/2025 6:20:00 PM SHORT at 6211.00, Stop: 6221.25, Target: 6190.50, Risk: 41.0 ticks
+[EXIT] 1/28/2025 3:55:00 AM Trade closed at 6221.75
+[STATE] Reset for next setup -> BiasEstablished
+[BIAS] 1/28/2025 None - Close 6257.75 inside prev range
+[BIAS] 1/29/2025 None - Close 6228.25 inside prev range
+[BIAS] 1/30/2025 None - Close 6260.00 inside prev range
+[BIAS] 1/31/2025 None - Close 6228.00 inside prev range
+[BIAS] 2/3/2025 Bearish - Close 6183.00 < Prev Low 6218.50
+[POI] 2/3/2025 DAILY Bearish Swing POI at 6308.50
+[BIAS] 2/4/2025 Bullish - Close 6223.75 > Prev High 6222.75
+[BIAS] 2/5/2025 Bullish - Close 6247.25 > Prev High 6229.75
+[BIAS] 2/6/2025 Bullish - Close 6266.75 > Prev High 6252.75
+[BIAS] 2/7/2025 Bearish - Close 6210.25 < Prev Low 6230.75
+[BIAS] 2/10/2025 None - Close 6249.50 inside prev range
+[BIAS] 2/11/2025 None - Close 6253.00 inside prev range
+[BIAS] 2/12/2025 None - Close 6233.50 inside prev range
+[BIAS] 2/13/2025 Bullish - Close 6296.00 > Prev High 6258.75
+[C1] 2/13/2025 10:00:00 PM C1 at 6304.00 - zone touched, waiting for PULLBACK
+[PULLBACK] 2/13/2025 11:00:00 PM Bearish pullback complete - low: 6302.00, waiting for C2 return
+[C2] 2/14/2025 1:00:00 AM C2 at 6300.25 - opening filter PASSED (open: 6304.00 outside, close: 6300.25 inside), ready for CISD
+[CISD] 2/14/2025 1:05:00 AM CISD confirmed - OB: 6300.00 - 6300.75, Series: 5 candles
+[ENTRY] 2/14/2025 1:10:00 AM LONG at 6301.00, Stop: 6299.00, Target: 6305.00, Risk: 8.0 ticks
+[EXIT] 2/14/2025 2:10:00 AM Trade closed at 6305.00
+[STATE] Reset for next setup -> BiasEstablished
+[BIAS] 2/14/2025 None - Close 6292.75 inside prev range
+[BIAS] 2/17/2025 None - Close 6306.75 inside prev range
+[BIAS] 2/18/2025 None - Close 6307.50 inside prev range
+[BIAS] 2/19/2025 Bullish - Close 6323.75 > Prev High 6318.50
+[POI] 2/19/2025 DAILY Bullish Swing POI at 6279.00
+[C1] 2/20/2025 10:00:00 AM C1 at 6277.50 - zone touched, waiting for PULLBACK
+[PULLBACK] 2/20/2025 3:00:00 PM Bullish pullback complete - high: 6311.25, waiting for C2 return
+[BIAS] 2/20/2025 None - Close 6297.25 inside prev range
+[C2] 2/21/2025 10:00:00 AM C2 at 6275.75 - opening filter PASSED (open: 6300.25 outside, close: 6275.75 inside), ready for CISD
+[POI] 2/21/2025 3:00:00 PM POI invalidated: Close count threshold exceeded
+[STATE] -> BiasEstablished (POI invalidated)
+[BIAS] 2/21/2025 Bearish - Close 6189.75 < Prev Low 6263.50
+[POI] 2/21/2025 DAILY Bearish Swing POI at 6327.25
+[BIAS] 2/24/2025 Bearish - Close 6161.50 < Prev Low 6185.25
+[BIAS] 2/25/2025 Bearish - Close 6130.75 < Prev Low 6155.25
+[BIAS] 2/26/2025 None - Close 6131.50 inside prev range
+[BIAS] 2/27/2025 Bearish - Close 6037.00 < Prev Low 6106.25
+[BIAS] 2/28/2025 None - Close 6124.00 inside prev range
+[BIAS] 3/3/2025 None - Close 6021.50 inside prev range
+[BIAS] 3/4/2025 Bearish - Close 5950.25 < Prev Low 5982.50
+[BIAS] 3/5/2025 None - Close 6012.00 inside prev range
+[BIAS] 3/6/2025 Bearish - Close 5907.00 < Prev Low 5911.50
+[BIAS] 3/7/2025 None - Close 5936.75 inside prev range
+[BIAS] 3/10/2025 Bearish - Close 5781.50 < Prev Low 5833.75
+[BIAS] 3/11/2025 None - Close 5737.75 inside prev range
+[BIAS] 3/12/2025 None - Close 5765.50 inside prev range
+[BIAS] 3/13/2025 Bearish - Close 5688.25 < Prev Low 5711.00
+[BIAS] 3/14/2025 Bullish - Close 5800.75 > Prev High 5783.75
+[BIAS] 3/17/2025 Bullish - Close 5840.75 > Prev High 5809.50
+[BIAS] 3/18/2025 None - Close 5777.75 inside prev range
+[BIAS] 3/19/2025 None - Close 5838.25 inside prev range
+[BIAS] 3/20/2025 None - Close 5821.25 inside prev range
+[BIAS] 3/21/2025 None - Close 5826.75 inside prev range
+[BIAS] 3/24/2025 Bullish - Close 5924.00 > Prev High 5832.25
+[BIAS] 3/25/2025 Bullish - Close 5935.00 > Prev High 5934.00
+[BIAS] 3/26/2025 Bearish - Close 5868.00 < Prev Low 5910.75
+[BIAS] 3/27/2025 Bearish - Close 5847.75 < Prev Low 5851.50
+[BIAS] 3/28/2025 Bearish - Close 5731.50 < Prev Low 5828.50
+[BIAS] 3/31/2025 None - Close 5761.75 inside prev range
+[BIAS] 4/1/2025 Bullish - Close 5783.00 > Prev High 5781.25
+[BIAS] 4/2/2025 Bullish - Close 5820.75 > Prev High 5803.25
+[BIAS] 4/3/2025 Bearish - Close 5541.25 < Prev Low 5674.75
+[BIAS] 4/4/2025 Bearish - Close 5218.75 < Prev Low 5523.75
+[BIAS] 4/7/2025 None - Close 5205.75 inside prev range
+[BIAS] 4/8/2025 None - Close 5128.75 inside prev range
+[BIAS] 4/9/2025 Bullish - Close 5599.50 > Prev High 5413.75
+[BIAS] 4/10/2025 None - Close 5410.50 inside prev range
+[BIAS] 4/11/2025 None - Close 5499.75 inside prev range
+[BIAS] 4/14/2025 Bullish - Close 5549.25 > Prev High 5526.75
+[BIAS] 4/15/2025 None - Close 5536.75 inside prev range
+[BIAS] 4/16/2025 Bearish - Close 5414.25 < Prev Low 5521.50
+[BIAS] 4/17/2025 None - Close 5421.25 inside prev range
+[BIAS] 4/21/2025 Bearish - Close 5293.25 < Prev Low 5394.00
+[BIAS] 4/22/2025 Bullish - Close 5423.25 > Prev High 5415.25
+[BIAS] 4/23/2025 Bullish - Close 5510.25 > Prev High 5447.75
+[BIAS] 4/24/2025 Bullish - Close 5619.75 > Prev High 5608.25
+[BIAS] 4/25/2025 Bullish - Close 5658.25 > Prev High 5650.00
+[BIAS] 4/28/2025 None - Close 5661.50 inside prev range
+[BIAS] 4/29/2025 Bullish - Close 5692.25 > Prev High 5687.25
+[BIAS] 4/30/2025 None - Close 5695.50 inside prev range
+[BIAS] 5/1/2025 None - Close 5731.75 inside prev range
+[BIAS] 5/2/2025 Bullish - Close 5817.50 > Prev High 5791.00
+[BIAS] 5/5/2025 None - Close 5780.25 inside prev range
+[BIAS] 5/6/2025 Bearish - Close 5734.25 < Prev Low 5763.75
+[BIAS] 5/7/2025 None - Close 5760.50 inside prev range
+[BIAS] 5/8/2025 None - Close 5793.00 inside prev range
+[BIAS] 5/9/2025 None - Close 5786.50 inside prev range
+[BIAS] 5/12/2025 Bullish - Close 5973.50 > Prev High 5823.75
+[BIAS] 5/13/2025 Bullish - Close 6013.00 > Prev High 5984.75
+[BIAS] 5/14/2025 None - Close 6017.00 inside prev range
+[BIAS] 5/15/2025 Bullish - Close 6041.75 > Prev High 6033.50
+[BIAS] 5/16/2025 Bullish - Close 6084.00 > Prev High 6053.00
+[BIAS] 5/19/2025 Bullish - Close 6091.00 > Prev High 6086.00
+[BIAS] 5/20/2025 None - Close 6068.25 inside prev range
+[BIAS] 5/21/2025 Bearish - Close 5969.75 < Prev Low 6035.25
+[BIAS] 5/22/2025 None - Close 5965.25 inside prev range
+[BIAS] 5/23/2025 Bearish - Close 5925.50 < Prev Low 5937.25
+[BIAS] 5/26/2025 Bullish - Close 5999.50 > Prev High 5980.50
+[BIAS] 5/27/2025 Bullish - Close 6042.75 > Prev High 6003.50
+[BIAS] 5/28/2025 None - Close 6011.25 inside prev range
+[BIAS] 5/29/2025 None - Close 6031.25 inside prev range
+[BIAS] 5/30/2025 None - Close 6024.50 inside prev range
+[BIAS] 6/2/2025 Bullish - Close 6055.75 > Prev High 6041.25
+[BIAS] 6/3/2025 Bullish - Close 6090.00 > Prev High 6064.00
+[BIAS] 6/4/2025 None - Close 6089.50 inside prev range
+[BIAS] 6/5/2025 Bearish - Close 6054.50 < Prev Low 6082.50
+[BIAS] 6/6/2025 None - Close 6115.25 inside prev range
+[BIAS] 6/9/2025 None - Close 6118.75 inside prev range
+[BIAS] 6/10/2025 Bullish - Close 6153.50 > Prev High 6136.25
+[BIAS] 6/11/2025 None - Close 6137.50 inside prev range
+[BIAS] 6/12/2025 None - Close 6158.00 inside prev range
+[BIAS] 6/13/2025 Bearish - Close 6087.75 < Prev Low 6096.25
+[BIAS] 6/16/2025 None - Close 6146.50 inside prev range
+[BIAS] 6/17/2025 None - Close 6095.25 inside prev range
+[BIAS] 6/18/2025 None - Close 6091.00 inside prev range
+[BIAS] 6/19/2025 Bearish - Close 6035.00 < Prev Low 6074.50
+[BIAS] 6/20/2025 None - Close 6074.75 inside prev range
+[BIAS] 6/23/2025 Bullish - Close 6133.75 > Prev High 6127.75
+[BIAS] 6/24/2025 Bullish - Close 6203.00 > Prev High 6138.25
+[BIAS] 6/25/2025 None - Close 6203.75 inside prev range
+[BIAS] 6/26/2025 Bullish - Close 6251.75 > Prev High 6217.00
+[BIAS] 6/27/2025 Bullish - Close 6280.50 > Prev High 6256.75
+[BIAS] 6/30/2025 Bullish - Close 6310.50 > Prev High 6295.75
+[BIAS] 7/1/2025 None - Close 6305.50 inside prev range
+[C1] 7/2/2025 1:00:00 AM C1 at 6322.25 - zone touched, waiting for PULLBACK
+[PULLBACK] 7/2/2025 2:00:00 AM Bearish pullback complete - low: 6315.50, waiting for C2 return
+[C2] 7/2/2025 3:00:00 AM C2 at 6326.25 - opening filter PASSED (open: 6321.25 outside, close: 6326.25 inside), ready for CISD
+[BIAS] 7/2/2025 Bullish - Close 6331.75 > Prev High 6318.25
+[CISD] 7/2/2025 6:30:00 PM CISD confirmed - OB: 6330.00 - 6331.25, Series: 4 candles
+[ENTRY] 7/2/2025 6:35:00 PM LONG at 6331.50, Stop: 6329.00, Target: 6336.50, Risk: 10.0 ticks
+[POI] 7/2/2025 10:00:00 PM POI invalidated: Close count threshold exceeded
+[STATE] -> BiasEstablished (POI invalidated)
+[EXIT] 7/2/2025 10:35:00 PM Trade closed at 6328.50
+[STATE] Reset for next setup -> BiasEstablished
+[BIAS] 7/3/2025 Bullish - Close 6381.00 > Prev High 6336.25
+[POI] 7/3/2025 DAILY Bullish FVG: 6318.25 - 6327.25
+[BIAS] 7/4/2025 None - Close 6340.25 inside prev range
+[C1] 7/7/2025 1:00:00 PM C1 at 6322.75 - zone touched, waiting for PULLBACK
+[PULLBACK] 7/7/2025 4:00:00 PM Bullish pullback complete - high: 6348.00, waiting for C2 return
+[BIAS] 7/7/2025 Bearish - Close 6332.75 < Prev Low 6333.25
+[C2] 7/7/2025 5:00:00 PM C2 at 6320.00 - opening filter PASSED (open: 6332.25 outside, close: 6320.00 inside), ready for CISD
+[CISD] 7/7/2025 6:05:00 PM CISD confirmed - OB: 6319.00 - 6320.25, Series: 5 candles
+[ENTRY] 7/7/2025 6:10:00 PM SHORT at 6320.00, Stop: 6321.25, Target: 6317.50, Risk: 5.0 ticks
+[EXIT] 7/7/2025 6:20:00 PM Trade closed at 6317.50
+[STATE] Reset for next setup -> BiasEstablished
+[BIAS] 7/8/2025 None - Close 6328.75 inside prev range
+[BIAS] 7/9/2025 Bullish - Close 6364.00 > Prev High 6345.75
+[POI] 7/9/2025 DAILY Bullish Swing POI at 6303.00
+[BIAS] 7/10/2025 Bullish - Close 6381.00 > Prev High 6372.00
+[BIAS] 7/11/2025 None - Close 6356.75 inside prev range
+[BIAS] 7/14/2025 None - Close 6367.75 inside prev range
+[BIAS] 7/15/2025 None - Close 6340.75 inside prev range
+[C1] 7/16/2025 12:00:00 PM C1 at 6337.75 - zone touched, waiting for PULLBACK
+[PULLBACK] 7/16/2025 1:00:00 PM Bullish pullback complete - high: 6351.75, waiting for C2 return
+[BIAS] 7/16/2025 None - Close 6360.00 inside prev range
+[BIAS] 7/17/2025 Bullish - Close 6397.25 > Prev High 6365.50
+[BIAS] 7/18/2025 None - Close 6391.50 inside prev range
+[BIAS] 7/21/2025 None - Close 6401.50 inside prev range
+[BIAS] 7/22/2025 None - Close 6403.50 inside prev range
+[BIAS] 7/23/2025 Bullish - Close 6453.00 > Prev High 6410.50
+[BIAS] 7/24/2025 None - Close 6458.25 inside prev range
+[BIAS] 7/25/2025 Bullish - Close 6481.75 > Prev High 6475.00
+[BIAS] 7/28/2025 None - Close 6479.50 inside prev range
+[BIAS] 7/29/2025 Bearish - Close 6462.75 < Prev Low 6465.50
+[BIAS] 7/30/2025 None - Close 6453.00 inside prev range
+[BIAS] 7/31/2025 None - Close 6431.00 inside prev range
+[C2] 8/1/2025 11:00:00 AM C2 at 6323.75 - opening filter PASSED (open: 6319.00 outside, close: 6323.75 inside), ready for CISD
+[BIAS] 8/1/2025 Bearish - Close 6321.25 < Prev Low 6414.25
+[CISD] 8/3/2025 6:05:00 PM CISD confirmed - OB: 6319.75 - 6321.50, Series: 5 candles
+[ENTRY] 8/3/2025 6:10:00 PM SHORT at 6311.25, Stop: 6322.50, Target: 6288.75, Risk: 45.0 ticks
+[EXIT] 8/3/2025 6:40:00 PM Trade closed at 6322.75
+[STATE] Reset for next setup -> BiasEstablished
+[BIAS] 8/4/2025 None - Close 6412.75 inside prev range
+[BIAS] 8/5/2025 None - Close 6382.00 inside prev range
+[BIAS] 8/6/2025 None - Close 6427.75 inside prev range
+[BIAS] 8/7/2025 None - Close 6423.25 inside prev range
+[BIAS] 8/8/2025 None - Close 6470.25 inside prev range
+[BIAS] 8/11/2025 None - Close 6456.50 inside prev range
+[BIAS] 8/12/2025 Bullish - Close 6525.25 > Prev High 6488.25
+[POI] 8/12/2025 DAILY PDL POI at 6444.25
+[BIAS] 8/13/2025 Bullish - Close 6545.50 > Prev High 6526.75
+[BIAS] 8/14/2025 None - Close 6547.25 inside prev range
+[BIAS] 8/15/2025 None - Close 6528.25 inside prev range
+[BIAS] 8/18/2025 None - Close 6526.00 inside prev range
+[BIAS] 8/19/2025 Bearish - Close 6489.25 < Prev Low 6512.75
+[C1] 8/20/2025 10:00:00 AM C1 at 6444.00 - zone touched, waiting for PULLBACK
+[PULLBACK] 8/20/2025 1:00:00 PM Bullish pullback complete - high: 6487.50, waiting for C2 return
+[C2] 8/20/2025 3:00:00 PM C2 at 6457.25 - opening filter PASSED (open: 6462.75 outside, close: 6457.25 inside), ready for CISD
+[CISD] 8/20/2025 4:00:00 PM CISD confirmed - OB: 6474.00 - 6481.00, Series: 7 candles
+[BIAS] 8/20/2025 Bearish - Close 6470.00 < Prev Low 6476.00
+[ENTRY] 8/20/2025 6:05:00 PM SHORT at 6472.25, Stop: 6482.00, Target: 6452.75, Risk: 39.0 ticks
+[EXIT] 8/21/2025 6:25:00 AM Trade closed at 6452.75
+[STATE] Reset for next setup -> BiasEstablished
+[BIAS] 8/21/2025 None - Close 6445.00 inside prev range
+[BIAS] 8/22/2025 Bullish - Close 6540.00 > Prev High 6475.75
+[POI] 8/22/2025 DAILY Bullish Swing POI at 6419.50
+[BIAS] 8/25/2025 None - Close 6512.25 inside prev range
+[BIAS] 8/26/2025 None - Close 6539.25 inside prev range
+[BIAS] 8/27/2025 Bullish - Close 6552.75 > Prev High 6544.25
+[BIAS] 8/28/2025 Bullish - Close 6574.25 > Prev High 6562.25
+[BIAS] 8/29/2025 None - Close 6529.50 inside prev range
+[BIAS] 9/1/2025 None - Close 6539.75 inside prev range
+[BIAS] 9/2/2025 Bearish - Close 6482.25 < Prev Low 6516.25
+[BIAS] 9/3/2025 None - Close 6514.00 inside prev range
+[BIAS] 9/4/2025 Bullish - Close 6567.50 > Prev High 6521.00
+[BIAS] 9/5/2025 None - Close 6546.50 inside prev range
+[BIAS] 9/8/2025 None - Close 6562.75 inside prev range
+[BIAS] 9/9/2025 Bullish - Close 6578.50 > Prev High 6573.25
+[BIAS] 9/10/2025 Bullish - Close 6596.50 > Prev High 6593.00
+[BIAS] 9/11/2025 Bullish - Close 6649.25 > Prev High 6622.00
+[BIAS] 9/12/2025 None - Close 6645.00 inside prev range
+[BIAS] 9/15/2025 Bullish - Close 6679.25 > Prev High 6662.75
+[BIAS] 9/16/2025 None - Close 6667.50 inside prev range
+[BIAS] 9/17/2025 Bearish - Close 6658.75 < Prev Low 6661.25
+[BIAS] 9/18/2025 Bullish - Close 6693.50 > Prev High 6686.50
+[BIAS] 9/19/2025 Bullish - Close 6722.50 > Prev High 6719.75
+[BIAS] 9/22/2025 Bullish - Close 6752.50 > Prev High 6731.50
+[BIAS] 9/23/2025 None - Close 6715.00 inside prev range
+[BIAS] 9/24/2025 Bearish - Close 6692.25 < Prev Low 6701.75
+[BIAS] 9/25/2025 Bearish - Close 6659.75 < Prev Low 6678.00
+[BIAS] 9/26/2025 None - Close 6696.50 inside prev range
+[BIAS] 9/29/2025 Bullish - Close 6713.50 > Prev High 6703.75
+[BIAS] 9/30/2025 Bullish - Close 6738.75 > Prev High 6736.00
+[BIAS] 10/1/2025 Bullish - Close 6761.50 > Prev High 6743.50
+[BIAS] 10/2/2025 None - Close 6766.75 inside prev range
+[BIAS] 10/3/2025 None - Close 6764.00 inside prev range
+[BIAS] 10/6/2025 None - Close 6788.75 inside prev range
+[BIAS] 10/7/2025 Bearish - Close 6761.50 < Prev Low 6766.50
+[BIAS] 10/8/2025 None - Close 6801.25 inside prev range
+[BIAS] 10/9/2025 None - Close 6779.25 inside prev range
+[BIAS] 10/10/2025 Bearish - Close 6595.25 < Prev Low 6760.75
+[BIAS] 10/13/2025 None - Close 6694.75 inside prev range
+[BIAS] 10/14/2025 None - Close 6686.50 inside prev range
+[BIAS] 10/15/2025 None - Close 6715.00 inside prev range
+[BIAS] 10/16/2025 None - Close 6668.75 inside prev range
+[BIAS] 10/17/2025 None - Close 6702.50 inside prev range
+[BIAS] 10/20/2025 Bullish - Close 6773.75 > Prev High 6718.00
+[BIAS] 10/21/2025 None - Close 6773.25 inside prev range
+[BIAS] 10/22/2025 Bearish - Close 6737.00 < Prev Low 6759.25
+[BIAS] 10/23/2025 None - Close 6775.00 inside prev range
+[BIAS] 10/24/2025 Bullish - Close 6827.00 > Prev High 6785.75
+[BIAS] 10/27/2025 Bullish - Close 6908.25 > Prev High 6841.25
+[BIAS] 10/28/2025 Bullish - Close 6925.75 > Prev High 6916.25
+[BIAS] 10/29/2025 None - Close 6922.75 inside prev range
+[BIAS] 10/30/2025 Bearish - Close 6855.50 < Prev Low 6882.25
+[BIAS] 10/31/2025 None - Close 6874.00 inside prev range
+[BIAS] 11/3/2025 None - Close 6882.75 inside prev range
+[BIAS] 11/4/2025 Bearish - Close 6801.75 < Prev Low 6849.50
+[BIAS] 11/5/2025 None - Close 6825.25 inside prev range
+[BIAS] 11/6/2025 Bearish - Close 6747.50 < Prev Low 6748.50
+[BIAS] 11/7/2025 None - Close 6753.75 inside prev range
+[BIAS] 11/10/2025 Bullish - Close 6856.75 > Prev High 6772.00
+[BIAS] 11/11/2025 Bullish - Close 6871.50 > Prev High 6865.75
+[BIAS] 11/12/2025 None - Close 6875.75 inside prev range
+[BIAS] 11/13/2025 Bearish - Close 6760.00 < Prev Low 6852.00
+[BIAS] 11/14/2025 None - Close 6755.25 inside prev range
+[BIAS] 11/17/2025 None - Close 6692.00 inside prev range
+[BIAS] 11/18/2025 Bearish - Close 6639.75 < Prev Low 6658.50
+[BIAS] 11/19/2025 None - Close 6661.50 inside prev range
+[BIAS] 11/20/2025 Bearish - Close 6557.50 < Prev Low 6613.25
+[BIAS] 11/21/2025 None - Close 6620.25 inside prev range
+[BIAS] 11/24/2025 Bullish - Close 6721.25 > Prev High 6677.50
+[BIAS] 11/25/2025 Bullish - Close 6781.50 > Prev High 6731.75
+[BIAS] 11/26/2025 Bullish - Close 6828.00 > Prev High 6792.50
+[BIAS] 11/27/2025 None - Close 6828.00 inside prev range
+[BIAS] 11/28/2025 Bullish - Close 6859.50 > Prev High 6833.75
+[BIAS] 12/1/2025 Bearish - Close 6826.75 < Prev Low 6828.75
+[BIAS] 12/2/2025 None - Close 6840.25 inside prev range
+[BIAS] 12/3/2025 None - Close 6862.00 inside prev range
+[BIAS] 12/4/2025 None - Close 6866.75 inside prev range
+[BIAS] 12/5/2025 None - Close 6878.25 inside prev range
+[BIAS] 12/8/2025 Bearish - Close 6855.75 < Prev Low 6856.75
+[BIAS] 12/9/2025 None - Close 6848.25 inside prev range
+[BIAS] 12/10/2025 Bullish - Close 6891.75 > Prev High 6872.75
+[BIAS] 12/11/2025 None - Close 6907.25 inside prev range
+[BIAS] 12/12/2025 None - Close 6830.75 inside prev range
+[BIAS] 12/15/2025 None - Close 6823.00 inside prev range
+[BIAS] 12/16/2025 Bearish - Close 6801.00 < Prev Low 6806.25
+[BIAS] 12/17/2025 Bearish - Close 6726.50 < Prev Low 6762.00
+[BIAS] 12/18/2025 None - Close 6778.25 inside prev range

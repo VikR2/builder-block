@@ -3,7 +3,7 @@
 name: code-reviewer
 description: Specialist for reviewing C# code in NinjaTrader 8 trading strategies. Validates skill integration, code quality, and NT8 best practices. Final gate before strategy deployment.
 tools: Read, Edit, Grep, Bash
-model: sonnet
+model: opus 
 
 ---
 
@@ -191,6 +191,160 @@ if (State == State.Terminated)
 }
 ```
 
+## POI-Type Logic Validation (CRITICAL)
+
+Different POI types have different rules. Generated code MUST handle them correctly.
+
+Reference: `data/architectures/poi-type-contracts.md`
+
+### FVG Code Check
+
+| Check | Expected | Bug If Wrong |
+|-------|----------|--------------|
+| C1/C2 validation | Checks if candle is WITHIN FVG zone | Confirmations never count |
+| Wick outside OK | `candleLow <= fvgTop && candleHigh >= fvgBottom` | Misses valid touches |
+| Invalidation direction | Bullish=close BELOW, Bearish=close ABOVE | **Inverted logic (common!)** |
+| Consecutive threshold | 6+ closes, not single bar | POI invalidates too fast |
+| Counter reset | Reset when price returns to zone | Never invalidates |
+
+```csharp
+// FVG: Check for CORRECT invalidation direction
+// PASS:
+if (bias == Bullish && close < poiBottom - buffer) invalidCount++;
+if (bias == Bearish && close > poiTop + buffer) invalidCount++;
+
+// FAIL (inverted - common bug!):
+if (bias == Bullish && close > poiTop + buffer) invalidCount++;  // WRONG!
+```
+
+### OB Code Check
+
+| Check | Expected | Bug If Wrong |
+|-------|----------|--------------|
+| OB candle reference | Index [1] (last opposing) | Index [0] is reversal, wrong candle |
+| C1/C2 outside OB | Signals invalidation | Using FVG rules instead |
+| Stop placement | Full structure (m5OBLow/High) | Body only = stop too tight |
+
+```csharp
+// OB: Check for CORRECT candle reference
+// PASS:
+m5OBHigh = Highs[IDX_ENTRY][1];  // Last opposing candle
+m5OBLow = Lows[IDX_ENTRY][1];
+
+// FAIL (wrong candle):
+m5OBHigh = Highs[IDX_ENTRY][0];  // This is reversal, NOT OB!
+```
+
+### Confirmation Counting Check
+
+| Check | Expected | Bug If Wrong |
+|-------|----------|--------------|
+| Counting mode | CUMULATIVE (FVG) | Count resets on non-touch |
+| Reset conditions | Only on POI invalid, new POI | Resets too often |
+| Never reset on | Candle outside zone | Confirmations never accumulate |
+
+```csharp
+// PASS - Cumulative counting:
+if (candleTouchesZone)
+    h1CandlesAtPOI++;  // Only increment, never decrement
+
+// No else clause that resets!
+
+// FAIL - Consecutive counting:
+if (candleTouchesZone)
+    h1CandlesAtPOI++;
+else
+    h1CandlesAtPOI = 0;  // WRONG - resets on non-touch
+```
+
+### Frame Reference Check
+
+| Check | Expected |
+|-------|----------|
+| Pattern comments | Each pattern has `// Visual Reference: {frame}` comment |
+| Interpretation documented | Code comment explains the visual interpretation |
+
+```csharp
+// PASS:
+// ==========================================================
+// Pattern: CISD (Change In State Of Delivery)
+// Visual Reference: 9AL41xON3hA/frame_008.jpg (7:00)
+// Interpretation: OB = last opposing candle (index [1])
+// ==========================================================
+private void DetectCISD() { ... }
+
+// FAIL - No frame reference:
+private void DetectCISD() { ... }
+```
+
+### POI Validation Checklist
+
+Add to review:
+- [ ] POI type identified (FVG, OB, or Swing)
+- [ ] C1/C2 validation logic matches POI type rules
+- [ ] FVG invalidation direction is CORRECT (bullish=below)
+- [ ] OB candle reference uses index [1], not [0]
+- [ ] Stop placement uses full structure, not body-only
+- [ ] Confirmation counting is CUMULATIVE (no reset on non-touch)
+- [ ] Each pattern has frame reference comment
+
+---
+
+## Direction Logic Validation (CRITICAL)
+
+Multi-timeframe strategies require careful direction flow between HTF and LTF. This section catches direction inversion bugs.
+
+### Direction Flow Checks
+
+| Check | Expected | Bug If Wrong |
+|-------|----------|--------------|
+| HTF direction stored | Direction from HTF pattern stored in state variable | Entry uses wrong direction |
+| Entry direction matches HTF | Long entries only after bullish HTF, shorts only after bearish HTF | **Direction inversion (CRITICAL)** |
+| State cleared on new HTF signal | Old LTF state reset when new HTF pattern detected | Old setup completes with new direction |
+| Cooldown after HTF detection | Minimum bars between HTF detection and LTF entry | Race condition between old/new setups |
+
+### Direction Consistency Checklist
+
+```
+For each HTF→LTF signal flow:
+  - [ ] HTF direction stored in dedicated variable (e.g., h4Direction, dailyBias)
+  - [ ] LTF entry checks HTF direction variable (not immediate candle color)
+  - [ ] State reset called when HTF direction changes
+  - [ ] Cooldown prevents entries during HTF transition (2+ bars minimum)
+  - [ ] Debug output includes both HTF and LTF directions
+```
+
+### Code Pattern Check
+
+```csharp
+// PASS: Explicit direction from stored HTF state
+if (h4C2Direction == SignalDirection.Long)
+    EnterLong();
+else if (h4C2Direction == SignalDirection.Short)
+    EnterShort();
+
+// FAIL: Direction from immediate LTF signal (ignores HTF)
+if (currentCandleBullish)  // BAD - doesn't check HTF
+    EnterLong();
+
+// PASS: Cooldown prevents race condition
+if (CurrentBars[0] - h4C2DetectedAtBar < 2) return;  // Wait for HTF to settle
+
+// FAIL: No cooldown - old setup can fire with new direction
+// (Entry fires immediately after HTF change)
+```
+
+### Direction Validation Checklist
+
+Add to review:
+- [ ] HTF direction variable exists and is set on HTF signal
+- [ ] LTF entry uses HTF direction variable, not derived direction
+- [ ] ResetLTFState() called when new HTF signal detected
+- [ ] Cooldown implemented between HTF detection and LTF entry
+- [ ] Entry signal includes direction in debug output for verification
+
+---
+
 ## Review Checklist
 
 ### Critical (Block deployment)
@@ -201,6 +355,12 @@ if (State == State.Terminated)
 - [ ] **No duplicate variable/property declarations (CS0102)**
 - [ ] **Dynamic targets validate direction (long target > entry, short target < entry)**
 - [ ] **Display attributes have unique names (not strategy name)**
+- [ ] **POI invalidation direction is correct (bullish=below, bearish=above)**
+- [ ] **OB candle reference uses index [1] (last opposing), not [0]**
+- [ ] **Confirmation counting is cumulative (no reset on non-touch)**
+- [ ] **HTF→LTF direction flow: entry direction matches stored HTF direction**
+- [ ] **Cooldown between HTF signal and LTF entry (prevents race condition)**
+- [ ] **State reset on new HTF signal (prevents stale setup completion)**
 
 ### Important (Warn but allow)
 - [ ] Variables reset daily

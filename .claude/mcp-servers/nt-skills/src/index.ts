@@ -50,6 +50,50 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+// Helper function to validate visual_context_path
+// Returns { valid: boolean, error?: string }
+function validateVisualContextPath(
+  path: string | null | undefined,
+  sourceVideoUrl: string | null | undefined
+): { valid: boolean; error?: string } {
+  if (!path) return { valid: true }; // Optional field
+
+  // Build absolute path from project root
+  const projectRoot = resolve(__dirname, "../../../../");
+  const absolutePath = resolve(projectRoot, path);
+
+  // Check path exists
+  if (!existsSync(absolutePath)) {
+    return { valid: false, error: `Path does not exist: ${path}` };
+  }
+
+  // Check frame_index.json exists
+  const frameIndexPath = join(absolutePath, "frame_index.json");
+  if (!existsSync(frameIndexPath)) {
+    return { valid: false, error: `No frame_index.json in: ${path}` };
+  }
+
+  // Extract video ID from path
+  const pathVideoId = path.split("/").pop();
+
+  // If source_video_url provided, validate match
+  if (sourceVideoUrl) {
+    // Extract video ID from YouTube URL
+    const urlMatch = sourceVideoUrl.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (urlMatch) {
+      const urlVideoId = urlMatch[1];
+      if (pathVideoId !== urlVideoId) {
+        return {
+          valid: false,
+          error: `Path video ID (${pathVideoId}) does not match source URL video ID (${urlVideoId})`,
+        };
+      }
+    }
+  }
+
+  return { valid: true };
+}
+
 // Helper function for Levenshtein distance (for fuzzy name matching)
 function levenshteinDistance(a: string, b: string): number {
   const matrix: number[][] = [];
@@ -118,6 +162,46 @@ function jaccardSimilarity(setA: string[], setB: string[]): number {
 
   const union = a.size + b.size - intersection;
   return union === 0 ? 0 : intersection / union;
+}
+
+// Helper functions for POI type defaults (from poi-type-contracts.md)
+function getDefaultC1C2Rule(poiType: string): string {
+  switch (poiType) {
+    case "fvg":
+      return "within_zone"; // C1/C2 must print WITHIN FVG zone
+    case "ob":
+      return "outside_invalidates"; // C1/C2 outside OB signals invalidation
+    case "swing":
+      return "flexible"; // More flexibility for swing points
+    default:
+      return "within_zone";
+  }
+}
+
+function getDefaultThreshold(poiType: string): number {
+  switch (poiType) {
+    case "fvg":
+      return 6; // 6 consecutive closes for FVG invalidation
+    case "ob":
+      return 30; // 30 closes for structural POI (OB)
+    case "swing":
+      return 6; // Less strict for swing
+    default:
+      return 6;
+  }
+}
+
+function getDefaultCountingMode(poiType: string): string {
+  switch (poiType) {
+    case "fvg":
+      return "cumulative"; // FVG: cumulative counting (no reset on non-touch)
+    case "ob":
+      return "location_based"; // OB: location-based (outside vs inside)
+    case "swing":
+      return "cumulative"; // Swing: context-dependent, default cumulative
+    default:
+      return "cumulative";
+  }
 }
 
 // Interface for skill object
@@ -566,6 +650,10 @@ const TOOLS: Tool[] = [
           description: "Model complexity level",
           default: "medium",
         },
+        visual_context_path: {
+          type: "string",
+          description: "Path to video frames directory (e.g., 'data/video-frames/9AL41xON3hA'). Must match source video ID.",
+        },
       },
       required: ["name", "description", "skill_ids"],
     },
@@ -573,7 +661,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_model",
     description:
-      "Fetch a complete trading model with all metadata, optionally including iterations and variants.",
+      "Fetch a complete trading model with all metadata, optionally including skills (with code), iterations and variants. Use include_skills=true for code generation. Returns visual_interpretations and poi_type_rules for frame-driven code generation.",
     inputSchema: {
       type: "object",
       properties: {
@@ -584,6 +672,11 @@ const TOOLS: Tool[] = [
         model_name: {
           type: "string",
           description: "Name of the model to fetch (alternative to model_id)",
+        },
+        include_skills: {
+          type: "boolean",
+          description: "Include full skill objects with code_snippet for code generation",
+          default: false,
         },
         include_iterations: {
           type: "boolean",
@@ -783,6 +876,137 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  {
+    name: "save_visual_interpretation",
+    description:
+      "Save a verified visual interpretation for a pattern in a model. Use this after analyzing frames and getting user confirmation. Stores interpretation for reuse in future code generation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        model_id: {
+          type: "number",
+          description: "ID of the model to add interpretation to",
+        },
+        pattern_name: {
+          type: "string",
+          description: "Pattern name (e.g., 'cisd_pattern', 'fvg_c1c2', 'ob_detection', 'entry_logic')",
+        },
+        frame_ref: {
+          type: "string",
+          description: "Frame reference path (e.g., '9AL41xON3hA/frame_008.jpg')",
+        },
+        interpretation: {
+          type: "string",
+          description: "Description of what was observed in the frame",
+        },
+        code_implication: {
+          type: "string",
+          description: "Specific code logic derived from the interpretation (e.g., 'OB = index [1], not [0]')",
+        },
+        verified_by_user: {
+          type: "boolean",
+          description: "Whether user confirmed this interpretation",
+          default: true,
+        },
+        user_feedback: {
+          type: "string",
+          description: "Optional feedback or corrections from user",
+        },
+      },
+      required: ["model_id", "pattern_name", "interpretation"],
+    },
+  },
+  {
+    name: "set_model_poi_type",
+    description:
+      "Set POI-type-specific rules for a model. Different POI types (FVG, OB, Swing) have different C1/C2 and invalidation rules. This stores the rules for code generation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        model_id: {
+          type: "number",
+          description: "ID of the model to update",
+        },
+        primary_poi_type: {
+          type: "string",
+          enum: ["fvg", "ob", "swing"],
+          description: "Primary POI type for this model",
+        },
+        c1c2_location_rule: {
+          type: "string",
+          description: "C1/C2 location requirement (e.g., 'within_zone', 'outside_invalidates', 'flexible')",
+        },
+        invalidation_direction: {
+          type: "string",
+          description: "Invalidation direction rule (e.g., 'bullish_below_bearish_above')",
+        },
+        invalidation_threshold: {
+          type: "number",
+          description: "Number of consecutive closes required for invalidation",
+        },
+        confirmation_counting: {
+          type: "string",
+          enum: ["cumulative", "consecutive", "location_based"],
+          description: "How to count C1/C2 confirmations",
+        },
+        additional_rules: {
+          type: "object",
+          description: "Any additional POI-type-specific rules",
+        },
+      },
+      required: ["model_id", "primary_poi_type"],
+    },
+  },
+  {
+    name: "suggest_pattern_mappings",
+    description:
+      "Given visual annotation labels from a video frame, suggest which skills they map to. Use this to auto-populate pattern_mappings in frame_index.json. Returns skill IDs and code insights for each detected pattern.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        annotation_labels: {
+          type: "array",
+          items: { type: "string" },
+          description: "Visual labels from the frame (e.g., ['C1', 'C2', 'FVG', 'OB', 'sweep', 'X'])",
+        },
+        zones_shown: {
+          type: "array",
+          items: { type: "string" },
+          description: "Zone types visible in the frame (e.g., ['PDH', 'PDL', 'FVG zone', 'OB zone'])",
+        },
+        video_id: {
+          type: "string",
+          description: "Video ID for context (optional, used for frame references)",
+        },
+        frame_name: {
+          type: "string",
+          description: "Frame filename for references (optional)",
+        },
+      },
+      required: ["annotation_labels"],
+    },
+  },
+  {
+    name: "get_poi_type_rules",
+    description:
+      "Get POI-type-specific rules for C1/C2 confirmation, entry, and invalidation. Use this when generating code to get the correct validation logic for each POI type.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        poi_type: {
+          type: "string",
+          enum: ["FVG", "OB", "Swing", "all"],
+          description: "POI type to get rules for, or 'all' for all types",
+        },
+        rule_type: {
+          type: "string",
+          enum: ["c1_confirmation", "c2_confirmation", "invalidation", "entry", "all"],
+          description: "Rule type to get, or 'all' for all rule types",
+        },
+      },
+      required: ["poi_type"],
+    },
+  },
 ];
 
 // Create server
@@ -820,7 +1044,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   try {
-    const writableTools = ["save_skill", "save_skill_with_source", "save_model", "update_model_after_iteration"];
+    const writableTools = ["save_skill", "save_skill_with_source", "save_model", "update_model_after_iteration", "save_visual_interpretation", "set_model_poi_type"];
     const db = new Database(DB_PATH, { readonly: !writableTools.includes(name) });
 
     switch (name) {
@@ -1703,6 +1927,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const variantOf = (args.variant_of as number) || null;
         const typicalUseCase = (args.typical_use_case as string) || null;
         const complexity = (args.complexity as string) || "medium";
+        const visualContextPath = (args.visual_context_path as string) || null;
+
+        // Validate visual_context_path if provided
+        const pathValidation = validateVisualContextPath(visualContextPath, sourceVideoUrl);
+        if (!pathValidation.valid) {
+          db.close();
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  success: false,
+                  error: pathValidation.error,
+                  hint: "visual_context_path must be a valid path like 'data/video-frames/VIDEO_ID' with frame_index.json present",
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
 
         // Determine created_from based on source
         const createdFrom = sourceVideoUrl ? "youtube" : (variantOf ? "iteration" : "manual");
@@ -1712,10 +1956,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             name, description, skill_ids, skill_contexts,
             trade_flow_rules, context_annotations, state_machine_spec,
             source_video_url, source_video_title, extraction_confidence,
-            variant_of, typical_use_case, complexity,
+            variant_of, typical_use_case, complexity, visual_context_path,
             model_type, status, created_from, version,
             created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'complete_model', 'draft', ?, 1, datetime('now'), datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'complete_model', 'draft', ?, 1, datetime('now'), datetime('now'))
         `);
 
         let modelId: number;
@@ -1735,6 +1979,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             variantOf,
             typicalUseCase,
             complexity,
+            visualContextPath,
             createdFrom
           );
           modelId = result.lastInsertRowid as number;
@@ -1765,6 +2010,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     has_state_machine: !!stateMachineSpec,
                     source_video_url: sourceVideoUrl,
                     variant_of: variantOf,
+                    visual_context_path: visualContextPath,
                   },
                 },
                 null,
@@ -1778,6 +2024,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "get_model": {
         const modelId = args.model_id as number | undefined;
         const modelName = args.model_name as string | undefined;
+        const includeSkills = (args.include_skills as boolean) || false;
         const includeIterations = (args.include_iterations as boolean) || false;
         const includeVariants = (args.include_variants as boolean) || false;
 
@@ -1794,15 +2041,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        // Fetch the model
+        // Fetch the model - also check for models without model_type set
         let model: Record<string, unknown> | undefined;
         if (modelId) {
           model = db
-            .prepare("SELECT * FROM skill_combinations WHERE id = ? AND model_type = 'complete_model'")
+            .prepare("SELECT * FROM skill_combinations WHERE id = ?")
             .get(modelId) as Record<string, unknown> | undefined;
         } else if (modelName) {
           model = db
-            .prepare("SELECT * FROM skill_combinations WHERE name = ? AND model_type = 'complete_model'")
+            .prepare("SELECT * FROM skill_combinations WHERE name = ?")
             .get(modelName) as Record<string, unknown> | undefined;
         }
 
@@ -1820,16 +2067,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         // Parse JSON fields
+        const skillIds: number[] = JSON.parse((model.skill_ids as string) || "[]");
         const parsedModel = {
           ...model,
-          skill_ids: JSON.parse((model.skill_ids as string) || "[]"),
+          skill_ids: skillIds,
           skill_contexts: model.skill_contexts ? JSON.parse(model.skill_contexts as string) : null,
           trade_flow_rules: model.trade_flow_rules ? JSON.parse(model.trade_flow_rules as string) : null,
           context_annotations: model.context_annotations ? JSON.parse(model.context_annotations as string) : null,
           state_machine_spec: model.state_machine_spec ? JSON.parse(model.state_machine_spec as string) : null,
+          model_rules: model.model_rules ? JSON.parse(model.model_rules as string) : [],
+          failed_entry_conditions: model.failed_entry_conditions ? JSON.parse(model.failed_entry_conditions as string) : [],
           iteration_log: model.iteration_log ? JSON.parse(model.iteration_log as string) : [],
           backtest_history: model.backtest_history ? JSON.parse(model.backtest_history as string) : [],
+          // Frame-driven code generation fields
+          visual_interpretations: model.visual_interpretations ? JSON.parse(model.visual_interpretations as string) : null,
+          poi_type_rules: model.poi_type_rules ? JSON.parse(model.poi_type_rules as string) : null,
         };
+
+        // Fetch skills if requested (for code generation)
+        let skills: Record<string, unknown>[] = [];
+        if (includeSkills && skillIds.length > 0) {
+          const placeholders = skillIds.map(() => "?").join(",");
+          skills = db
+            .prepare(`
+              SELECT id, name, slug, category, subcategory, description,
+                     code_snippet, variables_required, dependencies, complexity, nlp_keywords
+              FROM skills
+              WHERE id IN (${placeholders})
+            `)
+            .all(...skillIds) as Record<string, unknown>[];
+
+          // Parse JSON fields and add model context
+          const skillContexts = parsedModel.skill_contexts || {};
+          skills = skills.map((skill) => ({
+            ...skill,
+            variables_required: skill.variables_required ? JSON.parse(skill.variables_required as string) : [],
+            dependencies: skill.dependencies ? JSON.parse(skill.dependencies as string) : [],
+            nlp_keywords: skill.nlp_keywords ? JSON.parse(skill.nlp_keywords as string) : [],
+            model_context: skillContexts[String(skill.id)] || null,
+          }));
+        }
 
         // Fetch iterations if requested
         let iterations: Record<string, unknown>[] = [];
@@ -1875,8 +2152,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify(
                 {
                   model: parsedModel,
+                  skills: includeSkills ? skills : undefined,
                   iterations: includeIterations ? iterations : undefined,
                   variants: includeVariants ? variants : undefined,
+                  skill_count: includeSkills ? skills.length : undefined,
                   iteration_count: includeIterations ? iterations.length : undefined,
                   variant_count: includeVariants ? variants.length : undefined,
                 },
@@ -2513,6 +2792,347 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             },
           ],
           isError: true,
+        };
+      }
+
+      case "save_visual_interpretation": {
+        const modelId = args.model_id as number;
+        const patternName = args.pattern_name as string;
+        const frameRef = (args.frame_ref as string) || null;
+        const interpretation = args.interpretation as string;
+        const codeImplication = (args.code_implication as string) || null;
+        const verifiedByUser = args.verified_by_user !== false; // Default true
+        const userFeedback = (args.user_feedback as string) || null;
+
+        // Get current model
+        const model = db
+          .prepare("SELECT id, visual_interpretations FROM skill_combinations WHERE id = ?")
+          .get(modelId) as { id: number; visual_interpretations: string | null } | undefined;
+
+        if (!model) {
+          db.close();
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error: Model not found with id=${modelId}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Parse existing interpretations or create new object
+        let interpretations: Record<string, unknown> = {};
+        try {
+          interpretations = model.visual_interpretations
+            ? JSON.parse(model.visual_interpretations)
+            : {};
+        } catch {
+          interpretations = {};
+        }
+
+        // Add/update the interpretation
+        const newInterpretation = {
+          frame_ref: frameRef,
+          interpretation,
+          code_implication: codeImplication,
+          verified_by_user: verifiedByUser,
+          user_feedback: userFeedback,
+          added_date: new Date().toISOString().split("T")[0],
+          verified_date: verifiedByUser ? new Date().toISOString().split("T")[0] : null,
+        };
+
+        interpretations[patternName] = newInterpretation;
+
+        // Update model
+        db.prepare(`
+          UPDATE skill_combinations
+          SET visual_interpretations = ?,
+              updated_at = datetime('now')
+          WHERE id = ?
+        `).run(JSON.stringify(interpretations), modelId);
+
+        // Also insert into interpretation_history for tracking
+        try {
+          db.prepare(`
+            INSERT INTO interpretation_history (
+              model_id, pattern_name, frame_ref, interpretation,
+              code_implication, user_verified, user_feedback,
+              verified_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            modelId,
+            patternName,
+            frameRef,
+            interpretation,
+            codeImplication,
+            verifiedByUser ? 1 : 0,
+            userFeedback,
+            verifiedByUser ? new Date().toISOString() : null
+          );
+        } catch {
+          // Table might not exist yet - that's OK, the migration will create it
+          console.error("interpretation_history table not found - skipping history insert");
+        }
+
+        db.close();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  model_id: modelId,
+                  pattern_name: patternName,
+                  message: `Visual interpretation saved for pattern "${patternName}"`,
+                  interpretation: newInterpretation,
+                  total_interpretations: Object.keys(interpretations).length,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "set_model_poi_type": {
+        const modelId = args.model_id as number;
+        const primaryPoiType = args.primary_poi_type as string;
+        const c1c2LocationRule = (args.c1c2_location_rule as string) || null;
+        const invalidationDirection = (args.invalidation_direction as string) || null;
+        const invalidationThreshold = (args.invalidation_threshold as number) || null;
+        const confirmationCounting = (args.confirmation_counting as string) || null;
+        const additionalRules = args.additional_rules as Record<string, unknown> | undefined;
+
+        // Get current model
+        const model = db
+          .prepare("SELECT id, poi_type_rules FROM skill_combinations WHERE id = ?")
+          .get(modelId) as { id: number; poi_type_rules: string | null } | undefined;
+
+        if (!model) {
+          db.close();
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error: Model not found with id=${modelId}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Build POI type rules object
+        const poiTypeRules = {
+          primary_poi_type: primaryPoiType,
+          c1c2_location_rule: c1c2LocationRule || getDefaultC1C2Rule(primaryPoiType),
+          invalidation_direction: invalidationDirection || "bullish_below_bearish_above",
+          invalidation_threshold: invalidationThreshold || getDefaultThreshold(primaryPoiType),
+          confirmation_counting: confirmationCounting || getDefaultCountingMode(primaryPoiType),
+          additional_rules: additionalRules || {},
+          updated_at: new Date().toISOString(),
+        };
+
+        // Update model
+        db.prepare(`
+          UPDATE skill_combinations
+          SET poi_type_rules = ?,
+              updated_at = datetime('now')
+          WHERE id = ?
+        `).run(JSON.stringify(poiTypeRules), modelId);
+
+        db.close();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  model_id: modelId,
+                  message: `POI type rules set for model (type: ${primaryPoiType})`,
+                  poi_type_rules: poiTypeRules,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "suggest_pattern_mappings": {
+        const annotationLabels = (args.annotation_labels as string[]) || [];
+        const zonesShown = (args.zones_shown as string[]) || [];
+        const videoId = (args.video_id as string) || null;
+        const frameName = (args.frame_name as string) || null;
+
+        // Pattern to skill mapping rules
+        const patternMappings: Record<string, { skill_name: string; skill_id: number; code_insight: string }> = {};
+
+        // Label-to-skill mappings
+        const labelMappings: Record<string, { skillName: string; codeInsight: string }> = {
+          // Candle confirmation labels
+          "C1": { skillName: "Candle 2 Closure", codeInsight: "C1 = first candle closing beyond POI zone" },
+          "C2": { skillName: "Candle 2 Closure", codeInsight: "C2 = second candle confirming direction (must close beyond C1)" },
+          "C3": { skillName: "Candle 3 Closure", codeInsight: "C3 = third candle for extended confirmation (XC2 pattern)" },
+          "C4": { skillName: "Candle 4 Expansion", codeInsight: "C4 = expansion candle, entry on closure" },
+          // POI type labels
+          "FVG": { skillName: "Fair Value Gap", codeInsight: "FVG = price inefficiency gap between candles" },
+          "OB": { skillName: "Order Block", codeInsight: "OB = last opposing candle before reversal (use index[1], NOT index[0])" },
+          "order block": { skillName: "Order Block", codeInsight: "OB = last opposing candle before reversal" },
+          "sweep": { skillName: "Liquidity Sweep Detection", codeInsight: "Sweep = liquidity grab at key level followed by reversal" },
+          "liquidity": { skillName: "Liquidity Sweep Detection", codeInsight: "Liquidity level = area of stop orders to be swept" },
+          // Pattern labels
+          "CISD": { skillName: "CISD Pattern", codeInsight: "CISD = Change In State Of Delivery - swing point break" },
+          "CHoCH": { skillName: "Change Of Character", codeInsight: "CHoCH = Change of Character - structure break" },
+          "BOS": { skillName: "Change Of Character", codeInsight: "BOS = Break of Structure" },
+          // Invalidation
+          "X": { skillName: "Invalidation", codeInsight: "X mark = level invalidated, do not re-trade" },
+          "invalidation": { skillName: "Invalidation", codeInsight: "Mark invalidated levels with X" },
+          // Structure
+          "swing": { skillName: "Protected Swings", codeInsight: "Swing = structural high/low level" },
+          "protected swing": { skillName: "Protected Swings", codeInsight: "Protected swing = level to watch for sweep" },
+          "SMT": { skillName: "SMT Divergence Confirmation", codeInsight: "SMT = Smart Money Technique divergence between correlated assets" },
+        };
+
+        // Zone-to-skill mappings
+        const zoneMappings: Record<string, { skillName: string; codeInsight: string }> = {
+          "PDH": { skillName: "Pre-market Bias Calculation", codeInsight: "PDH = Previous Day High - key liquidity level" },
+          "PDL": { skillName: "Pre-market Bias Calculation", codeInsight: "PDL = Previous Day Low - key liquidity level" },
+          "FVG zone": { skillName: "FVG Entry Zones", codeInsight: "FVG zone = area for potential entry" },
+          "OB zone": { skillName: "Order Blocks for Continuations", codeInsight: "OB zone = order block area for reaction" },
+          "POI": { skillName: "Fair Value Gap", codeInsight: "POI = Point of Interest for entry" },
+        };
+
+        // Query skills table for skill IDs
+        const skillQuery = db.prepare("SELECT id, name FROM skills WHERE LOWER(name) LIKE ?");
+
+        // Process annotation labels
+        for (const label of annotationLabels) {
+          const normalizedLabel = label.toLowerCase().trim();
+
+          for (const [pattern, mapping] of Object.entries(labelMappings)) {
+            if (normalizedLabel.includes(pattern.toLowerCase())) {
+              const skill = skillQuery.get(`%${mapping.skillName.toLowerCase()}%`) as { id: number; name: string } | undefined;
+              if (skill && !patternMappings[pattern]) {
+                patternMappings[pattern] = {
+                  skill_name: skill.name,
+                  skill_id: skill.id,
+                  code_insight: mapping.codeInsight,
+                };
+              }
+            }
+          }
+        }
+
+        // Process zones
+        for (const zone of zonesShown) {
+          const normalizedZone = zone.toLowerCase().trim();
+
+          for (const [pattern, mapping] of Object.entries(zoneMappings)) {
+            if (normalizedZone.includes(pattern.toLowerCase())) {
+              const skill = skillQuery.get(`%${mapping.skillName.toLowerCase()}%`) as { id: number; name: string } | undefined;
+              if (skill && !patternMappings[pattern]) {
+                patternMappings[pattern] = {
+                  skill_name: skill.name,
+                  skill_id: skill.id,
+                  code_insight: mapping.codeInsight,
+                };
+              }
+            }
+          }
+        }
+
+        db.close();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  pattern_count: Object.keys(patternMappings).length,
+                  pattern_mappings: patternMappings,
+                  video_id: videoId,
+                  frame_name: frameName,
+                  hint: "Add these to frame_index.json pattern_mappings for the frame",
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "get_poi_type_rules": {
+        const poiType = args.poi_type as string;
+        const ruleType = (args.rule_type as string) || "all";
+
+        let query = "SELECT * FROM poi_type_rules WHERE 1=1";
+        const params: string[] = [];
+
+        if (poiType !== "all") {
+          query += " AND poi_type = ?";
+          params.push(poiType);
+        }
+
+        if (ruleType !== "all") {
+          query += " AND rule_type = ?";
+          params.push(ruleType);
+        }
+
+        query += " ORDER BY poi_type, rule_type";
+
+        const rules = db.prepare(query).all(...params) as Array<{
+          id: number;
+          poi_type: string;
+          rule_type: string;
+          rule_text: string;
+          code_pattern: string | null;
+          timeframe_restriction: string | null;
+          source_video_id: string | null;
+          source_frame: string | null;
+        }>;
+
+        db.close();
+
+        // Group by POI type for easier consumption
+        const groupedRules: Record<string, Record<string, { rule_text: string; code_pattern: string | null }>> = {};
+
+        for (const rule of rules) {
+          if (!groupedRules[rule.poi_type]) {
+            groupedRules[rule.poi_type] = {};
+          }
+          groupedRules[rule.poi_type][rule.rule_type] = {
+            rule_text: rule.rule_text,
+            code_pattern: rule.code_pattern,
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  rule_count: rules.length,
+                  rules_by_poi_type: groupedRules,
+                  raw_rules: rules,
+                },
+                null,
+                2
+              ),
+            },
+          ],
         };
       }
 
