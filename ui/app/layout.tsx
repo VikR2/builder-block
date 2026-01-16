@@ -48,6 +48,13 @@ export default function RootLayout({
                     <span className="text-accent mr-1.5">○</span>
                     Projects
                   </Link>
+                  <Link
+                    href="/tcm"
+                    className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded transition-all"
+                  >
+                    <span className="text-yellow-500 mr-1.5">○</span>
+                    TCM Bot
+                  </Link>
                 </nav>
               </div>
               <div className="ml-auto flex items-center gap-4">
