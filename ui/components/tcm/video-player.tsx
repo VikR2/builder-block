@@ -7,6 +7,11 @@ interface VideoPlayerProps {
   clip: VideoClipInfo;
   autoPlay?: boolean;
   className?: string;
+  onTimeUpdate?: (currentTime: number) => void;
+  defaultMode?: PlaybackMode;
+  hideHeader?: boolean;
+  seekTo?: number;  // When this changes, seek to this timestamp
+  theaterMode?: boolean;  // When true, video fills parent container height
 }
 
 type PlaybackMode = 'clip' | 'full';
@@ -14,7 +19,16 @@ type PlaybackSpeed = 0.5 | 0.75 | 1 | 1.25 | 1.5 | 2;
 
 const PLAYBACK_SPEEDS: PlaybackSpeed[] = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-export function VideoPlayer({ clip, autoPlay = false, className = '' }: VideoPlayerProps) {
+export function VideoPlayer({
+  clip,
+  autoPlay = false,
+  className = '',
+  onTimeUpdate: onTimeUpdateCallback,
+  defaultMode = 'clip',
+  hideHeader = false,
+  seekTo,
+  theaterMode = false
+}: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -28,7 +42,7 @@ export function VideoPlayer({ clip, autoPlay = false, className = '' }: VideoPla
   const [isLoading, setIsLoading] = useState(true);
 
   // Mode state
-  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('clip');
+  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>(defaultMode);
 
   // Control state
   const [volume, setVolume] = useState(1);
@@ -81,6 +95,11 @@ export function VideoPlayer({ clip, autoPlay = false, className = '' }: VideoPla
       const time = video.currentTime;
       setCurrentTime(time);
 
+      // Call external callback if provided
+      if (onTimeUpdateCallback) {
+        onTimeUpdateCallback(time);
+      }
+
       // Only enforce boundaries in clip mode
       if (playbackMode === 'clip' && time >= clip.endTime) {
         video.pause();
@@ -128,7 +147,7 @@ export function VideoPlayer({ clip, autoPlay = false, className = '' }: VideoPla
       video.removeEventListener('error', handleError);
       video.removeEventListener('ended', handleEnded);
     };
-  }, [clip.startTime, clip.endTime, playbackMode, showControls]);
+  }, [clip.startTime, clip.endTime, playbackMode, showControls, onTimeUpdateCallback]);
 
   // Auto-play if enabled
   useEffect(() => {
@@ -156,6 +175,14 @@ export function VideoPlayer({ clip, autoPlay = false, className = '' }: VideoPla
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
+
+  // Handle external seek requests
+  useEffect(() => {
+    if (seekTo !== undefined && videoRef.current) {
+      videoRef.current.currentTime = seekTo;
+      showControls();
+    }
+  }, [seekTo, showControls]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -322,65 +349,67 @@ export function VideoPlayer({ clip, autoPlay = false, className = '' }: VideoPla
   return (
     <div
       ref={containerRef}
-      className={`rounded-lg overflow-hidden border border-border/50 ${isFullscreen ? 'fixed inset-0 z-50 rounded-none border-none' : ''} ${className}`}
+      className={`${theaterMode ? '' : 'rounded-lg border border-border/50'} overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none border-none' : ''} ${className}`}
       onMouseMove={showControls}
       onMouseLeave={() => isPlaying && setControlsVisible(false)}
       tabIndex={0}
     >
       {/* Header */}
-      <div className={`flex items-center justify-between px-3 py-2 bg-background/50 border-b border-border/30 transition-opacity duration-300 ${!controlsVisible && isPlaying ? 'opacity-0' : 'opacity-100'}`}>
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-          <span className="text-sm font-medium truncate max-w-[200px]">{clip.videoTitle}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Mode Toggle */}
-          <div className="flex items-center bg-background/50 rounded-full p-0.5">
-            <button
-              onClick={() => handleModeChange('clip')}
-              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all ${
-                playbackMode === 'clip'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-secondary'
-              }`}
-            >
-              Clip
-            </button>
-            <button
-              onClick={() => handleModeChange('full')}
-              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all ${
-                playbackMode === 'full'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-secondary'
-              }`}
-            >
-              Full
-            </button>
+      {!hideHeader && (
+        <div className={`flex items-center justify-between px-3 py-2 bg-background/50 border-b border-border/30 transition-opacity duration-300 ${!controlsVisible && isPlaying ? 'opacity-0' : 'opacity-100'}`}>
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span className="text-sm font-medium truncate max-w-[200px]">{clip.videoTitle}</span>
           </div>
 
-          {/* Expand button */}
-          {!isFullscreen && (
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1 rounded hover:bg-background transition-colors"
-              title={isExpanded ? 'Collapse' : 'Expand'}
-            >
-              {isExpanded ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
-              )}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Mode Toggle */}
+            <div className="flex items-center bg-background/50 rounded-full p-0.5">
+              <button
+                onClick={() => handleModeChange('clip')}
+                className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all ${
+                  playbackMode === 'clip'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-secondary'
+                }`}
+              >
+                Clip
+              </button>
+              <button
+                onClick={() => handleModeChange('full')}
+                className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all ${
+                  playbackMode === 'full'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-secondary'
+                }`}
+              >
+                Full
+              </button>
+            </div>
+
+            {/* Expand button */}
+            {!isFullscreen && (
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="p-1 rounded hover:bg-background transition-colors"
+                title={isExpanded ? 'Collapse' : 'Expand'}
+              >
+                {isExpanded ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Video Container */}
       <div className="relative bg-black">
@@ -393,7 +422,15 @@ export function VideoPlayer({ clip, autoPlay = false, className = '' }: VideoPla
         <video
           ref={videoRef}
           src={getVideoFilePath(clip.videoId)}
-          className={`w-full ${isFullscreen ? 'h-screen' : isExpanded ? 'max-h-[600px]' : 'max-h-[300px]'} object-contain`}
+          className={`w-full ${
+            isFullscreen
+              ? 'h-screen'
+              : theaterMode
+                ? 'h-full'  // Fill parent container in theater mode
+                : isExpanded
+                  ? 'max-h-[600px]'
+                  : 'max-h-[300px]'
+          } object-contain`}
           playsInline
           preload="metadata"
         />

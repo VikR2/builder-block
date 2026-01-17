@@ -11,7 +11,7 @@ export default function TCMPage() {
     <div className="container py-6">
       {/* Decorative background */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/3 via-transparent to-primary/3" />
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-rose-500/5" />
       </div>
 
       <div className="relative z-10 grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-10rem)]">
@@ -25,7 +25,7 @@ export default function TCMPage() {
           {/* Knowledge Stats */}
           <div className="rounded-xl border bg-card p-4">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
               Knowledge Base
@@ -39,7 +39,7 @@ export default function TCMPage() {
                 }
                 label="TCM Skills"
                 value={skills.length}
-                color="text-primary"
+                color="text-amber-500"
               />
               <StatItem
                 icon={
@@ -49,7 +49,7 @@ export default function TCMPage() {
                 }
                 label="Study Guides"
                 value={docs.length}
-                color="text-accent"
+                color="text-sky-500"
               />
               <StatItem
                 icon={
@@ -59,7 +59,7 @@ export default function TCMPage() {
                 }
                 label="Video Sources"
                 value={videos.length}
-                color="text-yellow-500"
+                color="text-rose-500"
               />
             </div>
           </div>
@@ -67,7 +67,7 @@ export default function TCMPage() {
           {/* Quick Topics */}
           <div className="rounded-xl border bg-card p-4 flex-1 overflow-hidden flex flex-col">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
               Quick Topics
