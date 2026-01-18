@@ -132,11 +132,31 @@ export function searchArchitectureDocuments(query: string): ArchDocument[] {
   );
 }
 
+// Stop words to filter from search queries
+const STOP_WORDS = new Set([
+  'explain', 'what', 'is', 'are', 'how', 'the', 'a', 'an', 'to', 'for', 'of', 'in',
+  'on', 'with', 'about', 'can', 'you', 'me', 'tell', 'show', 'describe', 'help',
+  'please', 'i', 'my', 'do', 'does', 'and', 'or', 'this', 'that', 'it', 'be'
+]);
+
+// Extract meaningful keywords from a query
+function extractKeywords(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !STOP_WORDS.has(word));
+}
+
 // Search within a document and return matching paragraphs
 export function searchDocumentParagraphs(query: string, limit: number = 5): { doc: string; paragraph: string; score: number }[] {
   const docs = getArchitectureDocuments();
-  const lowerQuery = query.toLowerCase();
+  const keywords = extractKeywords(query);
   const results: { doc: string; paragraph: string; score: number }[] = [];
+
+  // If no meaningful keywords, try the full query as fallback
+  if (keywords.length === 0) {
+    keywords.push(query.toLowerCase());
+  }
 
   for (const doc of docs) {
     // Split into paragraphs (double newline or section breaks)
@@ -144,13 +164,20 @@ export function searchDocumentParagraphs(query: string, limit: number = 5): { do
 
     for (const paragraph of paragraphs) {
       const lowerPara = paragraph.toLowerCase();
-      if (lowerPara.includes(lowerQuery)) {
-        // Simple scoring: count occurrences
-        const matches = (lowerPara.match(new RegExp(lowerQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length;
+
+      // Score based on keyword matches
+      let score = 0;
+      for (const keyword of keywords) {
+        const regex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        const matches = (lowerPara.match(regex) || []).length;
+        score += matches;
+      }
+
+      if (score > 0) {
         results.push({
           doc: doc.title,
           paragraph: paragraph.trim().substring(0, 500),
-          score: matches
+          score
         });
       }
     }
@@ -189,9 +216,22 @@ export function getLocalVideos(): VideoInfo[] {
   for (const folder of folders) {
     const videoPath = join(LOCAL_VIDEOS_PATH, folder.name);
     const hasFrames = existsSync(join(videoPath, 'frames'));
+    const manifestPath = join(videoPath, 'manifest.json');
 
-    // Extract title from folder name (remove hash suffix)
-    const title = folder.name.replace(/_[a-f0-9]+$/, '').replace(/_/g, ' ');
+    // Prefer title from manifest.json (source_title field)
+    let title: string;
+    if (existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+        title = manifest.source_title || folder.name.replace(/_[a-f0-9]+$/, '').replace(/_/g, ' ');
+      } catch {
+        // Fallback if manifest can't be parsed
+        title = folder.name.replace(/_[a-f0-9]+$/, '').replace(/_/g, ' ');
+      }
+    } else {
+      // Fallback: extract title from folder name (remove hash suffix)
+      title = folder.name.replace(/_[a-f0-9]+$/, '').replace(/_/g, ' ');
+    }
 
     videos.push({
       id: folder.name,
@@ -221,31 +261,46 @@ export function getVideoTranscript(videoId: string): TranscriptSegment[] | null 
 }
 
 // Search transcripts across all videos
-export function searchTranscripts(query: string, limit: number = 10): { videoId: string; videoTitle: string; segment: TranscriptSegment }[] {
+export function searchTranscripts(query: string, limit: number = 10): { videoId: string; videoTitle: string; segment: TranscriptSegment; score: number }[] {
   const videos = getLocalVideos();
-  const lowerQuery = query.toLowerCase();
-  const results: { videoId: string; videoTitle: string; segment: TranscriptSegment }[] = [];
+  const keywords = extractKeywords(query);
+  const results: { videoId: string; videoTitle: string; segment: TranscriptSegment; score: number }[] = [];
+
+  // If no meaningful keywords, try the full query as fallback
+  if (keywords.length === 0) {
+    keywords.push(query.toLowerCase());
+  }
 
   for (const video of videos) {
     const transcript = getVideoTranscript(video.id);
     if (!transcript) continue;
 
     for (const segment of transcript) {
-      if (segment.text.toLowerCase().includes(lowerQuery)) {
+      const lowerText = segment.text.toLowerCase();
+
+      // Score based on keyword matches
+      let score = 0;
+      for (const keyword of keywords) {
+        if (lowerText.includes(keyword)) {
+          score += 1;
+        }
+      }
+
+      if (score > 0) {
         results.push({
           videoId: video.id,
           videoTitle: video.title,
-          segment
+          segment,
+          score
         });
-
-        if (results.length >= limit) {
-          return results;
-        }
       }
     }
   }
 
-  return results;
+  // Sort by score and return top results
+  return results
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 }
 
 // Format timestamp as HH:MM:SS
