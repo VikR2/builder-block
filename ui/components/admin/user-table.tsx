@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Crown, Mail, MailCheck, Check, X, ChevronLeft, ChevronRight, UserPlus, Gift, CreditCard } from 'lucide-react';
+import { Search, Crown, Mail, MailCheck, Check, X, ChevronLeft, ChevronRight, UserPlus, Gift, CreditCard, Trash2 } from 'lucide-react';
 import { AddUserDialog } from './add-user-dialog';
+import { DeleteUserDialog } from './delete-user-dialog';
 
 interface User {
   id: number;
@@ -38,11 +39,18 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [deleteDialogUser, setDeleteDialogUser] = useState<User | null>(null);
 
   const handleUserCreated = (newUser: User) => {
     // Add new user to the top of the list
     setUsers([newUser, ...users]);
     setPagination({ ...pagination, total: pagination.total + 1 });
+  };
+
+  const handleUserDeleted = (deletedUserId: number) => {
+    // Remove user from the list
+    setUsers(users.filter(u => u.id !== deletedUserId));
+    setPagination({ ...pagination, total: pagination.total - 1 });
   };
 
   const fetchUsers = async (page: number = 1, search: string = '') => {
@@ -145,6 +153,14 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
         isOpen={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
         onUserCreated={handleUserCreated}
+      />
+
+      {/* Delete User Dialog */}
+      <DeleteUserDialog
+        user={deleteDialogUser}
+        isOpen={deleteDialogUser !== null}
+        onClose={() => setDeleteDialogUser(null)}
+        onDeleted={handleUserDeleted}
       />
 
       {/* Table */}
@@ -257,29 +273,40 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
 
                     {/* Actions */}
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => togglePremium(user.id, user.manualPremium)}
-                        disabled={updatingUserId === user.id}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                          user.manualPremium
-                            ? 'bg-rose-500/20 text-rose-500 hover:bg-rose-500/30'
-                            : 'bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30'
-                        } ${updatingUserId === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {updatingUserId === user.id ? (
-                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : user.manualPremium ? (
-                          <>
-                            <X className="h-4 w-4" />
-                            Revoke
-                          </>
-                        ) : (
-                          <>
-                            <Check className="h-4 w-4" />
-                            Grant Premium
-                          </>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => togglePremium(user.id, user.manualPremium)}
+                          disabled={updatingUserId === user.id}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            user.manualPremium
+                              ? 'bg-rose-500/20 text-rose-500 hover:bg-rose-500/30'
+                              : 'bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30'
+                          } ${updatingUserId === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {updatingUserId === user.id ? (
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          ) : user.manualPremium ? (
+                            <>
+                              <X className="h-4 w-4" />
+                              Revoke
+                            </>
+                          ) : (
+                            <>
+                              <Check className="h-4 w-4" />
+                              Grant Premium
+                            </>
+                          )}
+                        </button>
+                        {user.role !== 'admin' && (
+                          <button
+                            onClick={() => setDeleteDialogUser(user)}
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                            title="Delete user"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         )}
-                      </button>
+                      </div>
                     </td>
                   </tr>
                 ))
