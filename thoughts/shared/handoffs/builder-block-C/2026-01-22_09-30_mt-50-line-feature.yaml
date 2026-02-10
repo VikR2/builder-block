@@ -1,0 +1,49 @@
+---
+session: builder-block-C
+date: 2026-01-22
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Add 50% midpoint line to MT Combined Box in TradingView indicator
+now: Verify indicator in TradingView - reload and test toggle/style options
+test: Load Weekly-Open-MTR.pine in TradingView, check MT box has 50% line
+
+done_this_session:
+  - task: Added input settings for MT 50% line (showMT50Line toggle, mt50LineStyleInput selector)
+    files: [scripts-output/TradingView/Weekly-Open-MTR.pine]
+  - task: Added mt50Lines array for drawing storage
+    files: [scripts-output/TradingView/Weekly-Open-MTR.pine]
+  - task: Added cleanup loop and array.clear for mt50Lines
+    files: [scripts-output/TradingView/Weekly-Open-MTR.pine]
+  - task: Implemented MT 50% line drawing logic for current and historical boxes
+    files: [scripts-output/TradingView/Weekly-Open-MTR.pine]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - line_color_matches_box: Used mtBoxBorderColor for 50% line to maintain visual consistency with MT box
+  - default_style_dashed: Dashed style distinguishes 50% line from box borders while remaining visible
+  - conditional_on_showMTBox: 50% line only draws when both showMTBox AND showMT50Line are true
+
+findings:
+  - mt_box_structure: MT boxes track Sunday 6PM through Tuesday 6PM range with separate current/historical storage
+
+worked:
+  - Following existing drawing pattern (array storage, cleanup loops, MAX_LOOKBACK checks)
+  - Placing inputs in existing GRP_MT_COMBINED group for logical UI organization
+  - Using getLineStyle() helper already present in codebase
+
+failed: []
+
+next:
+  - Verify in TradingView that 50% line appears at midpoint of MT box
+  - Test toggle functionality (Show 50% Line on/off)
+  - Test line style changes (Solid, Dashed, Dotted)
+  - Verify historical MT boxes also display 50% lines
+
+files:
+  created: []
+  modified: [scripts-output/TradingView/Weekly-Open-MTR.pine]

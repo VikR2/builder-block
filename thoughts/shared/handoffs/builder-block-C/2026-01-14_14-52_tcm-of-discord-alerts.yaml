@@ -1,0 +1,69 @@
+---
+session: builder-block-C
+date: 2026-01-14
+status: complete
+outcome: PARTIAL_PLUS
+---
+
+goal: Fix TradingView TCM-OF.pine alerts to work with Discord webhooks
+now: Test the FORCE SR Levels Report toggle to verify Discord formatting
+
+test: Enable "FORCE: SR Levels Report (instant)" toggle in TradingView, check Discord
+
+done_this_session:
+  - task: Diagnosed alerts not working - Discord requires JSON format
+    files: [scripts-output/TradingView/TCM-OF.pine]
+  - task: Converted all alert() calls to Discord JSON format {"content": "..."}
+    files: [scripts-output/TradingView/TCM-OF.pine]
+  - task: Added instant FORCE test toggles that don't wait for bar close
+    files: [scripts-output/TradingView/TCM-OF.pine]
+  - task: Improved Discord formatting with emojis, separators, structured sections
+    files: [scripts-output/TradingView/TCM-OF.pine]
+
+blockers: []
+
+questions:
+  - Does the FORCE SR Levels Report display correctly in Discord?
+
+decisions:
+  - use_alert_freq_all_for_instant: Regular alerts use barstate.isconfirmed (wait for bar close), FORCE alerts use alert.freq_all for instant firing
+  - fallback_to_current_sr: If prevDaySRHigh is 0, use current session ONsessionHighPrice for testing
+
+findings:
+  - discord_requires_json: Discord webhooks silently reject plain text, must wrap in {"content": "..."}
+  - tcm_bias_pattern_works: Match TCM-Bias.pine pattern exactly - simple if condition with alert()
+  - barstate_isconfirmed_delay: Regular alerts wait up to 60 seconds on 1-min chart for bar close
+  - pine_variable_order: Code referencing variables must come after variable definitions
+
+worked:
+  - Discord JSON format '{"content": "message"}'
+  - alert.freq_all for instant firing without bar close
+  - Emojis and **bold** markdown work in Discord
+  - \\n for newlines in JSON strings
+
+failed:
+  - Plain text alerts to Discord webhook (silently rejected)
+  - str.replace_all(msg, "\n", "\\n") was replaced with direct \\n in string building
+
+next:
+  - User tests FORCE SR Levels Report toggle in TradingView
+  - Verify Discord message formatting looks correct
+  - Turn off FORCE toggle immediately after testing (fires every tick)
+
+files:
+  created: []
+  modified: [scripts-output/TradingView/TCM-OF.pine]
+
+alert_locations:
+  - lines 39-40: FORCE TEST (simple ping)
+  - lines 165-207: FORCE SR Levels Report (instant, full formatted report)
+  - lines 1656-1707: 7:00 AM SR Levels Alert (scheduled)
+  - lines 1718-1768: 9:20 AM Summary Alert (scheduled)
+  - lines 1630-1645: Target hit alerts (Long/Short T1/T2)
+
+test_toggles:
+  - "🔔 TEST: Simple Ping" - waits for bar close
+  - "🔴 FORCE TEST (instant)" - fires every tick
+  - "🔴 FORCE: SR Levels Report (instant)" - full report, fires every tick
+  - "📤 TEST: Send SR Levels Now" - waits for bar close
+  - "📤 TEST: Send Summary Now" - waits for bar close

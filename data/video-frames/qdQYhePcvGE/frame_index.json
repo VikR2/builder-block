@@ -1,0 +1,39 @@
+{
+  "video_id": "qdQYhePcvGE",
+  "video_url": "https://www.youtube.com/watch?v=qdQYhePcvGE",
+  "video_title": "Trading Candle 3 - Application Tutorial",
+  "video_type": "skills_library",
+  "created_at": "2026-01-07T14:30:00.000000",
+  "frame_count": 48,
+  "skills_covered": [
+    "c3_trading",
+    "entry_execution",
+    "fvg_entry",
+    "fractal_model_application"
+  ],
+  "key_quote": "how to trade candle 3 - with this video completed you will have my entire model",
+  "frames": [
+    {
+      "filename": "frame_0001.jpg",
+      "timestamp_sec": 0,
+      "frame_type": "title",
+      "categories": ["intro"],
+      "is_contradiction_relevant": false,
+      "frame_index": 0,
+      "visual_interpretation": {
+        "description": "Title slide: Trading Candle 3 - TTrades"
+      },
+      "pattern_mappings": {}
+    }
+  ],
+  "model_summary": {
+    "core_concept": "How to execute entries on C3 closure",
+    "relationship_to_series": "Combines C2/C3 concepts into actionable trading approach"
+  },
+  "pipeline_notes": {
+    "data_quality": "good",
+    "transcript_coverage": "complete",
+    "silent_sections": false,
+    "note": "48 frames - longest video in series, likely comprehensive"
+  }
+}

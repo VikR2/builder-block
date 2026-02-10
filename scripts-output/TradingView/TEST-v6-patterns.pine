@@ -1,0 +1,206 @@
+// Pine Script v6 Test Indicator - Verifies reference guide patterns
+// Generated: 2026-01-15
+// Purpose: Validate .claude/rules/pinescript-v6.md patterns compile without error
+
+//@version=6
+indicator('v6 Pattern Test', overlay=true, max_lines_count=100, max_labels_count=100, max_boxes_count=50)
+
+// ============================================================================
+// INPUT SETTINGS (Section 7: Input Grouping Pattern)
+// ============================================================================
+
+GRP_TIME = "Time Settings"
+GRP_VISUAL = "Visual Settings"
+GRP_COLORS = "Colors"
+
+sessionStart = input.int(7, "Session Start Hour", minval=0, maxval=23, group=GRP_TIME)
+sessionEnd = input.int(16, "Session End Hour", minval=0, maxval=23, group=GRP_TIME)
+customTimezone = input.string("America/New_York", "Timezone", group=GRP_TIME)  // NOT "timezone" - reserved keyword!
+
+showLines = input.bool(true, "Show Lines", group=GRP_VISUAL)
+showLabels = input.bool(true, "Show Labels", group=GRP_VISUAL)
+showDashboard = input.bool(true, "Show Dashboard", group=GRP_VISUAL)
+
+bullColor = input.color(color.new(#22C55E, 30), "Bullish Color", group=GRP_COLORS)
+bearColor = input.color(color.new(#EF4444, 30), "Bearish Color", group=GRP_COLORS)
+
+// ============================================================================
+// STATE VARIABLES (Section 3: v6 Bool Pattern - NO na allowed!)
+// ============================================================================
+
+// CORRECT v6: Use false/true, NOT na
+var bool isBullish = false
+var bool sessionActive = false
+var bool signalTriggered = false
+
+// float/int can still use na
+var float sessionHigh = na
+var float sessionLow = na
+var int signalBarIndex = 0
+
+// Drawing object references
+var line highLine = na
+var line lowLine = na
+var label highLabel = na
+var label lowLabel = na
+var box sessionBox = na
+
+// Array-based cleanup
+var array<label> signalLabels = array.new_label()
+var array<line> signalLines = array.new_line()
+
+// ============================================================================
+// HELPER FUNCTIONS (Section 6: Functions with explicit returns)
+// ============================================================================
+
+// Session detection pattern (Section 7)
+InSession(sessionTime, tz=syminfo.timezone) =>
+    not na(time(timeframe.period, sessionTime, tz))
+
+// Daily reset detection (Section 7)
+isNewDay() =>
+    ta.change(time("D")) != 0
+
+// String builder with explicit return (Section 6)
+getStatusText(bool bullish, float high, float low) =>
+    string result = ""
+    if bullish
+        result := "BULLISH | H: " + str.tostring(high, "#.##") + " L: " + str.tostring(low, "#.##")
+    else
+        result := "BEARISH | H: " + str.tostring(high, "#.##") + " L: " + str.tostring(low, "#.##")
+    result  // Explicit return
+
+// Array cleanup helper (Section 7)
+trackLabel(lbl) =>
+    array.push(signalLabels, lbl)
+    if array.size(signalLabels) > 50
+        label.delete(array.shift(signalLabels))
+
+trackLine(ln) =>
+    array.push(signalLines, ln)
+    if array.size(signalLines) > 100
+        line.delete(array.shift(signalLines))
+
+// ============================================================================
+// SESSION LOGIC
+// ============================================================================
+
+sessionString = str.tostring(sessionStart) + "00-" + str.tostring(sessionEnd) + "00"
+sessionActive := InSession(sessionString, customTimezone)
+
+// Daily reset (Section 7 pattern)
+if isNewDay()
+    sessionHigh := na
+    sessionLow := na
+    isBullish := false
+    signalTriggered := false
+
+// Update session high/low
+if sessionActive
+    if na(sessionHigh) or high > sessionHigh
+        sessionHigh := high
+    if na(sessionLow) or low < sessionLow
+        sessionLow := low
+
+// Determine bias at session end
+if sessionActive[1] and not sessionActive
+    isBullish := close > (sessionHigh + sessionLow) / 2
+
+// ============================================================================
+// DRAWING OBJECTS (Section 5: Complete API with xloc)
+// ============================================================================
+
+if showLines and not na(sessionHigh) and isNewDay()
+    // Delete previous lines
+    line.delete(highLine)
+    line.delete(lowLine)
+
+    // line.new() with xloc.bar_time for static positioning (Section 5)
+    highLine := line.new(time, sessionHigh, time, sessionHigh,
+        xloc=xloc.bar_time,          // REQUIRED for static positioning
+        extend=extend.both,          // Extends infinitely both directions
+        color=bullColor,
+        style=line.style_solid,
+        width=2)
+
+    lowLine := line.new(time, sessionLow, time, sessionLow,
+        xloc=xloc.bar_time,
+        extend=extend.both,
+        color=bearColor,
+        style=line.style_dashed,
+        width=2)
+
+if showLabels and not na(sessionHigh) and isNewDay()
+    // Delete previous labels
+    label.delete(highLabel)
+    label.delete(lowLabel)
+
+    // label.new() with xloc (Section 5)
+    highLabel := label.new(bar_index, sessionHigh, "Session High",
+        xloc=xloc.bar_index,         // Using bar_index here
+        style=label.style_none,      // Text only, no background
+        textcolor=bullColor,
+        size=size.small,
+        textalign=text.align_left,
+        tooltip="Previous session high: " + str.tostring(sessionHigh, "#.##"))
+
+    lowLabel := label.new(bar_index, sessionLow, "Session Low",
+        xloc=xloc.bar_index,
+        style=label.style_none,
+        textcolor=bearColor,
+        size=size.small,
+        textalign=text.align_left,
+        tooltip="Previous session low: " + str.tostring(sessionLow, "#.##"))
+
+// box.new() example (Section 5)
+if sessionActive and not na(sessionHigh) and not na(sessionLow)
+    box.delete(sessionBox)
+    sessionBox := box.new(bar_index - 20, sessionHigh, bar_index, sessionLow,
+        xloc=xloc.bar_index,
+        bgcolor=color.new(isBullish ? bullColor : bearColor, 90),
+        border_color=isBullish ? bullColor : bearColor,
+        border_width=1,
+        border_style=line.style_dotted)
+
+// ============================================================================
+// DASHBOARD (Section 7: Dashboard Table Pattern)
+// ============================================================================
+
+if showDashboard and barstate.islast
+    var table dash = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black, 80))
+
+    table.cell(dash, 0, 0, "Indicator", text_color=color.white)
+    table.cell(dash, 1, 0, "v6 Pattern Test", text_halign=text.align_right, text_color=color.white)
+
+    table.cell(dash, 0, 1, "Bias", text_color=color.white)
+    biasText = isBullish ? "BULLISH" : "BEARISH"
+    biasColor = isBullish ? bullColor : bearColor
+    table.cell(dash, 1, 1, biasText, text_halign=text.align_right, text_color=biasColor)
+
+    table.cell(dash, 0, 2, "Session High", text_color=color.white)
+    table.cell(dash, 1, 2, na(sessionHigh) ? "-" : str.tostring(sessionHigh, "#.##"), text_halign=text.align_right, text_color=color.white)
+
+    table.cell(dash, 0, 3, "Session Low", text_color=color.white)
+    table.cell(dash, 1, 3, na(sessionLow) ? "-" : str.tostring(sessionLow, "#.##"), text_halign=text.align_right, text_color=color.white)
+
+    table.cell(dash, 0, 4, "Status", text_color=color.white)
+    table.cell(dash, 1, 4, getStatusText(isBullish, sessionHigh, sessionLow), text_halign=text.align_right, text_color=color.gray)
+
+// ============================================================================
+// ALERTS (Section 7: Discord-ready JSON)
+// ============================================================================
+
+bullishAlert = isBullish and not isBullish[1]
+bearishAlert = not isBullish and isBullish[1]
+
+if bullishAlert
+    alertMsg = '{"content": "' + syminfo.ticker + ' turned BULLISH at ' + str.tostring(close, "#.##") + '"}'
+    alert(alertMsg, alert.freq_once_per_bar)
+
+if bearishAlert
+    alertMsg = '{"content": "' + syminfo.ticker + ' turned BEARISH at ' + str.tostring(close, "#.##") + '"}'
+    alert(alertMsg, alert.freq_once_per_bar)
+
+// Standard alertcondition
+alertcondition(bullishAlert, title="Bullish Signal", message="Bullish bias triggered")
+alertcondition(bearishAlert, title="Bearish Signal", message="Bearish bias triggered")

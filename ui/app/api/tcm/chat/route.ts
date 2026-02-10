@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { assembleContext, generateContextBasedResponse } from '@/lib/tcm-context';
 import { TCM_SYSTEM_PROMPT, CONTEXT_ASSEMBLY_PROMPT, formatContextForLLM } from '@/lib/tcm-prompts';
 import { findFramesForTranscriptSearch, getVideosWithFrames } from '@/lib/tcm-frames';
+import { generateChartDataForQuery, ChartConfig } from '@/lib/tcm-chart-data';
+import { VideoClipInfo } from '@/lib/tcm-video-clips';
+import { findVideoClipForQuery } from '@/lib/tcm-video-clips.server';
+import { formatTimestamp } from '@/lib/tcm-db';
 
-// Check for Anthropic API key
+// Anthropic API key - use LLM when available, fallback to context-based response
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const USE_LLM = ANTHROPIC_API_KEY && ANTHROPIC_API_KEY !== 'your-anthropic-api-key-here';
 
@@ -22,28 +26,72 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get video clip using FAISS semantic search FIRST (most accurate for video selection)
+    const videoClip = await findVideoClipForQuery(message);
+
     // Assemble context from knowledge base
     const context = assembleContext(message);
-    const allResults = [...context.skills, ...context.documents, ...context.transcripts];
+
+    // Find relevant video frames - prioritize FAISS-matched video
+    let frames = findRelevantFrames(message);
+
+    // If FAISS found a video, prioritize frames from that video
+    if (videoClip) {
+      const faissVideoFrames = frames.filter(f => f.videoId === videoClip.videoId);
+      const otherFrames = frames.filter(f => f.videoId !== videoClip.videoId);
+      // Put FAISS video frames first, then others
+      frames = [...faissVideoFrames, ...otherFrames].slice(0, 3);
+    }
+
+    // Build sources - prioritize FAISS result, only show related sources
+    let sources: typeof context.skills = [];
+
+    if (videoClip) {
+      // FAISS found relevant video - use it as the primary/only source
+      sources = [{
+        type: 'transcript' as const,
+        id: `faiss-${videoClip.videoId}`,
+        title: videoClip.videoTitle,
+        content: videoClip.description.replace(/^"|"$/g, ''),
+        source: `Video @ ${formatTimestamp(videoClip.startTime)}`,
+        timestamp: videoClip.startTime,
+        videoId: videoClip.videoId,
+      }];
+
+      // Optionally add other sources from the SAME video if available
+      const sameVideoSources = [
+        ...context.skills,
+        ...context.documents,
+        ...context.transcripts
+      ].filter(s =>
+        (s as { videoId?: string }).videoId === videoClip.videoId
+      );
+
+      sources = [...sources, ...sameVideoSources].slice(0, 3);
+    } else {
+      // No FAISS match - fall back to keyword search results
+      sources = [...context.skills, ...context.documents, ...context.transcripts].slice(0, 5);
+    }
 
     let response: string;
-    let sources = allResults.slice(0, 5);
 
     if (USE_LLM) {
       // Use Claude API for LLM-powered response
       response = await generateLLMResponse(message, context, history);
     } else {
-      // Use context-based response (no LLM)
+      // Use context-based response with built-in definitions
       response = generateContextBasedResponse(context);
     }
 
-    // Find relevant video frames
-    const frames = findRelevantFrames(message);
+    // Generate chart data if query relates to visual concepts
+    const chartData = generateChartDataForQuery(message);
 
     return NextResponse.json({
       response,
       sources,
       frames,
+      chartData,
+      videoClip,
       usedLLM: USE_LLM,
       contextSize: context.totalResults,
     });

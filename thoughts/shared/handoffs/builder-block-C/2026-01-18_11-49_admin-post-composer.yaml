@@ -1,0 +1,60 @@
+---
+session: builder-block-C
+date: 2026-01-18
+status: complete
+outcome: PARTIAL_PLUS
+---
+
+goal: Add admin post creation UI on home page with Discord notification options and auth-aware navigation
+now: Test email notifications and consider adding more webhook features
+
+done_this_session:
+  - task: Created PostComposer component for admin post creation
+    files: [ui/components/home/post-composer.tsx]
+  - task: Created WebhookManager modal for Discord webhook CRUD
+    files: [ui/components/admin/webhook-manager.tsx]
+  - task: Updated home page to include PostComposer for admins
+    files: [ui/app/(dashboard)/home/page.tsx, ui/components/home/index.ts]
+  - task: Created MainNav component with auth-aware navigation
+    files: [ui/components/main-nav.tsx]
+  - task: Updated root layout to use MainNav
+    files: [ui/app/layout.tsx]
+  - task: Fixed client-side import issue with bcrypt
+    files: [ui/components/home/post-composer.tsx, ui/components/main-nav.tsx]
+
+blockers: []
+
+questions:
+  - Should email notifications be actually sent in dev mode?
+  - Should there be a confirmation dialog before posting?
+
+decisions:
+  - import_auth_context_directly: Client components must import from @/lib/auth/context not @/lib/auth to avoid bundling bcrypt
+
+findings:
+  - bcrypt_client_bundle_error: Using @/lib/auth in client components causes ModuleParseError because bcrypt has native bindings
+  - auth_state_hydration_delay: Navigation shows unauthenticated state briefly until client fetches user from /api/auth/me
+
+worked:
+  - PostComposer with collapsed/expanded states
+  - WebhookManager modal with full CRUD
+  - router.refresh() to auto-update feed after post creation
+  - Conditional rendering based on useAdmin() hook
+
+failed:
+  - Initially imported @/lib/auth in client components which bundles server-side bcrypt
+
+next:
+  - Test email notification functionality
+  - Add webhook test button in WebhookManager
+  - Consider adding post edit/delete functionality
+
+files:
+  created:
+    - ui/components/home/post-composer.tsx
+    - ui/components/admin/webhook-manager.tsx
+    - ui/components/main-nav.tsx
+  modified:
+    - ui/components/home/index.ts
+    - ui/app/(dashboard)/home/page.tsx
+    - ui/app/layout.tsx

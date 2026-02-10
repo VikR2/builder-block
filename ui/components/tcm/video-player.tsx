@@ -12,6 +12,16 @@ interface VideoPlayerProps {
   hideHeader?: boolean;
   seekTo?: number;  // When this changes, seek to this timestamp
   theaterMode?: boolean;  // When true, video fills parent container height
+  debug?: boolean;  // Show debug overlay with state info
+}
+
+// Debug logging helper - only logs in development or when debug=true
+const DEBUG_ENABLED = process.env.NODE_ENV === 'development';
+function debugLog(component: string, action: string, data?: Record<string, unknown>) {
+  if (DEBUG_ENABLED) {
+    const timestamp = new Date().toISOString().split('T')[1].slice(0, 12);
+    console.log(`[${timestamp}] [${component}] ${action}`, data ? JSON.stringify(data) : '');
+  }
 }
 
 type PlaybackMode = 'clip' | 'full';
@@ -27,11 +37,14 @@ export function VideoPlayer({
   defaultMode = 'clip',
   hideHeader = false,
   seekTo,
-  theaterMode = false
+  theaterMode = false,
+  debug = false
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const isPlayingRef = useRef(false);
 
   // Core state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -53,9 +66,15 @@ export function VideoPlayer({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Hover state for progress bar
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<number>(0);
+
   // Derived values
+  // In full mode, use fullDuration if available, otherwise fall back to clip.endTime
+  // This ensures controls work before video metadata fully loads
   const effectiveStart = playbackMode === 'clip' ? clip.startTime : 0;
-  const effectiveEnd = playbackMode === 'clip' ? clip.endTime : fullDuration;
+  const effectiveEnd = playbackMode === 'clip' ? clip.endTime : (fullDuration > 0 ? fullDuration : clip.endTime);
   const effectiveDuration = effectiveEnd - effectiveStart;
 
   // Progress calculation
@@ -67,18 +86,39 @@ export function VideoPlayer({
   const clipStartPercent = fullDuration > 0 ? (clip.startTime / fullDuration) * 100 : 0;
   const clipEndPercent = fullDuration > 0 ? (clip.endTime / fullDuration) * 100 : 100;
 
+  // Keep ref in sync with state
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+    debugLog('VideoPlayer', 'isPlaying changed', { isPlaying });
+  }, [isPlaying]);
+
+  // Debug: Log controlsVisible changes
+  useEffect(() => {
+    debugLog('VideoPlayer', 'controlsVisible changed', { controlsVisible, isPlaying: isPlayingRef.current });
+  }, [controlsVisible]);
+
   // Reset controls visibility on user interaction
   const showControls = useCallback(() => {
+    debugLog('VideoPlayer', 'showControls called', {
+      isPlayingRef: isPlayingRef.current,
+      currentControlsVisible: controlsVisible
+    });
     setControlsVisible(true);
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
+      debugLog('VideoPlayer', 'Cleared existing timeout');
     }
-    if (isPlaying) {
+    // Use ref to get current isPlaying value to avoid stale closure
+    if (isPlayingRef.current) {
+      debugLog('VideoPlayer', 'Setting 3s hide timeout (video is playing)');
       controlsTimeoutRef.current = setTimeout(() => {
+        debugLog('VideoPlayer', 'Timeout fired - hiding controls');
         setControlsVisible(false);
       }, 3000);
+    } else {
+      debugLog('VideoPlayer', 'No timeout set (video is paused)');
     }
-  }, [isPlaying]);
+  }, [controlsVisible]); // Include controlsVisible for logging only
 
   // Video event handlers
   useEffect(() => {
@@ -86,6 +126,12 @@ export function VideoPlayer({
     if (!video) return;
 
     const handleLoadedMetadata = () => {
+      debugLog('VideoPlayer', 'loadedmetadata', {
+        duration: video.duration,
+        clipStartTime: clip.startTime,
+        clipEndTime: clip.endTime,
+        videoId: clip.videoId
+      });
       video.currentTime = clip.startTime;
       setFullDuration(video.duration);
       setIsLoading(false);
@@ -102,6 +148,11 @@ export function VideoPlayer({
 
       // Only enforce boundaries in clip mode
       if (playbackMode === 'clip' && time >= clip.endTime) {
+        debugLog('VideoPlayer', 'clip boundary reached', {
+          currentTime: time,
+          clipEndTime: clip.endTime,
+          action: 'pausing and resetting to start'
+        });
         video.pause();
         video.currentTime = clip.startTime;
         setIsPlaying(false);
@@ -109,24 +160,44 @@ export function VideoPlayer({
     };
 
     const handlePlay = () => {
+      debugLog('VideoPlayer', 'play event', {
+        currentTime: video.currentTime,
+        playbackMode,
+        effectiveStart,
+        effectiveEnd
+      });
       setIsPlaying(true);
       showControls();
     };
 
     const handlePause = () => {
+      debugLog('VideoPlayer', 'pause event', {
+        currentTime: video.currentTime,
+        willShowControls: true
+      });
       setIsPlaying(false);
       setControlsVisible(true);
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
+        debugLog('VideoPlayer', 'cleared hide timeout on pause');
       }
     };
 
     const handleError = () => {
+      debugLog('VideoPlayer', 'ERROR', {
+        videoId: clip.videoId,
+        error: video.error?.message || 'unknown error',
+        code: video.error?.code
+      });
       setHasError(true);
       setIsLoading(false);
     };
 
     const handleEnded = () => {
+      debugLog('VideoPlayer', 'ended event', {
+        playbackMode,
+        willPause: playbackMode === 'full'
+      });
       if (playbackMode === 'full') {
         setIsPlaying(false);
       }
@@ -234,15 +305,26 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
+    debugLog('VideoPlayer', 'togglePlay called', {
+      isPlaying,
+      currentTime: video.currentTime,
+      playbackMode,
+      effectiveStart,
+      effectiveEnd,
+      effectiveDuration
+    });
+
     if (isPlaying) {
       video.pause();
     } else {
       // In clip mode, start from beginning if at the end
       if (playbackMode === 'clip' && video.currentTime >= clip.endTime - 0.5) {
+        debugLog('VideoPlayer', 'resetting to clip start (was at end)');
         video.currentTime = clip.startTime;
       }
       // In full mode, restart if at the very end
       if (playbackMode === 'full' && video.currentTime >= fullDuration - 0.5) {
+        debugLog('VideoPlayer', 'resetting to 0 (was at end in full mode)');
         video.currentTime = 0;
       }
       video.play();
@@ -253,10 +335,21 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
+    const oldTime = video.currentTime;
     let newTime = video.currentTime + seconds;
 
     // Clamp to effective boundaries
     newTime = Math.max(effectiveStart, Math.min(effectiveEnd, newTime));
+
+    debugLog('VideoPlayer', 'seekRelative', {
+      seconds,
+      oldTime,
+      newTime,
+      effectiveStart,
+      effectiveEnd,
+      clamped: newTime !== oldTime + seconds
+    });
+
     video.currentTime = newTime;
     showControls();
   };
@@ -266,6 +359,11 @@ export function VideoPlayer({
     if (!video) return;
 
     const seekTime = effectiveStart + parseFloat(e.target.value);
+    debugLog('VideoPlayer', 'handleSeek (range input)', {
+      inputValue: e.target.value,
+      seekTime,
+      effectiveStart
+    });
     video.currentTime = seekTime;
     showControls();
   };
@@ -277,13 +375,31 @@ export function VideoPlayer({
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
     const seekTime = effectiveStart + (percent * effectiveDuration);
-    video.currentTime = Math.max(effectiveStart, Math.min(effectiveEnd, seekTime));
+    const clampedTime = Math.max(effectiveStart, Math.min(effectiveEnd, seekTime));
+
+    debugLog('VideoPlayer', 'progressBarClick', {
+      clickX: e.clientX,
+      rectLeft: rect.left,
+      rectWidth: rect.width,
+      percent,
+      seekTime,
+      clampedTime,
+      effectiveStart,
+      effectiveEnd,
+      effectiveDuration
+    });
+
+    video.currentTime = clampedTime;
     showControls();
   };
 
   const jumpToClipStart = () => {
     const video = videoRef.current;
     if (!video) return;
+    debugLog('VideoPlayer', 'jumpToClipStart', {
+      clipStartTime: clip.startTime,
+      previousTime: video.currentTime
+    });
     video.currentTime = clip.startTime;
     setPlaybackMode('clip');
     showControls();
@@ -292,6 +408,10 @@ export function VideoPlayer({
   const jumpToClipEnd = () => {
     const video = videoRef.current;
     if (!video) return;
+    debugLog('VideoPlayer', 'jumpToClipEnd', {
+      clipEndTime: clip.endTime,
+      previousTime: video.currentTime
+    });
     video.currentTime = clip.endTime;
     showControls();
   };
@@ -299,6 +419,15 @@ export function VideoPlayer({
   const handleModeChange = (mode: PlaybackMode) => {
     const video = videoRef.current;
     if (!video) return;
+
+    debugLog('VideoPlayer', 'modeChange', {
+      previousMode: playbackMode,
+      newMode: mode,
+      currentTime: video.currentTime,
+      clipStart: clip.startTime,
+      clipEnd: clip.endTime,
+      willJumpToClipStart: mode === 'clip' && (video.currentTime < clip.startTime || video.currentTime > clip.endTime)
+    });
 
     setPlaybackMode(mode);
 
@@ -331,6 +460,19 @@ export function VideoPlayer({
     if (newVolume > 0) setIsMuted(false);
   };
 
+  const handleProgressBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!progressBarRef.current) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const previewTime = effectiveStart + (percent * effectiveDuration);
+    setHoverTime(previewTime);
+    setHoverPosition(e.clientX - rect.left);
+  };
+
+  const handleProgressBarLeave = () => {
+    setHoverTime(null);
+  };
+
   if (hasError) {
     return (
       <div className={`rounded-lg overflow-hidden border border-border/50 bg-card ${className}`}>
@@ -349,14 +491,17 @@ export function VideoPlayer({
   return (
     <div
       ref={containerRef}
-      className={`${theaterMode ? '' : 'rounded-lg border border-border/50'} overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none border-none' : ''} ${className}`}
+      className={`flex flex-col ${theaterMode ? '' : 'rounded-lg border border-border/50'} overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none border-none' : ''} ${className}`}
       onMouseMove={showControls}
       onMouseLeave={() => isPlaying && setControlsVisible(false)}
       tabIndex={0}
     >
       {/* Header */}
       {!hideHeader && (
-        <div className={`flex items-center justify-between px-3 py-2 bg-background/50 border-b border-border/30 transition-opacity duration-300 ${!controlsVisible && isPlaying ? 'opacity-0' : 'opacity-100'}`}>
+        <div
+          className={`flex items-center justify-between px-3 py-2 bg-background/50 border-b border-border/30 transition-opacity duration-300 ${!controlsVisible && isPlaying ? 'opacity-0' : 'opacity-100'}`}
+          onMouseMove={showControls}
+        >
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -411,8 +556,8 @@ export function VideoPlayer({
         </div>
       )}
 
-      {/* Video Container */}
-      <div className="relative bg-black">
+      {/* Video Container - flex-1 to take remaining space in flexbox layout */}
+      <div className="relative bg-black flex-1 min-h-0" onMouseMove={showControls} onClick={togglePlay}>
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -422,7 +567,7 @@ export function VideoPlayer({
         <video
           ref={videoRef}
           src={getVideoFilePath(clip.videoId)}
-          className={`w-full ${
+          className={`w-full cursor-pointer ${
             isFullscreen
               ? 'h-screen'
               : theaterMode
@@ -437,7 +582,7 @@ export function VideoPlayer({
 
         {/* Large play button overlay */}
         <button
-          onClick={togglePlay}
+          onClick={(e) => { e.stopPropagation(); togglePlay(); }}
           className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${
             isPlaying ? 'opacity-0 pointer-events-none' : 'opacity-100 bg-black/20'
           }`}
@@ -451,7 +596,7 @@ export function VideoPlayer({
 
         {/* Clip context badge (in full mode) */}
         {playbackMode === 'full' && (
-          <div className={`absolute top-3 left-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-black/70 backdrop-blur-sm border border-yellow-500/30 transition-opacity duration-300 ${!controlsVisible && isPlaying ? 'opacity-0' : 'opacity-100'}`}>
+          <div className={`absolute top-3 left-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-black/70 backdrop-blur-sm border border-yellow-500/30 transition-opacity duration-300 ${!controlsVisible && isPlaying ? 'opacity-0' : 'opacity-100'}`} onClick={(e) => e.stopPropagation()}>
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
@@ -467,31 +612,37 @@ export function VideoPlayer({
             </button>
           </div>
         )}
-      </div>
 
-      {/* Controls */}
-      <div className={`px-3 py-2 bg-background/30 border-t border-border/30 transition-opacity duration-300 ${!controlsVisible && isPlaying ? 'opacity-0' : 'opacity-100'}`}>
-        {/* Progress bar with clip indicator */}
-        <div className="mb-2">
+        {/* Progress bar overlay - ALWAYS VISIBLE */}
+        <div className="absolute bottom-0 left-0 right-0 px-3 pb-2 pt-6 bg-gradient-to-t from-black/60 to-transparent" onClick={(e) => e.stopPropagation()}>
           <div
-            className="relative h-1.5 bg-border rounded-full overflow-visible cursor-pointer group"
+            ref={progressBarRef}
+            className="relative h-1 group cursor-pointer"
             onClick={handleProgressBarClick}
+            onMouseMove={handleProgressBarHover}
+            onMouseLeave={handleProgressBarLeave}
           >
+            {/* Background track */}
+            <div className="absolute inset-0 h-1 group-hover:h-1.5 transition-all bg-white/30 rounded-full" />
+
             {/* Clip region indicator (in full mode) */}
             {playbackMode === 'full' && (
               <div
-                className="absolute h-full bg-yellow-500/30 rounded-full"
-                style={{
-                  left: `${clipStartPercent}%`,
-                  width: `${clipEndPercent - clipStartPercent}%`
-                }}
+                className="absolute h-1 group-hover:h-1.5 transition-all bg-yellow-500/40 rounded-full"
+                style={{ left: `${clipStartPercent}%`, width: `${clipEndPercent - clipStartPercent}%` }}
               />
             )}
 
             {/* Progress fill */}
             <div
-              className="absolute h-full bg-primary rounded-full transition-all"
+              className="absolute h-1 group-hover:h-1.5 transition-all bg-red-500 rounded-full"
               style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+            />
+
+            {/* Scrubber thumb - appears on hover */}
+            <div
+              className="absolute top-1/2 w-3.5 h-3.5 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md pointer-events-none"
+              style={{ left: `${progress}%`, transform: 'translate(-50%, -50%)' }}
             />
 
             {/* Clip boundary markers (in full mode) */}
@@ -499,42 +650,70 @@ export function VideoPlayer({
               <>
                 <button
                   onClick={(e) => { e.stopPropagation(); jumpToClipStart(); }}
-                  className="absolute top-1/2 -translate-y-1/2 w-2 h-3 bg-yellow-500 rounded-sm hover:bg-yellow-400 transition-colors cursor-pointer"
+                  className="absolute top-1/2 w-2 h-4 bg-yellow-500 rounded-sm hover:bg-yellow-400 transition-colors cursor-pointer z-10"
                   style={{ left: `${clipStartPercent}%`, transform: 'translate(-50%, -50%)' }}
                   title="Clip start"
                 />
                 <button
                   onClick={(e) => { e.stopPropagation(); jumpToClipEnd(); }}
-                  className="absolute top-1/2 -translate-y-1/2 w-2 h-3 bg-yellow-500 rounded-sm hover:bg-yellow-400 transition-colors cursor-pointer"
+                  className="absolute top-1/2 w-2 h-4 bg-yellow-500 rounded-sm hover:bg-yellow-400 transition-colors cursor-pointer z-10"
                   style={{ left: `${clipEndPercent}%`, transform: 'translate(-50%, -50%)' }}
                   title="Clip end"
                 />
               </>
             )}
 
-            {/* Hover thumb */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-              style={{ left: `${progress}%`, transform: 'translate(-50%, -50%)' }}
-            />
-
-            {/* Hidden range input for accessibility */}
-            <input
-              type="range"
-              min={0}
-              max={effectiveDuration}
-              value={currentTime - effectiveStart}
-              onChange={handleSeek}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
+            {/* Time preview tooltip */}
+            {hoverTime !== null && (
+              <div
+                className="absolute -top-8 px-2 py-1 bg-black/90 rounded text-xs text-white font-mono pointer-events-none whitespace-nowrap z-20"
+                style={{ left: `${hoverPosition}px`, transform: 'translateX(-50%)' }}
+              >
+                {formatTimeSeconds(hoverTime)}
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Debug Overlay - shows when debug prop is true */}
+        {debug && (
+          <div
+            className="absolute top-3 right-3 p-2 bg-black/80 backdrop-blur-sm rounded text-xs font-mono text-white z-30 max-w-[200px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="font-bold text-yellow-400 mb-1">DEBUG</div>
+            <div className={`${controlsVisible ? 'text-green-400' : 'text-red-400'}`}>
+              controls: {controlsVisible ? 'VISIBLE' : 'HIDDEN'}
+            </div>
+            <div className={`${isPlaying ? 'text-green-400' : 'text-yellow-400'}`}>
+              playing: {isPlaying ? 'YES' : 'NO'}
+            </div>
+            <div>mode: {playbackMode}</div>
+            <div>time: {formatTimeSeconds(currentTime)}</div>
+            <div>effStart: {effectiveStart.toFixed(1)}</div>
+            <div>effEnd: {effectiveEnd.toFixed(1)}</div>
+            <div>duration: {effectiveDuration.toFixed(1)}</div>
+            <div>progress: {progress.toFixed(1)}%</div>
+            <div className="text-gray-400 text-[10px] mt-1">
+              Check console for detailed logs
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Button Controls - FADE when playing, flex-shrink-0 to prevent being hidden */}
+      <div
+        data-testid="video-controls"
+        data-controls-visible={controlsVisible}
+        data-is-playing={isPlaying}
+        className={`px-3 py-2 bg-zinc-800 border-t border-zinc-600 transition-opacity duration-300 min-h-[52px] flex-shrink-0 ${!controlsVisible && isPlaying ? 'opacity-0' : 'opacity-100'}`}
+        onMouseMove={showControls}
+      >
+        <div className="flex items-center gap-2 text-white">
           {/* Play/Pause button */}
           <button
             onClick={togglePlay}
-            className="p-1.5 rounded hover:bg-background transition-colors"
+            className="p-1.5 rounded hover:bg-white/10 transition-colors"
             title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
           >
             {isPlaying ? (
@@ -548,6 +727,28 @@ export function VideoPlayer({
             )}
           </button>
 
+          {/* Skip Back 10s */}
+          <button
+            onClick={() => seekRelative(-10)}
+            className="p-1.5 rounded hover:bg-white/10 transition-colors"
+            title="Back 10 seconds (←)"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12.5 3C17.15 3 21.08 6.03 22.47 10.22L20.1 11C19.05 7.81 16.04 5.5 12.5 5.5C10.54 5.5 8.77 6.22 7.38 7.38L10 10H3V3L5.6 5.6C7.45 4 9.85 3 12.5 3M10 12V22H8V14H6V12H10M18 14V20C18 21.11 17.11 22 16 22H14C12.9 22 12 21.1 12 20V14C12 12.9 12.9 12 14 12H16C17.11 12 18 12.9 18 14M14 14V20H16V14H14Z"/>
+            </svg>
+          </button>
+
+          {/* Skip Forward 10s */}
+          <button
+            onClick={() => seekRelative(10)}
+            className="p-1.5 rounded hover:bg-white/10 transition-colors"
+            title="Forward 10 seconds (→)"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10 3C4.85 3 0.92 6.03 -0.47 10.22L1.9 11C2.95 7.81 5.96 5.5 9.5 5.5C11.46 5.5 13.23 6.22 14.62 7.38L12 10H19V3L16.4 5.6C14.55 4 12.15 3 9.5 3H10M10 12V22H8V14H6V12H10M18 14V20C18 21.11 17.11 22 16 22H14C12.9 22 12 21.1 12 20V14C12 12.9 12.9 12 14 12H16C17.11 12 18 12.9 18 14M14 14V20H16V14H14Z"/>
+            </svg>
+          </button>
+
           {/* Volume control */}
           <div
             className="relative flex items-center"
@@ -556,7 +757,7 @@ export function VideoPlayer({
           >
             <button
               onClick={() => setIsMuted(m => !m)}
-              className="p-1.5 rounded hover:bg-background transition-colors"
+              className="p-1.5 rounded hover:bg-white/10 transition-colors"
               title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
             >
               {isMuted || volume === 0 ? (
@@ -602,14 +803,18 @@ export function VideoPlayer({
           <div className="relative">
             <button
               onClick={() => setShowSpeedMenu(m => !m)}
-              className="px-2 py-1 text-xs font-medium rounded hover:bg-background transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium rounded bg-white/10 hover:bg-white/20 transition-colors"
               title="Playback speed"
             >
-              {playbackSpeed}x
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12,6 12,12 16,14"/>
+              </svg>
+              <span>{playbackSpeed}x</span>
             </button>
 
             {showSpeedMenu && (
-              <div className="absolute bottom-full right-0 mb-1 py-1 bg-popover border border-border rounded-lg shadow-lg z-10">
+              <div className="absolute bottom-full right-0 mb-2 py-1 bg-black/95 border border-white/20 rounded-lg shadow-xl z-20 min-w-[80px]">
                 {PLAYBACK_SPEEDS.map(speed => (
                   <button
                     key={speed}
@@ -617,8 +822,8 @@ export function VideoPlayer({
                       setPlaybackSpeed(speed);
                       setShowSpeedMenu(false);
                     }}
-                    className={`block w-full px-3 py-1 text-xs text-left hover:bg-accent transition-colors ${
-                      playbackSpeed === speed ? 'text-primary font-medium' : ''
+                    className={`block w-full px-4 py-1.5 text-sm text-left hover:bg-white/10 transition-colors ${
+                      playbackSpeed === speed ? 'text-red-500 font-semibold' : 'text-white'
                     }`}
                   >
                     {speed}x
@@ -631,7 +836,7 @@ export function VideoPlayer({
           {/* Fullscreen button */}
           <button
             onClick={toggleFullscreen}
-            className="p-1.5 rounded hover:bg-background transition-colors"
+            className="p-1.5 rounded hover:bg-white/10 transition-colors"
             title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen (F)'}
           >
             {isFullscreen ? (

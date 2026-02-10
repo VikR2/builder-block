@@ -79,6 +79,29 @@ export function getFullContext(): {
   };
 }
 
+// Built-in concept definitions for common TCM terms (used when no LLM)
+const CONCEPT_DEFINITIONS: Record<string, string> = {
+  'order matching': '**Order Matching** is the process where buy orders find their corresponding sell orders (counterparties). In TCM theory, this happens during the Asian session "matching window" when the previous day\'s submitted orders get paired up. Think of it like a dating app for orders - each buyer needs to find a seller, and vice versa.',
+  'order fulfillment': '**Order Fulfillment** is the complete lifecycle of an institutional order: Submission → Matching → Filling → Distribution. Like Amazon delivering a package, orders go through stages from being placed to being completely filled.',
+  'submission range': '**Submission Range (SR)** is the time window from 12:40 PM to 3:20 PM ET when large institutional orders get placed into the market. This is when "the book" starts building.',
+  'book building': '**Book Building** is the process of orders accumulating on both the buy and sell side. The "book" represents the overlap between where orders were submitted (SR) and where they get matched (Asian session).',
+  'matching window': '**Matching Window** is the Asian trading session when orders that were submitted during the previous day\'s SR find their counterparties. This is when order matching occurs.',
+  'eq level': '**EQ Level** (Equilibrium) is the 50% midpoint of "the book" - essentially the average price where matched orders exist. Price tends to return to this level.',
+  'bias': '**Bias** is the directional expectation determined by: Key Level + Delivery Type at Key Level = BIAS. A sweep at a key level suggests reversal, while a run suggests continuation.',
+  'liquidity': '**Liquidity** in TCM refers to matched order pairs - places where both buyers and sellers have committed orders. Unmatched orders create "liquidity voids" that price may need to revisit.',
+};
+
+// Check if query matches a built-in concept
+function getBuiltInDefinition(query: string): string | null {
+  const lowerQuery = query.toLowerCase();
+  for (const [concept, definition] of Object.entries(CONCEPT_DEFINITIONS)) {
+    if (lowerQuery.includes(concept) || concept.includes(lowerQuery.replace(/what is |explain |tell me about /gi, '').trim())) {
+      return definition;
+    }
+  }
+  return null;
+}
+
 // Generate a non-LLM response based on context
 export function generateContextBasedResponse(context: AssembledContext): string {
   const { skills, documents, transcripts, query } = context;
@@ -88,44 +111,51 @@ export function generateContextBasedResponse(context: AssembledContext): string 
     return generateNoResultsResponse(query);
   }
 
-  let response = '';
+  const parts: string[] = [];
+
+  // Check for built-in definition first (gives better explanation)
+  const builtInDef = getBuiltInDefinition(query);
+  if (builtInDef) {
+    parts.push(builtInDef);
+  }
 
   // Primary answer from skills (most authoritative)
   if (skills.length > 0) {
     const primarySkill = skills[0];
-    response += `**${primarySkill.title}**\n\n${primarySkill.content}\n`;
+    // Only add skill if we didn't have a built-in definition
+    if (!builtInDef) {
+      parts.push(`**${primarySkill.title}**\n\n${primarySkill.content}`);
+    }
 
-    // Add secondary skills if relevant
+    // Add related concepts briefly
     if (skills.length > 1) {
-      response += '\n**Related Concepts:**\n';
-      for (let i = 1; i < Math.min(skills.length, 3); i++) {
-        response += `- **${skills[i].title}**: ${skills[i].content.substring(0, 100)}...\n`;
-      }
+      const related = skills.slice(1, 3)
+        .map(s => `**${s.title}**: ${s.content.substring(0, 80)}...`)
+        .join('\n- ');
+      parts.push(`\n**Related Concepts:**\n- ${related}`);
     }
   }
 
-  // Add document excerpts for more detail
+  // Add document excerpts for more detail (without --- separators)
   if (documents.length > 0) {
-    response += '\n---\n\n**From the Study Materials:**\n\n';
-    response += `> ${documents[0].content.substring(0, 400)}${documents[0].content.length > 400 ? '...' : ''}\n`;
-    response += `\n*Source: ${documents[0].title}*\n`;
+    const doc = documents[0];
+    const excerpt = doc.content.substring(0, 350);
+    parts.push(`\n**From Study Materials:**\n\n${excerpt}${doc.content.length > 350 ? '...' : ''}\n\n*Source: ${doc.title}*`);
   }
 
-  // Add transcript references
-  if (transcripts.length > 0 && skills.length === 0 && documents.length === 0) {
-    response += '\n**From Video Discussions:**\n\n';
-    response += `"${transcripts[0].content}"\n`;
-    response += `\n*${transcripts[0].source} - ${transcripts[0].title}*\n`;
+  // Add transcript references when we have no skills
+  if (transcripts.length > 0 && skills.length === 0 && !builtInDef) {
+    const t = transcripts[0];
+    parts.push(`\n**From Video Training:**\n\n"${t.content}"\n\n*${t.source} - ${t.title}*`);
   }
 
-  // If we only have transcripts and nothing else, provide them
-  if (!response && transcripts.length > 0) {
-    response = `This concept is discussed in the TCM videos:\n\n`;
-    response += `"${transcripts[0].content}"\n`;
-    response += `\n*${transcripts[0].source}*`;
+  // If we only have transcripts
+  if (parts.length === 0 && transcripts.length > 0) {
+    const t = transcripts[0];
+    parts.push(`This concept is discussed in the TCM videos:\n\n"${t.content}"\n\n*${t.source}*`);
   }
 
-  return response || generateNoResultsResponse(query);
+  return parts.join('\n') || generateNoResultsResponse(query);
 }
 
 // Response when no results found

@@ -1,0 +1,59 @@
+---
+session: builder-block-C
+date: 2026-01-31
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Extract trading model from shawn1-1.mp4 video and create comprehensive study guide
+now: Test skills in trading workflow or extract another video
+
+test: sqlite3 data/builder.db "SELECT id, name FROM skills WHERE id >= 115;"
+
+done_this_session:
+  - task: Processed 65-minute local video with Whisper medium transcription
+    files: [data/local-videos/manifest.json, data/local-videos/transcript.txt]
+  - task: Created 8 new skills from Shawn's 7AM/4:40AM trading model
+    files: [data/builder.db]
+  - task: Generated comprehensive 320-line study guide with 11 parts
+    files: [data/architectures/2026-01-31-shawn-7am-440-model.txt]
+  - task: Linked skills to source video in skill_sources table
+    files: [data/builder.db]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - used_system_python: uv environment had Python version conflict with llvmlite; system Python 3.12 had faster-whisper already installed
+  - whisper_medium_model: Selected for accuracy over speed on 65-minute educational content
+  - skills_115_122_range: Created 8 new skills in ID range 115-122 for Shawn's model
+
+findings:
+  - shawn_model_core: 7AM and 4:40AM open prices are the foundation; rejection vs close-through determines bias
+  - three_bar_rule: After OLR, wait for close beyond 3-bar high/low before expecting retracement
+  - famous_last_words: Key psychology - don't trade what doesn't print
+  - pm_session_avoid: Mentor explicitly avoids PM session trading
+
+worked:
+  - Running scripts/process_local_mp4.py with system python instead of uv
+  - faster-whisper for transcription (1018 segments, 43734 chars)
+  - Frame extraction at 156s intervals (adjusted from 60s for 25 frame max)
+
+failed:
+  - uv run python failed due to llvmlite requiring Python <3.10
+
+next:
+  - Consider creating TradingView indicator for 7AM/4:40AM levels
+  - Test study guide with actual trading session
+  - Process additional Shawn mentorship videos if available
+
+files:
+  created:
+    - data/local-videos/manifest.json
+    - data/local-videos/transcript.txt
+    - data/local-videos/transcript_timed.json
+    - data/local-videos/frames/frame_001.jpg through frame_025.jpg
+    - data/architectures/2026-01-31-shawn-7am-440-model.txt
+  modified:
+    - data/builder.db (skills 115-122, skill_sources, processed_local_videos)

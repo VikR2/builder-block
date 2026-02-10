@@ -1,6 +1,11 @@
+import { redirect } from 'next/navigation';
 import { getAllSkills, getSkillCategories, searchSkills } from "@/lib/db";
 import { SkillsSearch } from "@/components/skills-search";
 import Link from "next/link";
+import { getCurrentUser } from '@/lib/auth';
+import { PaywallOverlay } from '@/components/paywall';
+
+export const dynamic = 'force-dynamic';
 
 // Server action for search
 async function searchSkillsAction(query: string) {
@@ -8,7 +13,22 @@ async function searchSkillsAction(query: string) {
   return searchSkills(query);
 }
 
-export default function SkillsPage() {
+export default async function SkillsPage() {
+  // Check authentication and premium status
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect('/login?redirect=/skills');
+  }
+
+  if (!user.isPremium) {
+    return <PaywallOverlay
+      returnUrl="/skills"
+      title="Skills Library"
+      description="Subscribe to Premium to access the full trading skills library with code snippets."
+    />;
+  }
+
   const skills = getAllSkills();
   const categories = getSkillCategories();
 

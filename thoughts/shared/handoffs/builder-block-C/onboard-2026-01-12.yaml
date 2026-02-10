@@ -1,0 +1,191 @@
+---
+date: 2026-01-12
+type: onboard
+status: active
+---
+
+goal: Improve existing NinjaTrader 8 strategies and learn codebase for better C# practices
+
+now: Explore V29-V32 strategies to identify improvement opportunities using NT8 best practices
+
+# =============================================================================
+# TECH STACK
+# =============================================================================
+tech_stack:
+  - TypeScript/Node.js (MCP server - .claude/mcp-servers/)
+  - Next.js 15 + React 19 (UI - ui/)
+  - Python (automation scripts - scripts/)
+  - SQLite (skills database - data/builder.db)
+  - C# (NinjaTrader 8 strategies - scripts-output/)
+
+# =============================================================================
+# ARCHITECTURE
+# =============================================================================
+architecture: |
+  NinjaTrader 8 Strategy Development System with AI-assisted learning
+
+  Flow: YouTube Video -> Skills Extraction -> Strategy Generation -> Backtesting -> Iteration
+
+  Components:
+  1. Skills Library (62 trading patterns in SQLite with embeddings)
+  2. MCP Server (auto-loads relevant skills into Claude context)
+  3. YouTube Extraction Pipeline (frames + transcript -> skills)
+  4. Strategy Generator (skills + SAD -> C# code)
+  5. Backtest Analyzer (CSV analysis -> improvement suggestions)
+
+  Strategy Versioning:
+  - V29-V32: Current "Fractal Model" strategies (active development)
+  - V6-V22: Deprecated (removed in commit 84b5da6)
+
+# =============================================================================
+# KEY FILES
+# =============================================================================
+key_files:
+  # Active Strategies
+  - path: scripts-output/Strategies/TTradesFractalModelV32.cs
+    purpose: Latest strategy with Continuation/Reversal trade type tracking
+
+  - path: scripts-output/Strategies/TTradesFractalModelV29.cs
+    purpose: Base Fractal Model implementation
+
+  # Indicators
+  - path: scripts-output/Indicators/MultiTimeframeC1C2Indicator.cs
+    purpose: MTF C1/C2 reversal pattern detection with state machine (957 lines)
+
+  - path: scripts-output/Indicators/TTradesDailyBiasIndicator.cs
+    purpose: Daily bias calculation (PDH/PDL sweep)
+
+  # Skills Database
+  - path: data/builder.db
+    purpose: 62 trading skills with embeddings, categories, dependencies
+
+  - path: data/schema.sql
+    purpose: Database schema (skills, projects, journal, trade_data tables)
+
+  # Python Scripts
+  - path: scripts/generate_from_youtube.py
+    purpose: Main YouTube extraction pipeline
+
+  - path: scripts/implement_strategy.py
+    purpose: C# code generation from skills
+
+  - path: scripts/backtest_analyzer.py
+    purpose: Analyze backtest CSV files for patterns
+
+  # Documentation
+  - path: docs/strategies/LumiTraders-LiquiditySweepES-SAD.md
+    purpose: Example Strategy Architecture Document (SAD) format
+
+# =============================================================================
+# NINJATRADER 8 BEST PRACTICES (Observed in codebase)
+# =============================================================================
+nt8_patterns:
+
+  state_machine:
+    description: "Use enums for strategy states - cleaner than boolean flags"
+    example: |
+      private enum StrategyState {
+          Idle, BiasEstablished, C1Touch, C2Confirmed, WaitingForCISD, InTrade
+      }
+      private StrategyState currentState = StrategyState.Idle;
+    files: [TTradesFractalModelV32.cs:42-52, MultiTimeframeC1C2Indicator.cs:47-56]
+
+  multi_timeframe:
+    description: "Add data series in Configure, process in OnBarUpdate by BarsInProgress"
+    example: |
+      // State.Configure
+      AddDataSeries(BarsPeriodType.Day, 1);    // BarsInProgress 1 = Daily
+      AddDataSeries(BarsPeriodType.Minute, 60); // BarsInProgress 2 = H1
+
+      // OnBarUpdate
+      switch (BarsInProgress) {
+          case 0: ProcessEntryTimeframe(); break;
+          case 1: ProcessBiasTimeframe(); break;
+          case 2: ProcessConfirmationTimeframe(); break;
+      }
+    files: [TTradesFractalModelV32.cs:176-202]
+
+  parameter_attributes:
+    description: "Use NinjaScriptProperty, Range, Display for clean UI"
+    example: |
+      [NinjaScriptProperty]
+      [Range(1, int.MaxValue)]
+      [Display(Name = "Contracts", Order = 1, GroupName = "Trade Settings")]
+      public int Contracts { get; set; }
+    files: [TTradesFractalModelV32.cs:76-108]
+
+  debug_logging:
+    description: "Conditional debug output with EnableDebug parameter"
+    example: |
+      [NinjaScriptProperty]
+      [Display(Name = "Enable Debug", Order = 7, GroupName = "Debug")]
+      public bool EnableDebug { get; set; }
+
+      if (EnableDebug) Print($"[BIAS] {Times[1][0]:d} Bullish");
+    files: [TTradesFractalModelV32.cs:107-108, 231]
+
+  entry_exit_management:
+    description: "Use SetStopLoss/SetProfitTarget for bracket orders, OnExecutionUpdate for tracking"
+    example: |
+      SetStopLoss(CalculationMode.Price, stopPrice);
+      SetProfitTarget(CalculationMode.Price, targetPrice);
+      EnterLong(Contracts, "ReversalLong");
+    files: [TTradesFractalModelV32.cs:483-485]
+
+  state_defaults:
+    description: "Critical settings in OnStateChange -> State.SetDefaults"
+    important_settings:
+      - Calculate: OnBarClose (safer) vs OnEachTick (more responsive)
+      - IsExitOnSessionCloseStrategy: true (auto-exit EOD)
+      - StopTargetHandling: PerEntryExecution (for multi-entry)
+      - MaximumBarsLookBack: TwoHundredFiftySix (standard)
+      - BarsRequiredToTrade: 20 (minimum history)
+    files: [TTradesFractalModelV32.cs:143-173]
+
+  color_serialization:
+    description: "Brush properties need XmlIgnore + Serializable pattern for NT8"
+    example: |
+      [NinjaScriptProperty]
+      [XmlIgnore]
+      [Display(Name = "Bullish Color", Order = 1, GroupName = "Colors")]
+      public Brush BullishColor { get; set; }
+
+      [Browsable(false)]
+      public string BullishColorSerializable {
+          get { return Serialize.BrushToString(BullishColor); }
+          set { BullishColor = Serialize.StringToBrush(value); }
+      }
+    files: [MultiTimeframeC1C2Indicator.cs:921-943]
+
+# =============================================================================
+# IMPROVEMENT OPPORTUNITIES
+# =============================================================================
+improvement_opportunities:
+  - area: "State machine clarity"
+    issue: "V32 has 6 states but transitions could be more explicit"
+    suggestion: "Add state transition diagram, consider sub-states for complex flows"
+
+  - area: "Risk validation"
+    issue: "Risk tick bounds (4-20) are hardcoded"
+    suggestion: "Make configurable parameters with Display attributes"
+
+  - area: "Trade logging"
+    issue: "Print statements only - no persistent logging"
+    suggestion: "Consider writing to NinjaTrader output file or custom log"
+
+  - area: "Indicator reuse"
+    issue: "Strategies reimplement bias/C1C2 logic from scratch"
+    suggestion: "Compose strategies from indicator instances where possible"
+
+  - area: "Backtest metadata"
+    issue: "Signal names like 'ReversalLong' but no version tracking"
+    suggestion: "Include strategy version in signal name for backtest analysis"
+
+# =============================================================================
+# NEXT ACTIONS
+# =============================================================================
+next:
+  - Read V29-V32 diff to understand incremental changes
+  - Review backtest results in results/ folder
+  - Identify which improvement opportunity to tackle first
+  - Check skills database for relevant trading concepts not yet implemented

@@ -1,8 +1,28 @@
+import { redirect } from 'next/navigation';
 import Link from "next/link";
 import { getAllStudyGuides } from "@/lib/tcm-db";
 import { StudyGuideGenerator } from "@/components/tcm/study-guide-generator";
+import { getCurrentUser } from '@/lib/auth';
+import { PaywallOverlay } from '@/components/paywall';
 
-export default function GuidesPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function GuidesPage() {
+  // Check authentication and premium status
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect('/login?redirect=/tcm/guides');
+  }
+
+  if (!user.isPremium) {
+    return <PaywallOverlay
+      returnUrl="/tcm/guides"
+      title="Study Guides"
+      description="Subscribe to Premium to access AI-generated study guides for trading concepts."
+    />;
+  }
+
   const guides = getAllStudyGuides();
 
   return (

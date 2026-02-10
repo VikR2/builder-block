@@ -1,7 +1,11 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getStudyGuideBySlug, getTCMSkills } from "@/lib/tcm-db";
 import { GuideContent, ExportButton } from "@/components/tcm/guide-content";
+import { getCurrentUser } from '@/lib/auth';
+import { PaywallOverlay } from '@/components/paywall';
+
+export const dynamic = 'force-dynamic';
 
 interface GuidePageProps {
   params: Promise<{ slug: string }>;
@@ -9,6 +13,22 @@ interface GuidePageProps {
 
 export default async function GuidePage({ params }: GuidePageProps) {
   const { slug } = await params;
+
+  // Check authentication and premium status
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect(`/login?redirect=/tcm/guides/${slug}`);
+  }
+
+  if (!user.isPremium) {
+    return <PaywallOverlay
+      returnUrl={`/tcm/guides/${slug}`}
+      title="Study Guide"
+      description="Subscribe to Premium to access this study guide."
+    />;
+  }
+
   const guide = getStudyGuideBySlug(slug);
 
   if (!guide) {
@@ -28,6 +48,11 @@ export default async function GuidePage({ params }: GuidePageProps) {
       </div>
 
       <div className="relative z-10 max-w-4xl mx-auto">
+        {/* Back Link */}
+        <Link href="/tcm/guides" className="text-muted-foreground hover:text-foreground text-sm flex items-center gap-1 mb-4">
+          <span>←</span> Back to Study Guides
+        </Link>
+
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 mb-6 text-sm">
           <Link href="/tcm" className="text-muted-foreground hover:text-foreground transition-colors">

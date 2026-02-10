@@ -5,9 +5,51 @@
 
 import fs from 'fs';
 import path from 'path';
+import { getFolderIdByDbId, getVideoByFolderId } from './tcm-admin/db';
 
 // Local videos directory path
 const LOCAL_VIDEOS_DIR = path.join(process.cwd(), '..', 'data', 'local-videos');
+
+/**
+ * Resolve a video ID to a folder ID
+ * Accepts both:
+ * - Numeric database IDs (e.g., "4") -> resolves to folder_id from database
+ * - Folder IDs (e.g., "read_and_interpret_volume_afa0985f") -> used directly
+ *
+ * @param id - Either a numeric DB ID or a folder ID string
+ * @returns The folder ID string, or null if not found
+ */
+export function resolveVideoId(id: string): string | null {
+  // If id looks like a folder (contains underscore followed by hex hash pattern)
+  // Pattern: slug_xxxxxxxx where x is hex
+  if (/^[a-z0-9_]+_[a-f0-9]{8}$/i.test(id)) {
+    // Verify the folder exists
+    const folderPath = path.join(LOCAL_VIDEOS_DIR, id);
+    try {
+      fs.accessSync(folderPath);
+      return id;
+    } catch {
+      // Folder doesn't exist, try database lookup in case it's a coincidental pattern
+      const dbVideo = getVideoByFolderId(id);
+      return dbVideo?.folder_id || null;
+    }
+  }
+
+  // If numeric, look up folder_id from database
+  if (/^\d+$/.test(id)) {
+    const folderId = getFolderIdByDbId(parseInt(id, 10));
+    return folderId;
+  }
+
+  // Try as folder ID directly (might be a slug without the hash)
+  const folderPath = path.join(LOCAL_VIDEOS_DIR, id);
+  try {
+    fs.accessSync(folderPath);
+    return id;
+  } catch {
+    return null;
+  }
+}
 
 export interface VideoDetails {
   id: string;

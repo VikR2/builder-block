@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Video Controls Test</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #1a1a1a; color: white; }
+    .test-container { max-width: 800px; margin: 0 auto; }
+    .instructions { background: #333; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    .instructions h3 { margin-top: 0; color: #4ade80; }
+    .instructions ol { margin-bottom: 0; }
+    .status { margin-top: 20px; padding: 10px; border-radius: 4px; }
+    .status.pass { background: #166534; }
+    .status.fail { background: #991b1b; }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <h1>Video Player Controls Test</h1>
+
+    <div class="instructions">
+      <h3>Test Steps:</h3>
+      <ol>
+        <li>Go to <a href="/tcm" style="color: #60a5fa;">/tcm</a></li>
+        <li>Ask: "What is a liquidity sweep?"</li>
+        <li>Wait for video response</li>
+        <li>Click play on the video</li>
+        <li>Wait 4+ seconds for controls to fade</li>
+        <li>Move mouse over the video</li>
+        <li><strong>Expected:</strong> Controls should reappear immediately</li>
+      </ol>
+    </div>
+
+    <div class="instructions">
+      <h3>What was fixed:</h3>
+      <ul>
+        <li><strong>Root cause:</strong> Stale closure in <code>showControls</code> callback</li>
+        <li>The <code>useCallback</code> captured <code>isPlaying</code> state at render time</li>
+        <li>When video started playing, the callback still had old <code>isPlaying=false</code></li>
+        <li><strong>Fix:</strong> Use a ref (<code>isPlayingRef</code>) that's always current</li>
+        <li>Also added <code>onMouseMove</code> to header and controls divs for redundancy</li>
+      </ul>
+    </div>
+
+    <p>Open browser DevTools console and paste this to monitor state:</p>
+    <pre style="background: #333; padding: 10px; border-radius: 4px; overflow-x: auto;">
+// In DevTools console:
+// This will log when controls visibility changes
+const observer = new MutationObserver((mutations) => {
+  mutations.forEach(m => {
+    if (m.attributeName === 'class') {
+      const el = m.target;
+      if (el.className.includes('opacity-0')) {
+        console.log('Controls HIDDEN', new Date().toISOString());
+      } else if (el.className.includes('opacity-100')) {
+        console.log('Controls VISIBLE', new Date().toISOString());
+      }
+    }
+  });
+});
+
+// Find the controls container and observe it
+document.querySelectorAll('[class*="transition-opacity"]').forEach(el => {
+  observer.observe(el, { attributes: true });
+});
+console.log('Observing', document.querySelectorAll('[class*="transition-opacity"]').length, 'elements');
+    </pre>
+  </div>
+</body>
+</html>

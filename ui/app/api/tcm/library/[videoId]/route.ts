@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  resolveVideoId,
   getVideoDetails,
   getVideoChapters,
   getGroupedTranscript,
@@ -25,19 +26,29 @@ export async function GET(
   const { videoId } = await params;
 
   try {
-    const video = await getVideoDetails(videoId);
+    // Resolve numeric DB ID or folder ID to actual folder ID
+    const folderId = resolveVideoId(videoId);
+
+    if (!folderId) {
+      return NextResponse.json(
+        { error: 'Video not found - could not resolve ID' },
+        { status: 404 }
+      );
+    }
+
+    const video = await getVideoDetails(folderId);
 
     if (!video) {
       return NextResponse.json(
-        { error: 'Video not found' },
+        { error: 'Video not found - manifest missing' },
         { status: 404 }
       );
     }
 
     const [chapters, grouped, segments] = await Promise.all([
-      getVideoChapters(videoId),
-      getGroupedTranscript(videoId, 30),
-      getVideoTranscript(videoId)
+      getVideoChapters(folderId),
+      getGroupedTranscript(folderId, 30),
+      getVideoTranscript(folderId)
     ]);
 
     const response: VideoLibraryResponse = {

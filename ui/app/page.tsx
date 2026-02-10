@@ -1,8 +1,16 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getStats, getAllSkills } from "@/lib/db";
 import { getTCMSkills, getArchitectureDocuments, getLocalVideos } from "@/lib/tcm-db";
+import { getCurrentUser } from "@/lib/auth";
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Redirect authenticated users to /home
+  const user = await getCurrentUser();
+  if (user) {
+    redirect('/home');
+  }
+
   const stats = getStats();
   const recentSkills = getAllSkills().slice(0, 4);
   const tcmSkills = getTCMSkills();

@@ -1,0 +1,1521 @@
+{
+  "video_id": "volume_insighst_p2_04321b27",
+  "video_title": "Volume Insighst P2",
+  "model": "all-MiniLM-L6-v2",
+  "window_size": 3,
+  "stride": 1,
+  "dimension": 384,
+  "num_embeddings": 151,
+  "segments": [
+    {
+      "text": "right check right so record is without an audience the kind of shared idea this is really the culmination of the volume studies versus the time ranges studies that we've been doing so far so trades here pretty important I mean this",
+      "start": 7.86,
+      "end": 34.95,
+      "segment_indices": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "text": "this is really the culmination of the volume studies versus the time ranges studies that we've been doing so far so trades here pretty important I mean this long by the way close enough so here's a just we've been having conversations",
+      "start": 15.34,
+      "end": 43.23,
+      "segment_indices": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "text": "that we've been doing so far so trades here pretty important I mean this long by the way close enough so here's a just we've been having conversations about how to utilize volume okay and we have discussed that since the start",
+      "start": 25.98,
+      "end": 60.39,
+      "segment_indices": [
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "text": "long by the way close enough so here's a just we've been having conversations about how to utilize volume okay and we have discussed that since the start of sessions carry volatility a lot of participation is going to come in the",
+      "start": 34.95,
+      "end": 66.79,
+      "segment_indices": [
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "text": "about how to utilize volume okay and we have discussed that since the start of sessions carry volatility a lot of participation is going to come in the market around these times namely in the form of big orders being filled okay",
+      "start": 43.23,
+      "end": 73.39,
+      "segment_indices": [
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "text": "of sessions carry volatility a lot of participation is going to come in the market around these times namely in the form of big orders being filled okay I say big orders being filled please remember that order matching order",
+      "start": 60.39,
+      "end": 82.35,
+      "segment_indices": [
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "text": "market around these times namely in the form of big orders being filled okay I say big orders being filled please remember that order matching order pairing happens on a schedule to keep it simple and to keep it a little bit",
+      "start": 66.79,
+      "end": 93.78,
+      "segment_indices": [
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "text": "I say big orders being filled please remember that order matching order pairing happens on a schedule to keep it simple and to keep it a little bit more simple we have orders being submitted ahead of the session so that the",
+      "start": 73.39,
+      "end": 99.42,
+      "segment_indices": [
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "text": "pairing happens on a schedule to keep it simple and to keep it a little bit more simple we have orders being submitted ahead of the session so that the best fill and the earliest available liquidity is attributed to fill in those",
+      "start": 82.35,
+      "end": 107.38,
+      "segment_indices": [
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "text": "more simple we have orders being submitted ahead of the session so that the best fill and the earliest available liquidity is attributed to fill in those orders you usually get orders being submitted ahead of time this is why orders",
+      "start": 93.78,
+      "end": 113.02,
+      "segment_indices": [
+        9,
+        10,
+        11
+      ]
+    },
+    {
+      "text": "best fill and the earliest available liquidity is attributed to fill in those orders you usually get orders being submitted ahead of time this is why orders for today get submitted yesterday orders for tomorrow get submitted today",
+      "start": 99.42,
+      "end": 120.46,
+      "segment_indices": [
+        10,
+        11,
+        12
+      ]
+    },
+    {
+      "text": "orders you usually get orders being submitted ahead of time this is why orders for today get submitted yesterday orders for tomorrow get submitted today okay similarly if orders are intended to be filled in the New York session it",
+      "start": 107.38,
+      "end": 131.46,
+      "segment_indices": [
+        11,
+        12,
+        13
+      ]
+    },
+    {
+      "text": "for today get submitted yesterday orders for tomorrow get submitted today okay similarly if orders are intended to be filled in the New York session it gonna be so much before the New York session okay so with that in mind I pay",
+      "start": 113.02,
+      "end": 138.1,
+      "segment_indices": [
+        12,
+        13,
+        14
+      ]
+    },
+    {
+      "text": "okay similarly if orders are intended to be filled in the New York session it gonna be so much before the New York session okay so with that in mind I pay attention to all the persons who understand the dynamics of the market and",
+      "start": 120.46,
+      "end": 143.14,
+      "segment_indices": [
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "text": "gonna be so much before the New York session okay so with that in mind I pay attention to all the persons who understand the dynamics of the market and they're trying to get their orders filled early so with the volume studies",
+      "start": 131.46,
+      "end": 148.9,
+      "segment_indices": [
+        14,
+        15,
+        16
+      ]
+    },
+    {
+      "text": "attention to all the persons who understand the dynamics of the market and they're trying to get their orders filled early so with the volume studies have been doing that study brought me to the conclusion that if I pay attention",
+      "start": 138.1,
+      "end": 156.22,
+      "segment_indices": [
+        15,
+        16,
+        17
+      ]
+    },
+    {
+      "text": "they're trying to get their orders filled early so with the volume studies have been doing that study brought me to the conclusion that if I pay attention to orders that are being filled in London session I know some people might argue",
+      "start": 143.14,
+      "end": 162.7,
+      "segment_indices": [
+        16,
+        17,
+        18
+      ]
+    },
+    {
+      "text": "have been doing that study brought me to the conclusion that if I pay attention to orders that are being filled in London session I know some people might argue to start the London session like maybe talk up it really doesn't matter okay if I",
+      "start": 148.9,
+      "end": 169.7,
+      "segment_indices": [
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "text": "to orders that are being filled in London session I know some people might argue to start the London session like maybe talk up it really doesn't matter okay if I pay attention to the orders being submitted here three to seven a.m. I should",
+      "start": 156.22,
+      "end": 175.02,
+      "segment_indices": [
+        18,
+        19,
+        20
+      ]
+    },
+    {
+      "text": "to start the London session like maybe talk up it really doesn't matter okay if I pay attention to the orders being submitted here three to seven a.m. I should get the bulk of ideal prices where persons are trying to execute but we've had",
+      "start": 162.7,
+      "end": 182.46,
+      "segment_indices": [
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "text": "pay attention to the orders being submitted here three to seven a.m. I should get the bulk of ideal prices where persons are trying to execute but we've had that conversation before so you're no stranger to this idea pay attention to",
+      "start": 169.7,
+      "end": 186.86,
+      "segment_indices": [
+        20,
+        21,
+        22
+      ]
+    },
+    {
+      "text": "get the bulk of ideal prices where persons are trying to execute but we've had that conversation before so you're no stranger to this idea pay attention to thirty seven volume profile to go on anybody who hasn't started using it yet",
+      "start": 175.02,
+      "end": 192.26,
+      "segment_indices": [
+        21,
+        22,
+        23
+      ]
+    },
+    {
+      "text": "that conversation before so you're no stranger to this idea pay attention to thirty seven volume profile to go on anybody who hasn't started using it yet roll layout we have number of rows rows size seven thirty volume total volume",
+      "start": 182.46,
+      "end": 200.42,
+      "segment_indices": [
+        22,
+        23,
+        24
+      ]
+    },
+    {
+      "text": "thirty seven volume profile to go on anybody who hasn't started using it yet roll layout we have number of rows rows size seven thirty volume total volume here seventy and get the colors to look like this this is what I've done right",
+      "start": 186.86,
+      "end": 208.81,
+      "segment_indices": [
+        23,
+        24,
+        25
+      ]
+    },
+    {
+      "text": "roll layout we have number of rows rows size seven thirty volume total volume here seventy and get the colors to look like this this is what I've done right that's it so you haven't seen it before there you go now the point of the volume is",
+      "start": 192.26,
+      "end": 218.82,
+      "segment_indices": [
+        24,
+        25,
+        26
+      ]
+    },
+    {
+      "text": "here seventy and get the colors to look like this this is what I've done right that's it so you haven't seen it before there you go now the point of the volume is to amplify a skill that we already have that skill is we know how to read",
+      "start": 200.42,
+      "end": 225.3,
+      "segment_indices": [
+        25,
+        26,
+        27
+      ]
+    },
+    {
+      "text": "that's it so you haven't seen it before there you go now the point of the volume is to amplify a skill that we already have that skill is we know how to read reactions at key levels right we all do so if before you are struggling because",
+      "start": 208.81,
+      "end": 233.59,
+      "segment_indices": [
+        26,
+        27,
+        28
+      ]
+    },
+    {
+      "text": "to amplify a skill that we already have that skill is we know how to read reactions at key levels right we all do so if before you are struggling because you'd identify a lot of levels and then sometimes they get hit sometimes they",
+      "start": 218.82,
+      "end": 237.35,
+      "segment_indices": [
+        27,
+        28,
+        29
+      ]
+    },
+    {
+      "text": "reactions at key levels right we all do so if before you are struggling because you'd identify a lot of levels and then sometimes they get hit sometimes they don't get hit and you find yourself kind of like flocking around a little bit this",
+      "start": 225.3,
+      "end": 242.71,
+      "segment_indices": [
+        28,
+        29,
+        30
+      ]
+    },
+    {
+      "text": "you'd identify a lot of levels and then sometimes they get hit sometimes they don't get hit and you find yourself kind of like flocking around a little bit this should help you automatically because it should show you one levels that are not",
+      "start": 233.59,
+      "end": 251.35,
+      "segment_indices": [
+        29,
+        30,
+        31
+      ]
+    },
+    {
+      "text": "don't get hit and you find yourself kind of like flocking around a little bit this should help you automatically because it should show you one levels that are not subjective right sometimes you look at the high and you want a bearish order",
+      "start": 237.35,
+      "end": 256.75,
+      "segment_indices": [
+        30,
+        31,
+        32
+      ]
+    },
+    {
+      "text": "should help you automatically because it should show you one levels that are not subjective right sometimes you look at the high and you want a bearish order block but you get something else and you're trying to decide if you should stock",
+      "start": 242.71,
+      "end": 261.83,
+      "segment_indices": [
+        31,
+        32,
+        33
+      ]
+    },
+    {
+      "text": "subjective right sometimes you look at the high and you want a bearish order block but you get something else and you're trying to decide if you should stock a CSD still or go long happens to the best of us with this you change that",
+      "start": 251.35,
+      "end": 270.71,
+      "segment_indices": [
+        32,
+        33,
+        34
+      ]
+    },
+    {
+      "text": "block but you get something else and you're trying to decide if you should stock a CSD still or go long happens to the best of us with this you change that narrative from wondering what is happening to if this happens here this is what it",
+      "start": 256.75,
+      "end": 279.59,
+      "segment_indices": [
+        33,
+        34,
+        35
+      ]
+    },
+    {
+      "text": "a CSD still or go long happens to the best of us with this you change that narrative from wondering what is happening to if this happens here this is what it means and then take a look at the difference between those two narratives what",
+      "start": 261.83,
+      "end": 286.03,
+      "segment_indices": [
+        34,
+        35,
+        36
+      ]
+    },
+    {
+      "text": "narrative from wondering what is happening to if this happens here this is what it means and then take a look at the difference between those two narratives what something on this level to figure out a buyer's or direction or something versus if this",
+      "start": 270.71,
+      "end": 294.19,
+      "segment_indices": [
+        35,
+        36,
+        37
+      ]
+    },
+    {
+      "text": "means and then take a look at the difference between those two narratives what something on this level to figure out a buyer's or direction or something versus if this happens here this is what it means if you know what it means you can participate okay so these",
+      "start": 279.59,
+      "end": 302.75,
+      "segment_indices": [
+        36,
+        37,
+        38
+      ]
+    },
+    {
+      "text": "something on this level to figure out a buyer's or direction or something versus if this happens here this is what it means if you know what it means you can participate okay so these levels are intended to help us read what the morning session ideally seven a.m. to noon",
+      "start": 286.03,
+      "end": 311.43,
+      "segment_indices": [
+        37,
+        38,
+        39
+      ]
+    },
+    {
+      "text": "happens here this is what it means if you know what it means you can participate okay so these levels are intended to help us read what the morning session ideally seven a.m. to noon plenty when it's past noon if you're a sucker for precision this is where you want to get the",
+      "start": 294.19,
+      "end": 320.58,
+      "segment_indices": [
+        38,
+        39,
+        40
+      ]
+    },
+    {
+      "text": "levels are intended to help us read what the morning session ideally seven a.m. to noon plenty when it's past noon if you're a sucker for precision this is where you want to get the bulk of your trading done what you want to do here is session starts seven a.m. you want to employ",
+      "start": 302.75,
+      "end": 329.78,
+      "segment_indices": [
+        39,
+        40,
+        41
+      ]
+    },
+    {
+      "text": "plenty when it's past noon if you're a sucker for precision this is where you want to get the bulk of your trading done what you want to do here is session starts seven a.m. you want to employ time of day plus the levels plus the deliveries that you already know to frame a trade idea",
+      "start": 314.42,
+      "end": 339.3,
+      "segment_indices": [
+        40,
+        41,
+        42
+      ]
+    },
+    {
+      "text": "bulk of your trading done what you want to do here is session starts seven a.m. you want to employ time of day plus the levels plus the deliveries that you already know to frame a trade idea there are many ways to do that the most simplistic form if you're looking for loans you're looking for",
+      "start": 320.58,
+      "end": 346.74,
+      "segment_indices": [
+        41,
+        42,
+        43
+      ]
+    },
+    {
+      "text": "time of day plus the levels plus the deliveries that you already know to frame a trade idea there are many ways to do that the most simplistic form if you're looking for loans you're looking for where are the levels here I should buy from to reiterate green line means the largest buy order",
+      "start": 330.74,
+      "end": 355.3,
+      "segment_indices": [
+        42,
+        43,
+        44
+      ]
+    },
+    {
+      "text": "there are many ways to do that the most simplistic form if you're looking for loans you're looking for where are the levels here I should buy from to reiterate green line means the largest buy order red line means the largest sell order white line means the most ideal price or the price that",
+      "start": 340.26,
+      "end": 362.26,
+      "segment_indices": [
+        43,
+        44,
+        45
+      ]
+    },
+    {
+      "text": "where are the levels here I should buy from to reiterate green line means the largest buy order red line means the largest sell order white line means the most ideal price or the price that everybody wanted the most sought after price there are many ways to look at that",
+      "start": 348.74,
+      "end": 369.94,
+      "segment_indices": [
+        44,
+        45,
+        46
+      ]
+    },
+    {
+      "text": "red line means the largest sell order white line means the most ideal price or the price that everybody wanted the most sought after price there are many ways to look at that white line you to look at it as fair value for getting a trade in line with your bias I think",
+      "start": 355.3,
+      "end": 375.94,
+      "segment_indices": [
+        45,
+        46,
+        47
+      ]
+    },
+    {
+      "text": "everybody wanted the most sought after price there are many ways to look at that white line you to look at it as fair value for getting a trade in line with your bias I think that's the easiest way to look at it so we don't carry an emotional attachment if I'm bullish this",
+      "start": 363.06,
+      "end": 383.3,
+      "segment_indices": [
+        46,
+        47,
+        48
+      ]
+    },
+    {
+      "text": "white line you to look at it as fair value for getting a trade in line with your bias I think that's the easiest way to look at it so we don't carry an emotional attachment if I'm bullish this is where I want to get my loan if I'm bearish this is where I want to get my short okay and when I say",
+      "start": 369.94,
+      "end": 389.14,
+      "segment_indices": [
+        47,
+        48,
+        49
+      ]
+    },
+    {
+      "text": "that's the easiest way to look at it so we don't carry an emotional attachment if I'm bullish this is where I want to get my loan if I'm bearish this is where I want to get my short okay and when I say short I mean short setup you may not get the entry exactly at fair value and that should be fine",
+      "start": 375.94,
+      "end": 395.78,
+      "segment_indices": [
+        48,
+        49,
+        50
+      ]
+    },
+    {
+      "text": "is where I want to get my loan if I'm bearish this is where I want to get my short okay and when I say short I mean short setup you may not get the entry exactly at fair value and that should be fine you want fair value or fair value prices to support the idea you have and print a fractal or",
+      "start": 383.3,
+      "end": 404.9,
+      "segment_indices": [
+        49,
+        50,
+        51
+      ]
+    },
+    {
+      "text": "short I mean short setup you may not get the entry exactly at fair value and that should be fine you want fair value or fair value prices to support the idea you have and print a fractal or a delivery that you recognize and then you trade so even if you don't get an entry ideally at the",
+      "start": 389.14,
+      "end": 410.5,
+      "segment_indices": [
+        50,
+        51,
+        52
+      ]
+    },
+    {
+      "text": "you want fair value or fair value prices to support the idea you have and print a fractal or a delivery that you recognize and then you trade so even if you don't get an entry ideally at the level the reaction from it should tell you what you want okay good good so when you move from",
+      "start": 396.74,
+      "end": 418.74,
+      "segment_indices": [
+        51,
+        52,
+        53
+      ]
+    },
+    {
+      "text": "a delivery that you recognize and then you trade so even if you don't get an entry ideally at the level the reaction from it should tell you what you want okay good good so when you move from that we move into looking at the cyclical delivery in the market and we all know we look at 80",
+      "start": 404.9,
+      "end": 427.94,
+      "segment_indices": [
+        52,
+        53,
+        54
+      ]
+    },
+    {
+      "text": "level the reaction from it should tell you what you want okay good good so when you move from that we move into looking at the cyclical delivery in the market and we all know we look at 80 minute cycles so first 80 minute cycle starts at 7 o'clock it goes to 820 820 940 940 to 11 and then 11",
+      "start": 410.5,
+      "end": 442.97,
+      "segment_indices": [
+        53,
+        54,
+        55
+      ]
+    },
+    {
+      "text": "that we move into looking at the cyclical delivery in the market and we all know we look at 80 minute cycles so first 80 minute cycle starts at 7 o'clock it goes to 820 820 940 940 to 11 and then 11 to 1220 that's why we end the session at 1220 okay as I incorporated volume I've been playing around with",
+      "start": 418.74,
+      "end": 450.33,
+      "segment_indices": [
+        54,
+        55,
+        56
+      ]
+    },
+    {
+      "text": "minute cycles so first 80 minute cycle starts at 7 o'clock it goes to 820 820 940 940 to 11 and then 11 to 1220 that's why we end the session at 1220 okay as I incorporated volume I've been playing around with the idea of allowing ranges to print and then participating and then you know it's I've gotten some",
+      "start": 427.94,
+      "end": 458.01,
+      "segment_indices": [
+        55,
+        56,
+        57
+      ]
+    },
+    {
+      "text": "to 1220 that's why we end the session at 1220 okay as I incorporated volume I've been playing around with the idea of allowing ranges to print and then participating and then you know it's I've gotten some success with it the success is allowing the first 40 minutes of the 80 minute cycles to print and",
+      "start": 443.05,
+      "end": 464.81,
+      "segment_indices": [
+        56,
+        57,
+        58
+      ]
+    },
+    {
+      "text": "the idea of allowing ranges to print and then participating and then you know it's I've gotten some success with it the success is allowing the first 40 minutes of the 80 minute cycles to print and in stock in a setup at that higher level it could be a continuation the break way gap or a reversal",
+      "start": 450.33,
+      "end": 472.01,
+      "segment_indices": [
+        57,
+        58,
+        59
+      ]
+    },
+    {
+      "text": "success with it the success is allowing the first 40 minutes of the 80 minute cycles to print and in stock in a setup at that higher level it could be a continuation the break way gap or a reversal with all the things you know of a reversal setups so very long today if you remember there have been",
+      "start": 458.01,
+      "end": 478.49,
+      "segment_indices": [
+        58,
+        59,
+        60
+      ]
+    },
+    {
+      "text": "in stock in a setup at that higher level it could be a continuation the break way gap or a reversal with all the things you know of a reversal setups so very long today if you remember there have been this close that 720 open not 720 7 o'clock open I also took this trade here all the way up to here",
+      "start": 464.81,
+      "end": 491.82,
+      "segment_indices": [
+        59,
+        60,
+        61
+      ]
+    },
+    {
+      "text": "with all the things you know of a reversal setups so very long today if you remember there have been this close that 720 open not 720 7 o'clock open I also took this trade here all the way up to here and then lastly I did not take this short but I should have because if this is the largest salorda",
+      "start": 472.01,
+      "end": 498.78,
+      "segment_indices": [
+        60,
+        61,
+        62
+      ]
+    },
+    {
+      "text": "this close that 720 open not 720 7 o'clock open I also took this trade here all the way up to here and then lastly I did not take this short but I should have because if this is the largest salorda and I'm buying and I see this reaction from that level where a lot of silence taking place",
+      "start": 478.49,
+      "end": 504.46,
+      "segment_indices": [
+        61,
+        62,
+        63
+      ]
+    },
+    {
+      "text": "and then lastly I did not take this short but I should have because if this is the largest salorda and I'm buying and I see this reaction from that level where a lot of silence taking place this should have me thinking bearishness so while I did not take this trade",
+      "start": 492.7,
+      "end": 510.3,
+      "segment_indices": [
+        62,
+        63,
+        64
+      ]
+    },
+    {
+      "text": "and I'm buying and I see this reaction from that level where a lot of silence taking place this should have me thinking bearishness so while I did not take this trade understanding what we should have done or could have done here should be straightforward okay",
+      "start": 499.58,
+      "end": 516.7,
+      "segment_indices": [
+        63,
+        64,
+        65
+      ]
+    },
+    {
+      "text": "this should have me thinking bearishness so while I did not take this trade understanding what we should have done or could have done here should be straightforward okay this would have been here to here in the event that you did not take that then",
+      "start": 506.06,
+      "end": 521.74,
+      "segment_indices": [
+        64,
+        65,
+        66
+      ]
+    },
+    {
+      "text": "understanding what we should have done or could have done here should be straightforward okay this would have been here to here in the event that you did not take that then this would have been the rain then you'd be looking for something are only here to participate",
+      "start": 511.9,
+      "end": 526.7,
+      "segment_indices": [
+        65,
+        66,
+        67
+      ]
+    },
+    {
+      "text": "this would have been here to here in the event that you did not take that then this would have been the rain then you'd be looking for something are only here to participate like me I was long in here trade was good I think I got a long in here that didn't play out",
+      "start": 517.9,
+      "end": 536.06,
+      "segment_indices": [
+        66,
+        67,
+        68
+      ]
+    },
+    {
+      "text": "this would have been the rain then you'd be looking for something are only here to participate like me I was long in here trade was good I think I got a long in here that didn't play out this play out and then I waited for cycle to end because I wanted a pullback why a pullback if",
+      "start": 522.78,
+      "end": 546.54,
+      "segment_indices": [
+        67,
+        68,
+        69
+      ]
+    },
+    {
+      "text": "like me I was long in here trade was good I think I got a long in here that didn't play out this play out and then I waited for cycle to end because I wanted a pullback why a pullback if we get this range and prices staying below the range okay attempts to break higher fails",
+      "start": 526.94,
+      "end": 555.98,
+      "segment_indices": [
+        68,
+        69,
+        70
+      ]
+    },
+    {
+      "text": "this play out and then I waited for cycle to end because I wanted a pullback why a pullback if we get this range and prices staying below the range okay attempts to break higher fails when the new range is being created it is not likely that you're going to get a reversal",
+      "start": 536.94,
+      "end": 564.3,
+      "segment_indices": [
+        69,
+        70,
+        71
+      ]
+    },
+    {
+      "text": "we get this range and prices staying below the range okay attempts to break higher fails when the new range is being created it is not likely that you're going to get a reversal in the time window where the range is being created if the market is moving higher when you're bullish",
+      "start": 548.62,
+      "end": 571.5,
+      "segment_indices": [
+        70,
+        71,
+        72
+      ]
+    },
+    {
+      "text": "when the new range is being created it is not likely that you're going to get a reversal in the time window where the range is being created if the market is moving higher when you're bullish inside here it's better to think about it like retracement or continuation of our early narrative",
+      "start": 557.26,
+      "end": 581.34,
+      "segment_indices": [
+        71,
+        72,
+        73
+      ]
+    },
+    {
+      "text": "in the time window where the range is being created if the market is moving higher when you're bullish inside here it's better to think about it like retracement or continuation of our early narrative so this is bearish if we started breaking down here I'm not thinking oh this is the cell of the day",
+      "start": 565.1,
+      "end": 586.78,
+      "segment_indices": [
+        72,
+        73,
+        74
+      ]
+    },
+    {
+      "text": "inside here it's better to think about it like retracement or continuation of our early narrative so this is bearish if we started breaking down here I'm not thinking oh this is the cell of the day and that's it I'm thinking allow that to print wait for the first 40 minutes then get the trade",
+      "start": 571.5,
+      "end": 593.98,
+      "segment_indices": [
+        73,
+        74,
+        75
+      ]
+    },
+    {
+      "text": "so this is bearish if we started breaking down here I'm not thinking oh this is the cell of the day and that's it I'm thinking allow that to print wait for the first 40 minutes then get the trade afterwards it's much simpler less emotions easier to follow along so because I wanted to go long",
+      "start": 581.98,
+      "end": 603.42,
+      "segment_indices": [
+        74,
+        75,
+        76
+      ]
+    },
+    {
+      "text": "and that's it I'm thinking allow that to print wait for the first 40 minutes then get the trade afterwards it's much simpler less emotions easier to follow along so because I wanted to go long here and I don't think this long back to anything significant in here I participated in another",
+      "start": 586.78,
+      "end": 610.7,
+      "segment_indices": [
+        75,
+        76,
+        77
+      ]
+    },
+    {
+      "text": "afterwards it's much simpler less emotions easier to follow along so because I wanted to go long here and I don't think this long back to anything significant in here I participated in another long for a deeper retracement and then I exited I mean there we have it so when this range ends",
+      "start": 593.98,
+      "end": 617.58,
+      "segment_indices": [
+        76,
+        77,
+        78
+      ]
+    },
+    {
+      "text": "here and I don't think this long back to anything significant in here I participated in another long for a deeper retracement and then I exited I mean there we have it so when this range ends at 1140 chances are you're going to see a clear setup you should be able to follow",
+      "start": 603.42,
+      "end": 624.22,
+      "segment_indices": [
+        77,
+        78,
+        79
+      ]
+    },
+    {
+      "text": "long for a deeper retracement and then I exited I mean there we have it so when this range ends at 1140 chances are you're going to see a clear setup you should be able to follow that takes over either the high or the low of this if we're done for the day which I expect because",
+      "start": 610.7,
+      "end": 630.3,
+      "segment_indices": [
+        78,
+        79,
+        80
+      ]
+    },
+    {
+      "text": "at 1140 chances are you're going to see a clear setup you should be able to follow that takes over either the high or the low of this if we're done for the day which I expect because it's no noon or lunch or getting into lunch and we should see some type of run and then rally that's",
+      "start": 617.66,
+      "end": 637.58,
+      "segment_indices": [
+        79,
+        80,
+        81
+      ]
+    },
+    {
+      "text": "that takes over either the high or the low of this if we're done for the day which I expect because it's no noon or lunch or getting into lunch and we should see some type of run and then rally that's what I'm looking for that's besides the point point is since we have all these fixed ranges",
+      "start": 625.42,
+      "end": 646.46,
+      "segment_indices": [
+        80,
+        81,
+        82
+      ]
+    },
+    {
+      "text": "it's no noon or lunch or getting into lunch and we should see some type of run and then rally that's what I'm looking for that's besides the point point is since we have all these fixed ranges and we have a fixed range volume tool which is what we've been using here apart from simply",
+      "start": 630.3,
+      "end": 655.51,
+      "segment_indices": [
+        81,
+        82,
+        83
+      ]
+    },
+    {
+      "text": "what I'm looking for that's besides the point point is since we have all these fixed ranges and we have a fixed range volume tool which is what we've been using here apart from simply looking at the range waiting for the print and then trying to get in on something you can",
+      "start": 637.58,
+      "end": 661.43,
+      "segment_indices": [
+        82,
+        83,
+        84
+      ]
+    },
+    {
+      "text": "and we have a fixed range volume tool which is what we've been using here apart from simply looking at the range waiting for the print and then trying to get in on something you can employ the same idea here to refine again your level to participate so this line is going to be",
+      "start": 647.18,
+      "end": 671.51,
+      "segment_indices": [
+        83,
+        84,
+        85
+      ]
+    },
+    {
+      "text": "looking at the range waiting for the print and then trying to get in on something you can employ the same idea here to refine again your level to participate so this line is going to be the open price of the day seven in we put volume two on it's going to tell us that",
+      "start": 655.51,
+      "end": 681.1,
+      "segment_indices": [
+        84,
+        85,
+        86
+      ]
+    },
+    {
+      "text": "employ the same idea here to refine again your level to participate so this line is going to be the open price of the day seven in we put volume two on it's going to tell us that largest cell order largest by order now it's worth noting that anytime the white line is",
+      "start": 661.43,
+      "end": 689.34,
+      "segment_indices": [
+        85,
+        86,
+        87
+      ]
+    },
+    {
+      "text": "the open price of the day seven in we put volume two on it's going to tell us that largest cell order largest by order now it's worth noting that anytime the white line is closer to the green line it means the market is accepting lower prices if the market is accepting",
+      "start": 671.51,
+      "end": 696.7,
+      "segment_indices": [
+        86,
+        87,
+        88
+      ]
+    },
+    {
+      "text": "largest cell order largest by order now it's worth noting that anytime the white line is closer to the green line it means the market is accepting lower prices if the market is accepting lower prices you instinctively think of cells first if whatever the range you're looking at",
+      "start": 682.7,
+      "end": 705.18,
+      "segment_indices": [
+        87,
+        88,
+        89
+      ]
+    },
+    {
+      "text": "closer to the green line it means the market is accepting lower prices if the market is accepting lower prices you instinctively think of cells first if whatever the range you're looking at all right so if you're looking at this range and this is the market's accepting lower prices",
+      "start": 689.34,
+      "end": 708.38,
+      "segment_indices": [
+        88,
+        89,
+        90
+      ]
+    },
+    {
+      "text": "lower prices you instinctively think of cells first if whatever the range you're looking at all right so if you're looking at this range and this is the market's accepting lower prices and seven aim starts and it starts going up think or tracement or premium run to get in line with",
+      "start": 696.78,
+      "end": 717.26,
+      "segment_indices": [
+        89,
+        90,
+        91
+      ]
+    },
+    {
+      "text": "all right so if you're looking at this range and this is the market's accepting lower prices and seven aim starts and it starts going up think or tracement or premium run to get in line with the order flow so that's why I was short this morning with this with the cell because",
+      "start": 705.18,
+      "end": 723.58,
+      "segment_indices": [
+        90,
+        91,
+        92
+      ]
+    },
+    {
+      "text": "and seven aim starts and it starts going up think or tracement or premium run to get in line with the order flow so that's why I was short this morning with this with the cell because market's accepting lower prices can be open and we go above the open price a CST up there",
+      "start": 708.94,
+      "end": 731.26,
+      "segment_indices": [
+        91,
+        92,
+        93
+      ]
+    },
+    {
+      "text": "the order flow so that's why I was short this morning with this with the cell because market's accepting lower prices can be open and we go above the open price a CST up there is very very deep premium and I trust that our run to the range low is coming next so as you can see",
+      "start": 717.26,
+      "end": 738.62,
+      "segment_indices": [
+        92,
+        93,
+        94
+      ]
+    },
+    {
+      "text": "market's accepting lower prices can be open and we go above the open price a CST up there is very very deep premium and I trust that our run to the range low is coming next so as you can see lower prices that happened this is the most sought after price the price everybody wanted",
+      "start": 724.46,
+      "end": 747.02,
+      "segment_indices": [
+        93,
+        94,
+        95
+      ]
+    },
+    {
+      "text": "is very very deep premium and I trust that our run to the range low is coming next so as you can see lower prices that happened this is the most sought after price the price everybody wanted so again we had another cell here despite the fact that I was long I did not take this short",
+      "start": 731.26,
+      "end": 752.46,
+      "segment_indices": [
+        94,
+        95,
+        96
+      ]
+    },
+    {
+      "text": "lower prices that happened this is the most sought after price the price everybody wanted so again we had another cell here despite the fact that I was long I did not take this short I don't think I did remember that would have been a nice short too to sweep here",
+      "start": 740.06,
+      "end": 758.78,
+      "segment_indices": [
+        95,
+        96,
+        97
+      ]
+    },
+    {
+      "text": "so again we had another cell here despite the fact that I was long I did not take this short I don't think I did remember that would have been a nice short too to sweep here similarly I didn't mention any trading here don't want to trade I mentioned in here is the one",
+      "start": 747.02,
+      "end": 765.26,
+      "segment_indices": [
+        96,
+        97,
+        98
+      ]
+    },
+    {
+      "text": "I don't think I did remember that would have been a nice short too to sweep here similarly I didn't mention any trading here don't want to trade I mentioned in here is the one that incorporated this no I don't go running this across the entire range if this is clear",
+      "start": 754.22,
+      "end": 774.9,
+      "segment_indices": [
+        97,
+        98,
+        99
+      ]
+    },
+    {
+      "text": "similarly I didn't mention any trading here don't want to trade I mentioned in here is the one that incorporated this no I don't go running this across the entire range if this is clear if it's clear where cell illness taking place where trace to the key level doing this in my opinion",
+      "start": 759.82,
+      "end": 782.5,
+      "segment_indices": [
+        98,
+        99,
+        100
+      ]
+    },
+    {
+      "text": "that incorporated this no I don't go running this across the entire range if this is clear if it's clear where cell illness taking place where trace to the key level doing this in my opinion is pointless because as you can see the level doesn't really change that much a couple of points off",
+      "start": 765.26,
+      "end": 790.1,
+      "segment_indices": [
+        99,
+        100,
+        101
+      ]
+    },
+    {
+      "text": "if it's clear where cell illness taking place where trace to the key level doing this in my opinion is pointless because as you can see the level doesn't really change that much a couple of points off that's the same thing selling here is the same thing as selling right there to me so if the narrative is",
+      "start": 775.62,
+      "end": 796.18,
+      "segment_indices": [
+        100,
+        101,
+        102
+      ]
+    },
+    {
+      "text": "is pointless because as you can see the level doesn't really change that much a couple of points off that's the same thing selling here is the same thing as selling right there to me so if the narrative is in line with what you expected when this happened it makes no point to shift the goalposts right same",
+      "start": 782.5,
+      "end": 803.54,
+      "segment_indices": [
+        101,
+        102,
+        103
+      ]
+    },
+    {
+      "text": "that's the same thing selling here is the same thing as selling right there to me so if the narrative is in line with what you expected when this happened it makes no point to shift the goalposts right same era same era here we have this now I have the low here being run profiteking normal at a 80 low",
+      "start": 790.1,
+      "end": 812.1,
+      "segment_indices": [
+        102,
+        103,
+        104
+      ]
+    },
+    {
+      "text": "in line with what you expected when this happened it makes no point to shift the goalposts right same era same era here we have this now I have the low here being run profiteking normal at a 80 low oh my kids are tracing how far up would you expect the retracement to go it's a new cycle open price",
+      "start": 796.18,
+      "end": 819.54,
+      "segment_indices": [
+        103,
+        104,
+        105
+      ]
+    },
+    {
+      "text": "era same era here we have this now I have the low here being run profiteking normal at a 80 low oh my kids are tracing how far up would you expect the retracement to go it's a new cycle open price we have this above the open price then body style story weeks do the damage type of thing",
+      "start": 803.62,
+      "end": 826.82,
+      "segment_indices": [
+        104,
+        105,
+        106
+      ]
+    },
+    {
+      "text": "oh my kids are tracing how far up would you expect the retracement to go it's a new cycle open price we have this above the open price then body style story weeks do the damage type of thing we could get through here through here and hit there added confidence wait until",
+      "start": 812.1,
+      "end": 832.58,
+      "segment_indices": [
+        105,
+        106,
+        107
+      ]
+    },
+    {
+      "text": "we have this above the open price then body style story weeks do the damage type of thing we could get through here through here and hit there added confidence wait until end of the range what's the same white line is closer to the red line where except the market",
+      "start": 820.58,
+      "end": 841.58,
+      "segment_indices": [
+        106,
+        107,
+        108
+      ]
+    },
+    {
+      "text": "we could get through here through here and hit there added confidence wait until end of the range what's the same white line is closer to the red line where except the market is accepting higher prices look for lungs we open it's around and it drops down to where",
+      "start": 826.82,
+      "end": 848.78,
+      "segment_indices": [
+        107,
+        108,
+        109
+      ]
+    },
+    {
+      "text": "end of the range what's the same white line is closer to the red line where except the market is accepting higher prices look for lungs we open it's around and it drops down to where the largest buy order is a csd here you go along you watch the white line because you don't want",
+      "start": 832.58,
+      "end": 857.26,
+      "segment_indices": [
+        108,
+        109,
+        110
+      ]
+    },
+    {
+      "text": "is accepting higher prices look for lungs we open it's around and it drops down to where the largest buy order is a csd here you go along you watch the white line because you don't want a whole lot of participation always a participation here because this could push it either direction",
+      "start": 841.58,
+      "end": 864.38,
+      "segment_indices": [
+        109,
+        110,
+        111
+      ]
+    },
+    {
+      "text": "the largest buy order is a csd here you go along you watch the white line because you don't want a whole lot of participation always a participation here because this could push it either direction you're watching here because if you go along and we're approaching the price where the largest",
+      "start": 848.78,
+      "end": 871.14,
+      "segment_indices": [
+        110,
+        111,
+        112
+      ]
+    },
+    {
+      "text": "a whole lot of participation always a participation here because this could push it either direction you're watching here because if you go along and we're approaching the price where the largest sellers are and chances are you could get reactions like this or deeper so you want to watch those",
+      "start": 857.26,
+      "end": 877.38,
+      "segment_indices": [
+        111,
+        112,
+        113
+      ]
+    },
+    {
+      "text": "you're watching here because if you go along and we're approaching the price where the largest sellers are and chances are you could get reactions like this or deeper so you want to watch those from managing your trades range high taken open price taken you make a decision here the decision",
+      "start": 866.58,
+      "end": 884.82,
+      "segment_indices": [
+        112,
+        113,
+        114
+      ]
+    },
+    {
+      "text": "sellers are and chances are you could get reactions like this or deeper so you want to watch those from managing your trades range high taken open price taken you make a decision here the decision must always be take profit reduce risk simple taking profit could be partials are full position",
+      "start": 871.14,
+      "end": 892.98,
+      "segment_indices": [
+        113,
+        114,
+        115
+      ]
+    },
+    {
+      "text": "from managing your trades range high taken open price taken you make a decision here the decision must always be take profit reduce risk simple taking profit could be partials are full position don't overthink it are they taking your money or managing the risk you know the retracement",
+      "start": 877.38,
+      "end": 900.82,
+      "segment_indices": [
+        114,
+        115,
+        116
+      ]
+    },
+    {
+      "text": "must always be take profit reduce risk simple taking profit could be partials are full position don't overthink it are they taking your money or managing the risk you know the retracement here or the expectation here would have been expected to reach that white line that red line I mean",
+      "start": 884.82,
+      "end": 906.42,
+      "segment_indices": [
+        115,
+        116,
+        117
+      ]
+    },
+    {
+      "text": "don't overthink it are they taking your money or managing the risk you know the retracement here or the expectation here would have been expected to reach that white line that red line I mean as high as that right here so if it gets there again pulling the volume tool all the",
+      "start": 893.62,
+      "end": 914.18,
+      "segment_indices": [
+        116,
+        117,
+        118
+      ]
+    },
+    {
+      "text": "here or the expectation here would have been expected to reach that white line that red line I mean as high as that right here so if it gets there again pulling the volume tool all the with the end of the session does not offer you much insight in my opinion pull it on you'll see",
+      "start": 900.82,
+      "end": 922.25,
+      "segment_indices": [
+        117,
+        118,
+        119
+      ]
+    },
+    {
+      "text": "as high as that right here so if it gets there again pulling the volume tool all the with the end of the session does not offer you much insight in my opinion pull it on you'll see pull back this is saying white line is closer to the red line the market is looking for",
+      "start": 907.06,
+      "end": 929.13,
+      "segment_indices": [
+        118,
+        119,
+        120
+      ]
+    },
+    {
+      "text": "with the end of the session does not offer you much insight in my opinion pull it on you'll see pull back this is saying white line is closer to the red line the market is looking for is accepting lower prices which is what we're saying from over here so that narrative hasn't changed",
+      "start": 914.18,
+      "end": 935.45,
+      "segment_indices": [
+        119,
+        120,
+        121
+      ]
+    },
+    {
+      "text": "pull back this is saying white line is closer to the red line the market is looking for is accepting lower prices which is what we're saying from over here so that narrative hasn't changed in balance over here because these bars are very very small whenever the bars on",
+      "start": 924.25,
+      "end": 944.81,
+      "segment_indices": [
+        120,
+        121,
+        122
+      ]
+    },
+    {
+      "text": "is accepting lower prices which is what we're saying from over here so that narrative hasn't changed in balance over here because these bars are very very small whenever the bars on the histogram here is small that area in price is expected to be an imbalance",
+      "start": 930.41,
+      "end": 953.77,
+      "segment_indices": [
+        121,
+        122,
+        123
+      ]
+    },
+    {
+      "text": "in balance over here because these bars are very very small whenever the bars on the histogram here is small that area in price is expected to be an imbalance note the difference when we have an imbalance here with bodies the market came back and fill",
+      "start": 936.89,
+      "end": 962.33,
+      "segment_indices": [
+        122,
+        123,
+        124
+      ]
+    },
+    {
+      "text": "the histogram here is small that area in price is expected to be an imbalance note the difference when we have an imbalance here with bodies the market came back and fill when we have an imbalance here with wick the market came and we rejected and went lower",
+      "start": 945.45,
+      "end": 969.13,
+      "segment_indices": [
+        123,
+        124,
+        125
+      ]
+    },
+    {
+      "text": "note the difference when we have an imbalance here with bodies the market came back and fill when we have an imbalance here with wick the market came and we rejected and went lower note that that's important for how you anticipate or predict price action okay but anyway not",
+      "start": 955.29,
+      "end": 978.97,
+      "segment_indices": [
+        124,
+        125,
+        126
+      ]
+    },
+    {
+      "text": "when we have an imbalance here with wick the market came and we rejected and went lower note that that's important for how you anticipate or predict price action okay but anyway not much insights change with this worth is that expecting the market to reach higher we're expecting",
+      "start": 963.21,
+      "end": 986.81,
+      "segment_indices": [
+        125,
+        126,
+        127
+      ]
+    },
+    {
+      "text": "note that that's important for how you anticipate or predict price action okay but anyway not much insights change with this worth is that expecting the market to reach higher we're expecting the market to reach higher it got there it did not show bullish continuation we crushed",
+      "start": 970.09,
+      "end": 992.81,
+      "segment_indices": [
+        126,
+        127,
+        128
+      ]
+    },
+    {
+      "text": "much insights change with this worth is that expecting the market to reach higher we're expecting the market to reach higher it got there it did not show bullish continuation we crushed amen next one same thing all the levels are here clear bearishness",
+      "start": 978.97,
+      "end": 998.97,
+      "segment_indices": [
+        127,
+        128,
+        129
+      ]
+    },
+    {
+      "text": "the market to reach higher it got there it did not show bullish continuation we crushed amen next one same thing all the levels are here clear bearishness selling inside here is not that but it's not a sin okay looking for lower prices if not again we're",
+      "start": 986.81,
+      "end": 1010.49,
+      "segment_indices": [
+        128,
+        129,
+        130
+      ]
+    },
+    {
+      "text": "amen next one same thing all the levels are here clear bearishness selling inside here is not that but it's not a sin okay looking for lower prices if not again we're waiting for the cycle to finish there larger cell order came up here again no surprise there's",
+      "start": 992.89,
+      "end": 1019.45,
+      "segment_indices": [
+        129,
+        130,
+        131
+      ]
+    },
+    {
+      "text": "selling inside here is not that but it's not a sin okay looking for lower prices if not again we're waiting for the cycle to finish there larger cell order came up here again no surprise there's that big wick no surprise most sought after price we break lower largest buy orders here we're not",
+      "start": 1000.41,
+      "end": 1027.85,
+      "segment_indices": [
+        130,
+        131,
+        132
+      ]
+    },
+    {
+      "text": "waiting for the cycle to finish there larger cell order came up here again no surprise there's that big wick no surprise most sought after price we break lower largest buy orders here we're not close enough of the open price of that candle bearishness so in the markets breaking lower",
+      "start": 1010.49,
+      "end": 1033.21,
+      "segment_indices": [
+        131,
+        132,
+        133
+      ]
+    },
+    {
+      "text": "that big wick no surprise most sought after price we break lower largest buy orders here we're not close enough of the open price of that candle bearishness so in the markets breaking lower two things you can either look for three can look for a break we get down here at the range low",
+      "start": 1019.45,
+      "end": 1039.37,
+      "segment_indices": [
+        132,
+        133,
+        134
+      ]
+    },
+    {
+      "text": "close enough of the open price of that candle bearishness so in the markets breaking lower two things you can either look for three can look for a break we get down here at the range low you can look for a dark pool here we can look at it for an expansion through low",
+      "start": 1027.85,
+      "end": 1043.93,
+      "segment_indices": [
+        133,
+        134,
+        135
+      ]
+    },
+    {
+      "text": "two things you can either look for three can look for a break we get down here at the range low you can look for a dark pool here we can look at it for an expansion through low any one of those are present is always a good thing to trade in this case an expansion",
+      "start": 1034.09,
+      "end": 1051.29,
+      "segment_indices": [
+        134,
+        135,
+        136
+      ]
+    },
+    {
+      "text": "you can look for a dark pool here we can look at it for an expansion through low any one of those are present is always a good thing to trade in this case an expansion not the best of expansion but still an expansion because we have don't candles then we",
+      "start": 1040.17,
+      "end": 1057.45,
+      "segment_indices": [
+        135,
+        136,
+        137
+      ]
+    },
+    {
+      "text": "any one of those are present is always a good thing to trade in this case an expansion not the best of expansion but still an expansion because we have don't candles then we brought the low close below we continued retracement new low cycle ends we stop here allow the",
+      "start": 1044.89,
+      "end": 1065.61,
+      "segment_indices": [
+        136,
+        137,
+        138
+      ]
+    },
+    {
+      "text": "not the best of expansion but still an expansion because we have don't candles then we brought the low close below we continued retracement new low cycle ends we stop here allow the new range to form for back should have been not as bad as you may think because we have open price",
+      "start": 1052.97,
+      "end": 1078.36,
+      "segment_indices": [
+        137,
+        138,
+        139
+      ]
+    },
+    {
+      "text": "brought the low close below we continued retracement new low cycle ends we stop here allow the new range to form for back should have been not as bad as you may think because we have open price open price ejections csd after all that drop accept risk i did that's the long taking it back up in",
+      "start": 1057.45,
+      "end": 1088.68,
+      "segment_indices": [
+        138,
+        139,
+        140
+      ]
+    },
+    {
+      "text": "new range to form for back should have been not as bad as you may think because we have open price open price ejections csd after all that drop accept risk i did that's the long taking it back up in here then i left why did i leave why i did not want the high i wanted the high but i still have to",
+      "start": 1065.61,
+      "end": 1096.36,
+      "segment_indices": [
+        139,
+        140,
+        141
+      ]
+    },
+    {
+      "text": "open price ejections csd after all that drop accept risk i did that's the long taking it back up in here then i left why did i leave why i did not want the high i wanted the high but i still have to make decisions when price gets to certain levels take a look up here what stands out is",
+      "start": 1078.36,
+      "end": 1103.88,
+      "segment_indices": [
+        140,
+        141,
+        142
+      ]
+    },
+    {
+      "text": "here then i left why did i leave why i did not want the high i wanted the high but i still have to make decisions when price gets to certain levels take a look up here what stands out is smallest bars are inside here everything is big and then it goes small in balance",
+      "start": 1088.68,
+      "end": 1109.32,
+      "segment_indices": [
+        141,
+        142,
+        143
+      ]
+    },
+    {
+      "text": "make decisions when price gets to certain levels take a look up here what stands out is smallest bars are inside here everything is big and then it goes small in balance so the market is going to come back to it in balance but this imbalance has bodies",
+      "start": 1096.36,
+      "end": 1114.76,
+      "segment_indices": [
+        142,
+        143,
+        144
+      ]
+    },
+    {
+      "text": "smallest bars are inside here everything is big and then it goes small in balance so the market is going to come back to it in balance but this imbalance has bodies versus this imbalance as i wish so if we can close above here that's a good thing if we can't close",
+      "start": 1104.52,
+      "end": 1125.0,
+      "segment_indices": [
+        143,
+        144,
+        145
+      ]
+    },
+    {
+      "text": "so the market is going to come back to it in balance but this imbalance has bodies versus this imbalance as i wish so if we can close above here that's a good thing if we can't close above here it means lower so if rejecting this is normal and close above this is normal",
+      "start": 1110.28,
+      "end": 1134.76,
+      "segment_indices": [
+        144,
+        145,
+        146
+      ]
+    },
+    {
+      "text": "versus this imbalance as i wish so if we can close above here that's a good thing if we can't close above here it means lower so if rejecting this is normal and close above this is normal make a decision as we approach instead of get caught we're pants down so that's what that was",
+      "start": 1116.36,
+      "end": 1146.52,
+      "segment_indices": [
+        145,
+        146,
+        147
+      ]
+    },
+    {
+      "text": "above here it means lower so if rejecting this is normal and close above this is normal make a decision as we approach instead of get caught we're pants down so that's what that was so this range is not finished same same idea this white line is close to the red this market is",
+      "start": 1125.0,
+      "end": 1158.06,
+      "segment_indices": [
+        146,
+        147,
+        148
+      ]
+    },
+    {
+      "text": "make a decision as we approach instead of get caught we're pants down so that's what that was so this range is not finished same same idea this white line is close to the red this market is accepting higher prices there's a range open price loving father right there close the",
+      "start": 1137.16,
+      "end": 1165.82,
+      "segment_indices": [
+        147,
+        148,
+        149
+      ]
+    },
+    {
+      "text": "so this range is not finished same same idea this white line is close to the red this market is accepting higher prices there's a range open price loving father right there close the above i'm expecting more long setups to take this market higher and that's it that's simple so",
+      "start": 1148.04,
+      "end": 1174.3,
+      "segment_indices": [
+        148,
+        149,
+        150
+      ]
+    },
+    {
+      "text": "accepting higher prices there's a range open price loving father right there close the above i'm expecting more long setups to take this market higher and that's it that's simple so in keeping this digestible i'll end here give you time to play around with this idea and we'll talk",
+      "start": 1158.06,
+      "end": 1184.46,
+      "segment_indices": [
+        149,
+        150,
+        151
+      ]
+    },
+    {
+      "text": "above i'm expecting more long setups to take this market higher and that's it that's simple so in keeping this digestible i'll end here give you time to play around with this idea and we'll talk again for then do it thank you for coming to my TED Talk and bye",
+      "start": 1165.82,
+      "end": 1195.74,
+      "segment_indices": [
+        150,
+        151,
+        152
+      ]
+    }
+  ]
+}

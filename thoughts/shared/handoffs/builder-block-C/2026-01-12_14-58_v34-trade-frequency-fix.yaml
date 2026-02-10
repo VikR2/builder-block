@@ -1,0 +1,55 @@
+---
+session: builder-block-C
+date: 2026-01-12
+status: complete
+outcome: PARTIAL_MINUS
+---
+
+goal: Fix V34 strategy - too few trades (18 in 12 months, target was 2-3/week)
+now: Run backtest to verify trade frequency improved (expect 30-40+ trades)
+test: Compile TTradesFractalModelV34.cs in NinjaTrader, run backtest Jan-Dec 2025
+
+done_this_session:
+  - task: Analyzed backtest logs - identified 4 root causes for low trade count
+    files: [screenshots/NinjaScript Output 1_12_2026 1_51 PM.txt]
+  - task: Expanded kill zones (5.5h → 8.5h trading window)
+    files: [scripts-output/Strategies/TTradesFractalModelV34.cs]
+  - task: Relaxed CISD confirmation (>= instead of >)
+    files: [scripts-output/Strategies/TTradesFractalModelV34.cs]
+  - task: Added negative risk validation
+    files: [scripts-output/Strategies/TTradesFractalModelV34.cs]
+  - task: Added neutral candle logic (doji doesn't break series)
+    files: [scripts-output/Strategies/TTradesFractalModelV34.cs]
+
+blockers: []
+
+questions:
+  - Will expanded kill zones maintain win rate or degrade it?
+  - Is 30% body threshold for neutral candles optimal?
+
+decisions:
+  - expanded_kill_zones: London 2-6 AM, NY 8:30-12 PM, Afternoon 1:30-3 PM - covers more ICT sessions
+  - relaxed_cisd: >= instead of > catches near-misses (e.g., 6202.25 vs 6202.50)
+  - neutral_threshold_30pct: Body < 30% of range = doji/neutral, doesn't break opposing series
+
+findings:
+  - kill_zone_bottleneck: 729 "Outside kill zone" skips were biggest blocker
+  - cisd_pass_rate: Only 12% (35/289) CISD attempts passed - too strict
+  - negative_risk_bug: -16, -19 tick risk values indicate stop on wrong side of entry
+
+worked:
+  - Grep analysis of log file to count patterns ([ENTRY], [SKIP], [CISD])
+  - Systematic fix approach - highest impact first (kill zones)
+
+failed: []
+
+next:
+  - Compile V34 in NinjaTrader and verify no errors
+  - Run backtest Jan-Dec 2025 - expect 30-40+ trades
+  - Compare win rate before/after fixes
+  - If trade count still low, consider reducing CISDMinCandles to 1
+
+files:
+  created: []
+  modified:
+    - scripts-output/Strategies/TTradesFractalModelV34.cs

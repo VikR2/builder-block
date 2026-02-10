@@ -1,0 +1,223 @@
+{
+  "video_id": "IzOQmcgLyA0",
+  "video_url": "https://www.youtube.com/watch?v=IzOQmcgLyA0",
+  "video_title": "CAD Futures Trade Review - Dollar Analysis",
+  "video_type": "skills_library",
+  "created_at": "2026-01-07T13:30:00.000000",
+  "frame_count": 10,
+  "video_duration_sec": 453,
+  "frame_interval_sec": 45,
+  "skills_covered": [
+    "dxy_correlation",
+    "inverse_correlation_trading",
+    "fx_futures_analysis",
+    "c2_c4_confirmation"
+  ],
+  "frames": [
+    {
+      "filename": "frame_0001.jpg",
+      "timestamp_sec": 0,
+      "timestamp_str": "0:00",
+      "frame_type": "context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 0,
+      "visual_interpretation": {
+        "asset": "DXY (Dollar Index)",
+        "timeframe": "1D",
+        "annotation_labels": ["C4"],
+        "zones_shown": ["Large green FVG zone", "Yellow support zone"],
+        "description": "DXY daily chart showing bullish structure with C4 closure, large FVG zone"
+      },
+      "pattern_mappings": {
+        "dxy_analysis": {
+          "is_reference": true,
+          "visual_elements": ["DXY daily", "C4 in FVG"],
+          "code_insight": "DXY provides directional bias for FX pairs - bullish DXY = bearish CAD/EUR/GBP"
+        }
+      }
+    },
+    {
+      "filename": "frame_0002.jpg",
+      "timestamp_sec": 45,
+      "timestamp_str": "0:45",
+      "frame_type": "context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 1,
+      "visual_interpretation": {
+        "asset": "DXY",
+        "timeframe": "1D-4H",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "DXY structure analysis continuation"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0003.jpg",
+      "timestamp_sec": 90,
+      "timestamp_str": "1:30",
+      "frame_type": "context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 2,
+      "visual_interpretation": {
+        "asset": "DXY",
+        "timeframe": "4H",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "DXY 4H structure"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0004.jpg",
+      "timestamp_sec": 135,
+      "timestamp_str": "2:15",
+      "frame_type": "context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 3,
+      "visual_interpretation": {
+        "asset": "6C1 (CAD futures)",
+        "timeframe": "1D",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "CAD futures daily - inverse of DXY structure"
+      },
+      "pattern_mappings": {
+        "inverse_correlation": {
+          "is_reference": true,
+          "visual_elements": ["CAD bearish while DXY bullish"],
+          "code_insight": "CAD inversely correlated to DXY; DXY bullish = CAD bearish"
+        }
+      }
+    },
+    {
+      "filename": "frame_0005.jpg",
+      "timestamp_sec": 180,
+      "timestamp_str": "3:00",
+      "frame_type": "entry",
+      "categories": ["entry", "context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 4,
+      "visual_interpretation": {
+        "asset": "6C1 (CAD futures)",
+        "timeframe": "1h",
+        "annotation_labels": ["C2"],
+        "zones_shown": ["Yellow FVG zone", "Green FVG zone"],
+        "description": "CAD 1h showing C2 closure in yellow FVG zone, entry setup"
+      },
+      "pattern_mappings": {
+        "c2_in_fvg": {
+          "is_reference": true,
+          "visual_elements": ["C2 label", "yellow FVG zone"],
+          "code_insight": "C2 closure in FVG triggers entry search on LTF"
+        }
+      }
+    },
+    {
+      "filename": "frame_0006.jpg",
+      "timestamp_sec": 225,
+      "timestamp_str": "3:45",
+      "frame_type": "entry",
+      "categories": ["entry"],
+      "is_contradiction_relevant": true,
+      "frame_index": 5,
+      "visual_interpretation": {
+        "asset": "6C1",
+        "timeframe": "1h",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "CAD 1h trade development"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0007.jpg",
+      "timestamp_sec": 270,
+      "timestamp_str": "4:30",
+      "frame_type": "entry",
+      "categories": ["entry"],
+      "is_contradiction_relevant": true,
+      "frame_index": 6,
+      "visual_interpretation": {
+        "asset": "6C1",
+        "timeframe": "1h",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "Trade progression"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0008.jpg",
+      "timestamp_sec": 315,
+      "timestamp_str": "5:15",
+      "frame_type": "exit",
+      "categories": ["exit", "context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 7,
+      "visual_interpretation": {
+        "asset": "6C1 (CAD futures)",
+        "timeframe": "1h",
+        "annotation_labels": ["C2", "C2", "C4"],
+        "zones_shown": ["Teal FVG zone", "Yellow FVG zone", "Green structure zones"],
+        "description": "CAD 1h showing complete trade with multiple C2/C4 confirmations and FVG zones"
+      },
+      "pattern_mappings": {
+        "nested_confirmations": {
+          "is_reference": true,
+          "visual_elements": ["multiple C2/C4 labels at different price levels"],
+          "code_insight": "Nested C2/C4 confirmations at different zones strengthen signal"
+        },
+        "trade_result": {
+          "is_reference": true,
+          "visual_elements": ["completed bullish move"],
+          "code_insight": "CAD long after DXY showed bearish structure (inverse correlation)"
+        }
+      }
+    },
+    {
+      "filename": "frame_0009.jpg",
+      "timestamp_sec": 360,
+      "timestamp_str": "6:00",
+      "frame_type": "exit",
+      "categories": ["exit"],
+      "is_contradiction_relevant": true,
+      "frame_index": 8,
+      "visual_interpretation": {
+        "asset": "6C1",
+        "timeframe": "1h",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "Trade review continuation"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0010.jpg",
+      "timestamp_sec": 405,
+      "timestamp_str": "6:45",
+      "frame_type": "context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 9,
+      "visual_interpretation": {
+        "asset": "6C1",
+        "timeframe": "Various",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "Final summary"
+      },
+      "pattern_mappings": {}
+    }
+  ],
+  "pipeline_notes": {
+    "inefficiencies_found": [],
+    "data_quality": "good",
+    "transcript_coverage": "complete (0:00-7:30)",
+    "silent_sections": false
+  }
+}

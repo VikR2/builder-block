@@ -41,7 +41,8 @@ export async function GET(
     : 'image/jpeg';
 
   // Return image with caching headers
-  return new NextResponse(buffer, {
+  // Convert Node.js Buffer to Uint8Array for NextResponse compatibility
+  return new NextResponse(new Uint8Array(buffer), {
     status: 200,
     headers: {
       'Content-Type': contentType,

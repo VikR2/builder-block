@@ -1,0 +1,64 @@
+---
+session: builder-block-C
+date: 2026-01-16
+status: complete
+outcome: PARTIAL_MINUS
+---
+
+goal: Implement semantic boundary detection for TCM video clips - clips now extend until concept explanation ends
+now: Test in browser, consider adding more videos to FAISS index for broader coverage
+
+test: |
+  cd C:/Users/satvi/Repos/builder-block-C && python -c "
+  import sys; from pathlib import Path; sys.path.insert(0, str(Path('scripts/lib')))
+  from faiss_search import VideoSearcher
+  s = VideoSearcher(Path('data/local-videos'))
+  r = s.search_with_boundary('what is order fulfillment', 0.4)
+  assert r and (r.end - r.start) > 100, 'Boundary detection failed'
+  print('OK: Clip duration', r.end - r.start, 'seconds')
+  "
+
+done_this_session:
+  - task: Added search_with_boundary() method to Python FAISS search
+    files: [scripts/lib/faiss_search.py]
+  - task: Added searchFAISSWithBoundary() TypeScript wrapper
+    files: [ui/lib/tcm-faiss.server.ts]
+  - task: Updated searchWithFAISS() to use boundary detection instead of fixed windows
+    files: [ui/lib/tcm-video-clips.server.ts]
+  - task: Verified end-to-end via API - clips now ~2.6 min vs ~1 min
+
+blockers: []
+
+questions:
+  - Should threshold be configurable via UI or is 40% similarity decay good default?
+  - Consider adding more trading videos to FAISS index for broader concept coverage
+
+decisions:
+  - similarity_threshold_40_percent: Stops clip when similarity drops below 40% of peak score - balances completeness vs including unrelated content
+  - max_extension_300s: 5-minute safety cap prevents runaway clips from edge cases
+  - intro_buffer_10s: Increased from 5s to 10s for better context lead-in
+  - fallback_to_regular: If boundary search fails, falls back to regular FAISS search with fixed windows
+
+findings:
+  - boundary_detection_works: "Order fulfillment" query went from ~70s to ~155s clip duration
+  - intelligent_truncation: "Submission range" query shortened by 20s - correctly excluded unrelated trailing content
+  - faiss_reconstruct: Can reconstruct embeddings from FAISS index to compare similarity without re-encoding
+
+worked:
+  - Scanning forward through segments comparing each to original query embedding
+  - Using FAISS index.reconstruct() to get segment embeddings without re-loading model
+  - Threshold as percentage of peak score (relative, not absolute)
+
+failed: []
+
+next:
+  - Test in browser UI to verify video player seeks correctly
+  - Consider adding segment count logging to help tune threshold
+  - May want to expose similarity_threshold as optional API parameter
+
+files:
+  created: []
+  modified:
+    - scripts/lib/faiss_search.py  # Added search_with_boundary(), search_with_boundary_json()
+    - ui/lib/tcm-faiss.server.ts   # Added searchFAISSWithBoundary()
+    - ui/lib/tcm-video-clips.server.ts  # Updated searchWithFAISS() to use boundary detection

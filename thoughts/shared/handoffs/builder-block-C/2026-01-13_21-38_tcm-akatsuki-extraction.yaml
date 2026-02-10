@@ -1,0 +1,88 @@
+---
+session: builder-block-C
+date: 2026-01-13
+status: complete
+outcome: PARTIAL_PLUS
+---
+
+goal: Extract TCM Akatsuki indicator skills from bootcamp MP4 video using /pinescript workflow
+now: Pine Script generation skipped by user - consider generating TCM indicator Pine code later
+
+test: sqlite3 data/builder.db "SELECT id, name FROM skills WHERE id >= 101 ORDER BY id"
+
+done_this_session:
+  - task: Processed TCM_Akatsuki_Bootcamp_indicator_2026.mp4 (59 min video)
+    files: [data/local-videos/TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527/manifest.json, data/local-videos/TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527/transcript.txt]
+  - task: Extracted 30 frames and 386 transcript segments via Whisper
+    files: [data/local-videos/TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527/frames/]
+  - task: Created 8 new skills in database (IDs 101-108)
+    files: [data/builder.db]
+  - task: Generated Strategy Architecture Document for TCM indicator
+    files: [data/architectures/2026-01-13-tcm-akatsuki-indicator.md]
+  - task: Installed faster-whisper for transcription support
+    files: []
+
+blockers: []
+
+questions:
+  - Should the TCM indicator Pine Script be generated later?
+  - How to handle the existing TCM indicator the user may already have?
+
+decisions:
+  - skills_library_intent: User chose "Skills Library Addition" over "Complete Strategy" - extracted individual patterns rather than full trading system
+  - skip_pine_generation: User approved SAD but chose to skip Pine Script generation
+
+findings:
+  - tcm_order_fulfillment: Framework based on order lifecycle (submission → matching → filling → settlement)
+  - submission_range: 12:40-3:20 PM ET range where pending orders accumulate
+  - deviation_levels: SR size determines expected deviation (< 80pts = 2+ dev, 80-150 = 1-1.5, >150 = 0.5)
+  - sweep_vs_run: FVG presence/absence at H/L determines reversal vs continuation bias
+  - ten_fifteen_pullback: Predictable pullback window after 9:20 AM distribution
+
+worked:
+  - faster-whisper transcription (386 segments, 36K chars from 59 min video)
+  - Frame extraction at 119s intervals (adjusted from 45s for 30 max frames)
+  - 4-checkpoint workflow with AskUserQuestion for each gate
+
+failed: []
+
+next:
+  - Generate Pine Script v6 indicator for TCM Akatsuki if user requests later
+  - Test /pinescript workflow with a .pine file input (not just MP4)
+  - Consider adding embeddings to new skills #101-108
+
+files:
+  created:
+    - data/local-videos/TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527/manifest.json
+    - data/local-videos/TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527/transcript.txt
+    - data/local-videos/TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527/transcript_timed.json
+    - data/local-videos/TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527/frames/*.jpg (30 files)
+    - data/architectures/2026-01-13-tcm-akatsuki-indicator.md
+  modified:
+    - data/builder.db (added skills #101-108)
+
+skills_extracted:
+  - id: 101
+    name: TCM Order Fulfillment Theory
+    category: Market Structure
+  - id: 102
+    name: Submission Range (SR)
+    category: Market Structure
+  - id: 103
+    name: Order Lifecycle Timeline (TCM)
+    category: Session Management
+  - id: 104
+    name: SR Deviation Levels
+    category: Risk Management
+  - id: 105
+    name: Sweep vs Run Detection (TCM)
+    category: Entry Patterns
+  - id: 106
+    name: 10:15 AM Pullback Pattern
+    category: Entry Patterns
+  - id: 107
+    name: Liquidity Pockets (TCM Six Types)
+    category: Market Structure
+  - id: 108
+    name: Matched vs Unmatched Orders (TCM)
+    category: Market Structure

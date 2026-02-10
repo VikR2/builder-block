@@ -4,6 +4,21 @@ import { TranscriptSegment, getVideoTranscript, formatTimestamp } from './tcm-db
 
 const LOCAL_VIDEOS_PATH = join(process.cwd(), '..', 'data', 'local-videos');
 
+// Stop words to filter from search queries (same as tcm-db.ts)
+const STOP_WORDS = new Set([
+  'explain', 'what', 'is', 'are', 'how', 'the', 'a', 'an', 'to', 'for', 'of', 'in',
+  'on', 'with', 'about', 'can', 'you', 'me', 'tell', 'show', 'describe', 'help',
+  'please', 'i', 'my', 'do', 'does', 'and', 'this', 'that', 'it', 'be'
+]);
+
+// Extract meaningful keywords from a query
+function extractKeywords(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !STOP_WORDS.has(word));
+}
+
 // Frame metadata
 export interface FrameInfo {
   videoId: string;
@@ -76,7 +91,7 @@ export function findFramesNearTimestamp(
   );
 }
 
-// Find frames that match a transcript search
+// Find frames that match a transcript search using keyword matching
 export function findFramesForTranscriptSearch(
   videoId: string,
   query: string,
@@ -89,24 +104,36 @@ export function findFramesForTranscriptSearch(
     return [];
   }
 
-  const lowerQuery = query.toLowerCase();
+  // Extract keywords from query (filters stop words)
+  const keywords = extractKeywords(query);
+
+  // If no keywords after filtering, fall back to original words
+  const searchTerms = keywords.length > 0
+    ? keywords
+    : query.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+
   const results: Array<{ frame: FrameInfo; segment: TranscriptSegment; matchScore: number }> = [];
 
   for (const segment of transcript) {
-    if (segment.text.toLowerCase().includes(lowerQuery)) {
+    const lowerText = segment.text.toLowerCase();
+
+    // Score based on keyword matches
+    let score = 0;
+    for (const term of searchTerms) {
+      if (lowerText.includes(term)) {
+        score += 1;
+      }
+    }
+
+    if (score > 0) {
       // Find the closest frame to this segment's timestamp
       const closestFrame = findClosestFrame(frames, segment.start);
 
       if (closestFrame) {
-        // Calculate match score (how many times query appears)
-        const matches = (segment.text.toLowerCase().match(
-          new RegExp(lowerQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')
-        ) || []).length;
-
         results.push({
           frame: closestFrame,
           segment,
-          matchScore: matches,
+          matchScore: score,
         });
       }
     }

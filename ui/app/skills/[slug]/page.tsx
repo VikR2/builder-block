@@ -1,12 +1,32 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { codeToHtml } from 'shiki';
 import { getSkillBySlug } from "@/lib/db";
 import { CodeViewer } from "@/components/code-viewer";
 import { parseJSON, formatDate } from "@/lib/utils";
+import { getCurrentUser } from '@/lib/auth';
+import { PaywallOverlay } from '@/components/paywall';
+
+export const dynamic = 'force-dynamic';
 
 export default async function SkillPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+
+  // Check authentication and premium status
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect(`/login?redirect=/skills/${slug}`);
+  }
+
+  if (!user.isPremium) {
+    return <PaywallOverlay
+      returnUrl={`/skills/${slug}`}
+      title="Skill Details"
+      description="Subscribe to Premium to view skill details and code snippets."
+    />;
+  }
+
   const skill = getSkillBySlug(slug);
 
   if (!skill) {
@@ -30,6 +50,11 @@ export default async function SkillPage({ params }: { params: Promise<{ slug: st
   return (
     <div className="container py-10 max-w-5xl">
       <div className="flex flex-col gap-8">
+        {/* Back Link */}
+        <Link href="/skills" className="text-muted-foreground hover:text-foreground text-sm flex items-center gap-1 -mb-4">
+          <span>←</span> Back to Skills Library
+        </Link>
+
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/skills" className="hover:text-foreground">

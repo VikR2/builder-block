@@ -1,0 +1,38 @@
+{
+  "video_id": "tyoxl1l-6iI",
+  "video_url": "https://www.youtube.com/watch?v=tyoxl1l-6iI",
+  "video_title": "Candle 2 Closure - Core Concept Tutorial",
+  "video_type": "skills_library",
+  "created_at": "2026-01-07T14:30:00.000000",
+  "frame_count": 17,
+  "skills_covered": [
+    "c2_closure",
+    "candle_counting",
+    "fvg_confirmation",
+    "fractal_model_component"
+  ],
+  "key_quote": "what is a candle 2 closure within my fractal model",
+  "frames": [
+    {
+      "filename": "frame_0001.jpg",
+      "timestamp_sec": 0,
+      "frame_type": "title",
+      "categories": ["intro"],
+      "is_contradiction_relevant": false,
+      "frame_index": 0,
+      "visual_interpretation": {
+        "description": "Title slide: Candle 2 Closure - TTrades"
+      },
+      "pattern_mappings": {}
+    }
+  ],
+  "model_summary": {
+    "core_concept": "C2 closure is the 2nd candle closing in/through a zone, confirming zone validity",
+    "relationship_to_c3": "C2 is the minimum confirmation, C3 is stronger confirmation"
+  },
+  "pipeline_notes": {
+    "data_quality": "good",
+    "transcript_coverage": "complete",
+    "silent_sections": false
+  }
+}

@@ -1,0 +1,302 @@
+//==============================================================================
+// CISD + OB Close Entry Template
+//
+// Pre-debugged patterns from TTFM V34.3 iterations
+// Use this template for strategies requiring:
+// - Opposing series detection
+// - CISD (Change in State of Delivery) confirmation
+// - Entry at OB close (first candle of opposing series)
+//
+// QUALITY TARGETS (from V34 learnings):
+// - Trade frequency: 8-50 entries/month
+// - CISD success rate: >= 10%
+// - Avoid high frequency (>50) - indicates over-relaxed filters
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// SECTION: Variable Declarations
+// Add these to your strategy's #region Variables
+//------------------------------------------------------------------------------
+
+#region CISD Variables
+// M5 CISD - Track full opposing series range
+private int opposingSeriesCount = 0;
+private double opposingSeriesOpen = 0;
+private double opposingSeriesClose = 0;  // OB close = close of first opposing candle
+private double opposingSeriesHigh = 0;
+private double opposingSeriesLow = 0;
+
+// Protected swing from CISD
+private double protectedSwingHigh = 0;
+private double protectedSwingLow = 0;
+#endregion
+
+//------------------------------------------------------------------------------
+// SECTION: Properties (NinjaScript Parameters)
+// Add these to your strategy's #region Properties
+//------------------------------------------------------------------------------
+
+#region CISD Properties
+// CISD Settings
+[NinjaScriptProperty]
+[Range(1, 10)]
+[Display(Name = "CISD Min Opposing Series", Order = 1, GroupName = "CISD")]
+public int CISDMinCandles { get; set; }
+
+[NinjaScriptProperty]
+[Range(1, 20)]
+[Display(Name = "CISD Max Opposing Series", Order = 2, GroupName = "CISD")]
+public int CISDMaxCandles { get; set; }
+
+// Default values (in OnStateChange -> SetDefaults):
+// For 8-20 trades/month (conservative):
+//   CISDMinCandles = 2;
+//   CISDMaxCandles = 5;
+//
+// For 20-50 trades/month (relaxed):
+//   CISDMinCandles = 1;
+//   CISDMaxCandles = 8;
+#endregion
+
+//------------------------------------------------------------------------------
+// SECTION: Opposing Series Tracking
+// Call this on each bar to track the opposing series
+//------------------------------------------------------------------------------
+
+/// <summary>
+/// Track opposing series candles and determine when CISD check is needed.
+/// Call this method each bar when in the "tracking" state.
+///
+/// DEFINITIONS:
+/// - Opposing candle: bearish in bullish bias, bullish in bearish bias
+/// - Neutral candle: body < 30% of range (doji-like)
+/// - Series: consecutive opposing/neutral candles
+/// </summary>
+private void TrackOpposingSeries(double open, double high, double low, double close,
+                                  bool isBullishBias, bool enableDebug, DateTime barTime)
+{
+    double body = Math.Abs(close - open);
+    double range = high - low;
+    double bodyRatio = range > 0 ? body / range : 0;
+
+    bool isBullishCandle = close > open;
+    bool isBearishCandle = close < open;
+    bool isNeutral = bodyRatio < 0.3;  // < 30% body = neutral
+
+    // Opposing candle definition based on bias
+    bool isOpposing = isBullishBias ? isBearishCandle : isBullishCandle;
+
+    if (isOpposing)
+    {
+        opposingSeriesCount++;
+
+        // CRITICAL: Capture first candle's close as OB close
+        if (opposingSeriesCount == 1)
+        {
+            opposingSeriesOpen = open;
+            opposingSeriesClose = close;  // OB close for entry
+            opposingSeriesHigh = high;
+            opposingSeriesLow = low;
+        }
+        else
+        {
+            // Extend series range
+            opposingSeriesHigh = Math.Max(opposingSeriesHigh, high);
+            opposingSeriesLow = Math.Min(opposingSeriesLow, low);
+        }
+
+        if (enableDebug)
+            Print($"[M5] {barTime} Opposing #{opposingSeriesCount} | Series range: {opposingSeriesLow:F2} - {opposingSeriesHigh:F2}");
+
+        // Series too long = consolidation, reject
+        if (opposingSeriesCount > CISDMaxCandles)
+        {
+            if (enableDebug) Print($"[M5] {barTime} Series too long ({opposingSeriesCount} > {CISDMaxCandles}) - reset");
+            ResetCISDState();
+            return;
+        }
+    }
+    else if (isNeutral && opposingSeriesCount > 0)
+    {
+        // Neutral candles extend the series range but don't count
+        opposingSeriesHigh = Math.Max(opposingSeriesHigh, high);
+        opposingSeriesLow = Math.Min(opposingSeriesLow, low);
+        if (enableDebug)
+            Print($"[M5] {barTime} Neutral candle (body {bodyRatio*100:F0}%) - series continues | Range: {opposingSeriesLow:F2} - {opposingSeriesHigh:F2}");
+    }
+    else if (opposingSeriesCount >= CISDMinCandles)
+    {
+        // Non-opposing, non-neutral candle after valid series - ready to check CISD
+        if (enableDebug)
+            Print($"[M5] {barTime} Valid opposing series ({opposingSeriesCount}) - checking CISD | Range: {opposingSeriesLow:F2} - {opposingSeriesHigh:F2}");
+
+        // TRANSITION TO CISD CHECK STATE
+        // In your state machine: currentState = StrategyState.WaitingForCISD;
+    }
+    else if (opposingSeriesCount > 0)
+    {
+        // Series broken before reaching minimum count
+        if (enableDebug) Print($"[M5] {barTime} Series broken before min count ({opposingSeriesCount} < {CISDMinCandles}) - reset");
+        ResetCISDState();
+    }
+}
+
+//------------------------------------------------------------------------------
+// SECTION: CISD Confirmation
+// Call this to check if CISD is confirmed
+//------------------------------------------------------------------------------
+
+/// <summary>
+/// Check if CISD (Change in State of Delivery) is confirmed.
+///
+/// CISD RULE (strict TTFM):
+/// - Close must break through or equal the opposing series OPEN
+/// - NOT midpoint (produces too many trades with low win rate)
+///
+/// Returns true if CISD confirmed, false if failed (resets state).
+/// </summary>
+private bool CheckCISDConfirmation(double close, bool isBullishBias, bool enableDebug, DateTime barTime)
+{
+    bool closeThrough = false;
+
+    // CISD = close through or AT opposing series OPEN (strict TTFM rule)
+    if (isBullishBias)
+    {
+        closeThrough = close >= opposingSeriesOpen;
+    }
+    else // bearish bias
+    {
+        closeThrough = close <= opposingSeriesOpen;
+    }
+
+    if (closeThrough)
+    {
+        // Store protected swing for stop placement
+        protectedSwingHigh = opposingSeriesHigh;
+        protectedSwingLow = opposingSeriesLow;
+
+        if (enableDebug)
+            Print($"[CISD] {barTime} CONFIRMED | Close {close:F2} through series open {opposingSeriesOpen:F2} | Protected Swing: {protectedSwingLow:F2} - {protectedSwingHigh:F2}");
+
+        return true;
+    }
+    else
+    {
+        if (enableDebug)
+            Print($"[CISD] {barTime} Failed - Close {close:F2} did not break series open {opposingSeriesOpen:F2}");
+
+        ResetCISDState();
+        return false;
+    }
+}
+
+//------------------------------------------------------------------------------
+// SECTION: State Reset
+// Call this when state needs to be reset
+//------------------------------------------------------------------------------
+
+/// <summary>
+/// Reset all CISD tracking state.
+/// Call this:
+/// - When series breaks before min count
+/// - When CISD fails
+/// - On daily reset
+/// - After trade entry/exit
+/// </summary>
+private void ResetCISDState()
+{
+    opposingSeriesCount = 0;
+    opposingSeriesOpen = 0;
+    opposingSeriesClose = 0;
+    opposingSeriesHigh = 0;
+    opposingSeriesLow = 0;
+}
+
+//------------------------------------------------------------------------------
+// SECTION: Entry Price Calculation
+// Use OB close for entry price
+//------------------------------------------------------------------------------
+
+/// <summary>
+/// Calculate entry price using OB close.
+///
+/// OB CLOSE DEFINITION:
+/// - The close of the FIRST candle of the opposing series
+/// - NOT the CISD candle close
+/// - This is the "order block" that gets validated when CISD confirms
+/// </summary>
+private double CalculateEntryPrice()
+{
+    // Entry at OB close (first candle of opposing series)
+    return opposingSeriesClose;
+}
+
+//------------------------------------------------------------------------------
+// SECTION: Stop Loss Calculation
+// Use protected swing for stop placement
+//------------------------------------------------------------------------------
+
+/// <summary>
+/// Calculate stop loss using protected swing from CISD.
+///
+/// STOP PLACEMENT:
+/// - LONG: Stop below protectedSwingLow - buffer
+/// - SHORT: Stop above protectedSwingHigh + buffer
+/// </summary>
+private double CalculateStopPrice(bool isLong, double buffer, double tickSize)
+{
+    if (isLong)
+    {
+        // Stop below the low of the opposing series
+        return protectedSwingLow - buffer;
+    }
+    else
+    {
+        // Stop above the high of the opposing series
+        return protectedSwingHigh + buffer;
+    }
+}
+
+//------------------------------------------------------------------------------
+// USAGE EXAMPLE: State Machine Integration
+//------------------------------------------------------------------------------
+
+/*
+enum StrategyState
+{
+    WaitingForSetup,
+    TrackingOpposing,    // Tracking opposing series
+    WaitingForCISD,      // Checking CISD confirmation
+    CISDReady,           // CISD confirmed, checking entry conditions
+}
+
+// In OnBarUpdate:
+switch (currentState)
+{
+    case StrategyState.TrackingOpposing:
+        TrackOpposingSeries(Open[0], High[0], Low[0], Close[0],
+                           isBullishBias, EnableDebug, Time[0]);
+        // State transition happens inside TrackOpposingSeries
+        break;
+
+    case StrategyState.WaitingForCISD:
+        if (CheckCISDConfirmation(Close[0], isBullishBias, EnableDebug, Time[0]))
+        {
+            currentState = StrategyState.CISDReady;
+        }
+        // If CISD fails, state resets inside CheckCISDConfirmation
+        break;
+
+    case StrategyState.CISDReady:
+        double entryPrice = CalculateEntryPrice();  // OB close
+        double stopPrice = CalculateStopPrice(isBullishBias, StopBuffer, TickSize);
+        double riskTicks = Math.Abs(entryPrice - stopPrice) / TickSize;
+
+        // Validate risk before entry
+        if (riskTicks >= MinRiskTicks && riskTicks <= MaxRiskTicks)
+        {
+            // Submit orders...
+        }
+        break;
+}
+*/

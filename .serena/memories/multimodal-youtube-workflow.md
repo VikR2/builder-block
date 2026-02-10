@@ -1,5 +1,11 @@
 # Multimodal YouTube Extraction Workflow
 
+## Reference Files (2026-01-15 Update)
+
+- **Reference Guide:** `.claude/rules/video-extraction.md` - Stable patterns, thresholds, model context structure
+- **Memory Protocol:** `.claude/skills/youtube/CLAUDE.md` - claude-mem recall/storage integration
+- **Full Workflow:** `.claude/skills/youtube.md` - 11-step workflow with memory steps
+
 ## Purpose
 Extract trading skills from YouTube videos using both transcript AND visual analysis (charts, annotations, indicators) for higher quality extraction.
 
@@ -146,6 +152,17 @@ uv run python -m runtime.harness scripts/generate_from_youtube.py \
 ## Related
 - `/implement-strategy` - Generate code from SAD
 - `740.cs` - Reference quality for generated code
+
+## Memory Integration (2026-01-15)
+
+**Hybrid Memory Strategy:**
+- **Serena memories** (this file): Stable workflows, procedures
+- **claude-mem**: Session learnings, errors, decisions (auto-captured)
+- **CLAUDE.md files**: Directory entry context
+
+The workflow now includes:
+- **Step 1a**: Auto-recall past learnings from claude-mem before extraction
+- **Step 11**: Auto-store successful extractions, prompt for issues
 
 ## Auto-Generated Indicators (New)
 

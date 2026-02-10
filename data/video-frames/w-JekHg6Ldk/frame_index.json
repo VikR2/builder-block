@@ -1,0 +1,273 @@
+{
+  "video_id": "w-JekHg6Ldk",
+  "video_url": "https://www.youtube.com/watch?v=w-JekHg6Ldk",
+  "video_title": "ES Scalp Trade Review - Relative Strength & Weakness",
+  "video_type": "skills_library",
+  "created_at": "2026-01-07T13:00:00.000000",
+  "frame_count": 11,
+  "video_duration_sec": 494,
+  "frame_interval_sec": 45,
+  "skills_covered": [
+    "relative_strength_weakness",
+    "smt_divergence",
+    "15m_1m_fractal_model",
+    "multi_asset_correlation"
+  ],
+  "frames": [
+    {
+      "filename": "frame_0001.jpg",
+      "timestamp_sec": 0,
+      "timestamp_str": "0:00",
+      "frame_type": "context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 0,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "30m",
+        "annotation_labels": [],
+        "zones_shown": ["Blue horizontal level/FVG"],
+        "description": "30m ES chart showing market structure and FVG zone - intro to trade setup"
+      },
+      "pattern_mappings": {
+        "market_structure": {
+          "is_reference": true,
+          "visual_elements": ["downtrend structure", "FVG zone"],
+          "code_insight": "Initial market context before drilling into LTF"
+        }
+      }
+    },
+    {
+      "filename": "frame_0002.jpg",
+      "timestamp_sec": 45,
+      "timestamp_str": "0:45",
+      "frame_type": "context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 1,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "15m",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "15m ES chart showing structure timeframe"
+      },
+      "pattern_mappings": {
+        "structure_timeframe": {
+          "is_reference": true,
+          "visual_elements": ["15m structure"],
+          "code_insight": "15m used as structure timeframe in scalping model"
+        }
+      }
+    },
+    {
+      "filename": "frame_0003.jpg",
+      "timestamp_sec": 90,
+      "timestamp_str": "1:30",
+      "frame_type": "context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 2,
+      "visual_interpretation": {
+        "asset": "NQ1, ES1, YM1",
+        "timeframe": "15m",
+        "annotation_labels": ["NQ1", "ES1", "YM1"],
+        "zones_shown": ["FVG zones on all three"],
+        "description": "3-panel comparison showing Nasdaq, ES, and Dow futures - relative strength analysis"
+      },
+      "pattern_mappings": {
+        "relative_strength_analysis": {
+          "is_reference": true,
+          "visual_elements": ["3 charts side by side", "NQ/ES/YM comparison"],
+          "code_insight": "Compare correlated assets to find middle performer - ES chosen as it's between NQ and YM strength"
+        },
+        "multi_asset_correlation": {
+          "is_reference": true,
+          "visual_elements": ["NQ1 left", "ES1 middle", "YM1 right"],
+          "code_insight": "YM weakest, NQ strongest → trade ES as middle asset for balanced risk"
+        }
+      }
+    },
+    {
+      "filename": "frame_0004.jpg",
+      "timestamp_sec": 135,
+      "timestamp_str": "2:15",
+      "frame_type": "context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 3,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "15m",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "ES 15m structure analysis continuation"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0005.jpg",
+      "timestamp_sec": 180,
+      "timestamp_str": "3:00",
+      "frame_type": "entry",
+      "categories": ["entry", "context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 4,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "1m",
+        "annotation_labels": [],
+        "zones_shown": ["FVG zones"],
+        "description": "1m ES chart showing entry timeframe"
+      },
+      "pattern_mappings": {
+        "entry_timeframe": {
+          "is_reference": true,
+          "visual_elements": ["1m chart"],
+          "code_insight": "1m used for entry in 15m→1m scalping model"
+        }
+      }
+    },
+    {
+      "filename": "frame_0006.jpg",
+      "timestamp_sec": 225,
+      "timestamp_str": "3:45",
+      "frame_type": "entry",
+      "categories": ["entry", "context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 5,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "1m",
+        "annotation_labels": ["XC2", "YM1", "NQ1", "C2"],
+        "zones_shown": ["FVG zone (teal)"],
+        "description": "1m ES with XC2 label, YM1/NQ1 correlation lines, C2 at sweep level"
+      },
+      "pattern_mappings": {
+        "xc2_with_correlation": {
+          "is_reference": true,
+          "visual_elements": ["XC2 label", "YM1/NQ1 correlation lines"],
+          "code_insight": "XC2 confirmation with SMT divergence lines to correlated assets"
+        },
+        "correlation_lines": {
+          "is_reference": true,
+          "visual_elements": ["yellow lines showing YM1/NQ1 levels"],
+          "code_insight": "Draw horizontal lines showing where YM/NQ are relative to ES for divergence detection"
+        }
+      }
+    },
+    {
+      "filename": "frame_0007.jpg",
+      "timestamp_sec": 270,
+      "timestamp_str": "4:30",
+      "frame_type": "entry",
+      "categories": ["entry"],
+      "is_contradiction_relevant": true,
+      "frame_index": 6,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "1m",
+        "annotation_labels": [],
+        "zones_shown": ["FVG zones"],
+        "description": "1m ES showing trade development"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0008.jpg",
+      "timestamp_sec": 315,
+      "timestamp_str": "5:15",
+      "frame_type": "entry",
+      "categories": ["entry"],
+      "is_contradiction_relevant": true,
+      "frame_index": 7,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "1m",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "1m ES trade progression"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0009.jpg",
+      "timestamp_sec": 360,
+      "timestamp_str": "6:00",
+      "frame_type": "entry",
+      "categories": ["entry", "context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 8,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "1m",
+        "annotation_labels": ["SMT", "C4", "C2"],
+        "zones_shown": ["Green FVG zone", "Pink zone (invalidation)"],
+        "description": "1m ES showing SMT divergence label, C4 confirmation, C2 at top, trade entry zone"
+      },
+      "pattern_mappings": {
+        "smt_divergence": {
+          "is_reference": true,
+          "visual_elements": ["SMT label", "divergence with correlated asset"],
+          "code_insight": "SMT (Smart Money Technique) = when ES makes lower low but YM/NQ doesn't → bullish divergence"
+        },
+        "c4_confirmation": {
+          "is_reference": true,
+          "visual_elements": ["C4 label in FVG zone"],
+          "code_insight": "C4 = 4th candle closure in zone; strong confirmation for entry"
+        }
+      }
+    },
+    {
+      "filename": "frame_0010.jpg",
+      "timestamp_sec": 405,
+      "timestamp_str": "6:45",
+      "frame_type": "exit",
+      "categories": ["exit", "context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 9,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "1m",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "1m ES showing trade result"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0011.jpg",
+      "timestamp_sec": 450,
+      "timestamp_str": "7:30",
+      "frame_type": "exit",
+      "categories": ["exit", "context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 10,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "1m",
+        "annotation_labels": ["C2", "C2", "C4", "YM1"],
+        "zones_shown": ["Green FVG zones"],
+        "description": "1m ES showing complete trade with multiple C2/C4 labels, YM1 correlation"
+      },
+      "pattern_mappings": {
+        "trade_review": {
+          "is_reference": true,
+          "visual_elements": ["multiple C2/C4 markers", "trade entry/exit"],
+          "code_insight": "Full scalp trade: 15m structure → 1m entry on C4 in FVG with SMT confirmation"
+        },
+        "scalping_timeframe_model": {
+          "is_reference": true,
+          "visual_elements": ["1m chart with 15m context"],
+          "code_insight": "15m→1m pairing = scalping equivalent of daily→hourly; same fractal logic at faster pace"
+        }
+      }
+    }
+  ],
+  "pipeline_notes": {
+    "inefficiencies_found": [],
+    "data_quality": "good",
+    "transcript_coverage": "complete (0:00-8:14)",
+    "silent_sections": false
+  }
+}

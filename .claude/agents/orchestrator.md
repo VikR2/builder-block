@@ -270,6 +270,59 @@ Task("code-reviewer", "
 **Gate:** Integration score >= 70% AND no CRITICAL direction issues
 - If FAIL: Fix issues and re-review
 
+### Phase 5.5: Quality Gate Iteration (POST-BACKTEST)
+
+**Purpose:** Automatically verify and iterate on strategy quality after user runs backtest.
+
+**Flow:**
+```
+User runs 1-month backtest
+         ↓
+User provides log path
+         ↓
+python scripts/nt_log_parser.py <log_path> --json
+         ↓
+┌─────────────────────────────────────┐
+│         QUALITY GATE CHECK          │
+├──────────────────┬──────────────────┤
+│ Entries/month    │ 8-50 (target)    │
+│ CISD success     │ >= 10%           │
+│ Risk wide skips  │ <= 30%           │
+│ Compile errors   │ 0                │
+└──────────────────┴──────────────────┘
+         ↓
+IF ALL PASS → Continue to Delivery
+IF ANY FAIL → Apply auto-fix, bump version, repeat (max 3)
+```
+
+**Auto-fixes:**
+| Issue | Fix |
+|-------|-----|
+| CISD success rate < 10% | Relax CISD from `>` to `>=` |
+| Too many kill zone skips | `UseKillZonesOnly = false` |
+| Too many risk wide skips | `MaxRiskTicks += 10` |
+| Too few entries | Reduce `CISDMinCandles` |
+| Too many entries | Add kill zone filter |
+
+**Command:**
+```bash
+python scripts/nt_log_parser.py "path/to/log.txt" --json
+```
+
+**Output (used for gate check):**
+```json
+{
+  "entries": 324,
+  "cisd_success_rate": 0.184,
+  "skip_reasons": {"Risk too wide": 14},
+  "issues": ["HIGH FREQUENCY"],
+  "recommendations": ["Add kill zone filter"]
+}
+```
+
+**Gate:** All quality metrics within target range
+- If FAIL 3 times: Return to user with identified issues
+
 ### Phase 6: Delivery
 
 - Save strategy to `scripts-output/Strategies/`

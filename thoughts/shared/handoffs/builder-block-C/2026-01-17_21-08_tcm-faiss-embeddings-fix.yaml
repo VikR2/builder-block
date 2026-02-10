@@ -1,0 +1,58 @@
+---
+session: builder-block-C
+date: 2026-01-17
+status: complete
+outcome: PARTIAL_MINUS
+---
+
+goal: Fix TCM Knowledge Bot - new videos not searchable due to missing FAISS embeddings
+now: Test the fix in browser UI and verify volume questions show correct video
+
+test: |
+  curl -s -X POST http://localhost:3000/api/tcm/chat -H "Content-Type: application/json" -d '{"message": "How do I read and interpret volume?", "history": []}' | python -c "import sys,json; d=json.load(sys.stdin); print('Video:', d.get('videoClip',{}).get('videoId','NONE'))"
+  # Expected: read_and_interpret_volume_afa0985f
+
+done_this_session:
+  - task: Generated missing FAISS embeddings for 4 videos
+    files: [data/local-videos/*/embeddings.faiss]
+  - task: Fixed fire-and-forget embedding generation in processor.ts
+    files: [ui/lib/tcm-admin/processor.ts]
+  - task: Added admin cache clear API endpoint
+    files: [ui/app/api/tcm/admin/cache/route.ts]
+  - task: Fixed chat route to prioritize FAISS video for frames/sources
+    files: [ui/app/api/tcm/chat/route.ts]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - faiss_priority: FAISS semantic search now runs FIRST and its results prioritize sources/frames. Keyword matching still runs but FAISS video is boosted.
+  - async_iife: Used async IIFE for embedding generation in process exit handler since callback isn't async.
+  - cache_api: Created admin endpoint /api/tcm/admin/cache (POST to clear) so dev server restart not needed after embedding changes.
+
+findings:
+  - root_cause: processor.ts was fire-and-forget for embeddings (spawn + unref + stdio:ignore). No error visibility, no verification.
+  - dual_cache_issue: Both faissAvailable (tcm-faiss.server.ts:27) and videoClipCache (tcm-video-clips.server.ts:16) were stale after embedding generation.
+  - source_selection_bug: Chat route used keyword matching for sources/frames but FAISS for videoClip, causing mismatched results.
+
+worked:
+  - Running embed_transcripts.py generates embeddings for all videos with transcript_timed.json
+  - FAISS search finds correct video (score 0.64 for volume query)
+  - Prioritizing FAISS results in sources/frames fixed the mismatch
+
+failed:
+  - Initial fix didn't account for server-side cache - required cache clear API
+  - curl escaping on Windows MINGW is problematic - use PowerShell for complex JSON
+
+next:
+  - Test in browser UI at http://localhost:3000/tcm with volume questions
+  - Verify video player shows "read and interpret volume" video
+  - Consider adding FAISS-based search for assembleContext() to replace keyword matching entirely
+
+files:
+  created:
+    - ui/app/api/tcm/admin/cache/route.ts
+  modified:
+    - ui/lib/tcm-admin/processor.ts (lines 13, 17-40, 201-223)
+    - ui/app/api/tcm/chat/route.ts (lines 8, 28-90)

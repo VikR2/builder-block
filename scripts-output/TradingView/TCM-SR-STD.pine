@@ -24,12 +24,18 @@ show2STD = input.bool(false, "Show 2.0 STD Lines", group=GRP_STD, tooltip="Show 
 GRP_VIS = "Visual Settings"
 showLines = input.bool(true, "Show STD Lines", group=GRP_VIS)
 showLabels = input.bool(true, "Show Labels", group=GRP_VIS)
-showInfoBox = input.bool(true, "Show Info Box", group=GRP_VIS)
+infoBoxSize = input.string("Normal", "Info Box Size", options=["Normal", "Compact", "Hidden"], group=GRP_VIS, tooltip="Normal: full size, Compact: smaller text, Hidden: no info box")
 showSRRange = input.bool(true, "Show SR Range Lines", group=GRP_VIS)
 showSREQ = input.bool(true, "Show SR EQ Line", group=GRP_VIS, tooltip="Show SR Equilibrium (midpoint) line")
 showSRBox = input.bool(true, "Show SR Box", group=GRP_VIS, tooltip="Show shaded box for SR session range")
 lineExtension = input.int(50, "Line Extension (bars)", minval=5, maxval=200, group=GRP_VIS, tooltip="How far lines extend past current bar")
 labelOffset = input.int(68, "Label Offset (bars)", minval=5, maxval=200, group=GRP_VIS, tooltip="Where labels are placed (should be >= line extension)")
+
+// Line Style Inputs
+srRangeLineStyle = input.string("Solid", "SR Range Line Style", options=["Solid", "Dashed", "Dotted"], group=GRP_VIS)
+srRangeLineWidth = input.int(2, "SR Range Line Width", minval=1, maxval=4, group=GRP_VIS)
+srEQLineStyle = input.string("Dashed", "SR EQ Line Style", options=["Solid", "Dashed", "Dotted"], group=GRP_VIS)
+srEQLineWidth = input.int(2, "SR EQ Line Width", minval=1, maxval=4, group=GRP_VIS)
 
 GRP_COLORS = "Colors"
 bullishColor = input.color(color.rgb(38, 166, 154), "Bullish Target Color", group=GRP_COLORS)
@@ -51,10 +57,27 @@ showTuesdayBox = input.bool(true, "Show Tuesday Box (16:40-23:40)", group=GRP_SE
 tuesdayBoxBgColor = input.color(color.new(#2F4F4F, 96), "Tuesday Background", group=GRP_SESSIONS)
 tuesdayBoxBorderColor = input.color(color.new(#2F4F4F, 70), "Tuesday Border", group=GRP_SESSIONS)
 
-// Wednesday (Rebalance) Box - 2:00-4:40 AM ET
-showWednesdayBox = input.bool(true, "Show Wednesday Box (2:00-4:40)", group=GRP_SESSIONS)
+// Wednesday (Rebalance) Box - 2:00-7:00 AM ET
+showWednesdayBox = input.bool(true, "Show Wednesday Box (2:00-7:00)", group=GRP_SESSIONS)
 wednesdayBoxBgColor = input.color(color.new(#005B5B, 96), "Wednesday Background", group=GRP_SESSIONS)
 wednesdayBoxBorderColor = input.color(color.new(#005B5B, 70), "Wednesday Border", group=GRP_SESSIONS)
+
+GRP_SUBBOXES = "Sub-Session Boxes"
+
+// Early AM Sub-box (2:00-4:40 AM) - within Wednesday box
+showEarlyAMBox = input.bool(true, "Show Early AM Box (2:00-4:40)", group=GRP_SUBBOXES)
+earlyAMBoxBgColor = input.color(color.new(#D4A017, 85), "Early AM Background", group=GRP_SUBBOXES)
+earlyAMBoxBorderColor = input.color(color.new(#D4A017, 30), "Early AM Border", group=GRP_SUBBOXES)
+
+// PM Sub-box 1 (4:40-7:40 PM)
+showPMBox1 = input.bool(true, "Show PM Box (4:40-7:40 PM)", group=GRP_SUBBOXES)
+pmBox1BgColor = input.color(color.new(#E91E63, 85), "PM Box 1 Background", group=GRP_SUBBOXES)
+pmBox1BorderColor = input.color(color.new(#E91E63, 30), "PM Box 1 Border", group=GRP_SUBBOXES)
+
+// PM Sub-box 2 (6:00-7:40 PM) - nested within PM Box 1
+showPMBox2 = input.bool(true, "Show PM Box 2 (6:00-7:40 PM)", group=GRP_SUBBOXES)
+pmBox2BgColor = input.color(color.new(#FF5722, 85), "PM Box 2 Background", group=GRP_SUBBOXES)
+pmBox2BorderColor = input.color(color.new(#FF5722, 30), "PM Box 2 Border", group=GRP_SUBBOXES)
 
 // =============================================================================
 // MATCHING OVERLAY (THE BOOK) INPUTS
@@ -63,25 +86,61 @@ GRP_OVERLAY = "Matching Overlay (The Book)"
 showOverlayBox = input.bool(true, "Show Book (SR+Matching Overlap)", group=GRP_OVERLAY, tooltip="Shows the overlap between Submission Range and Matching Window - this is 'The Book' where liquidity exists")
 bookExtendRight = input.bool(true, "Extend Book Lines", group=GRP_OVERLAY, tooltip="Extend Book zone lines to the right edge of the chart")
 bookExtensionBars = input.int(50, "Extension Bars", minval=10, maxval=500, group=GRP_OVERLAY, tooltip="How many bars to extend lines (when 'Extend Book Lines' is disabled)")
-overlayBgColor = input.color(color.rgb(255, 215, 0), "Book Color", group=GRP_OVERLAY)
+overlayBgColor = input.color(color.rgb(128, 128, 128), "Book Color", group=GRP_OVERLAY)
 
 GRP_OPENS = "Opening Prices"
 
 // Daily Cycle Open (11:40 AM)
 showDailyCycleOpen = input.bool(true, "Show Daily Cycle Open (11:40)", group=GRP_OPENS)
-dailyCycleOpenColor = input.color(#020202, "Daily Cycle Open Color", group=GRP_OPENS)
+dailyCycleOpenColor = input.color(#020202, "  └ Color", group=GRP_OPENS)
+dailyCycleEndTime = input.string("Session End", "  └ Line Ends At", options=["Session End", "11:40", "14:00", "14:40", "15:00", "16:00", "Current Bar"], group=GRP_OPENS)
 
 // AM Open (2:00 AM)
 showAMOpen = input.bool(true, "Show AM Open (2:00)", group=GRP_OPENS)
-amOpenColor = input.color(#ED0C0C, "AM Open Color", group=GRP_OPENS)
+amOpenColor = input.color(#ED0C0C, "  └ Color", group=GRP_OPENS)
+amOpenEndTime = input.string("Session End", "  └ Line Ends At", options=["Session End", "11:40", "14:00", "14:40", "15:00", "16:00", "Current Bar"], group=GRP_OPENS)
 
 // 4:40 AM Open
 show440Open = input.bool(true, "Show 4:40 AM Open", group=GRP_OPENS)
-open440Color = input.color(#E615E6, "4:40 AM Color", group=GRP_OPENS)
+open440Color = input.color(#E615E6, "  └ Color", group=GRP_OPENS)
+open440EndTime = input.string("Session End", "  └ Line Ends At", options=["Session End", "11:40", "14:00", "14:40", "15:00", "16:00", "Current Bar"], group=GRP_OPENS)
 
 // 7:00 AM Open
 show700Open = input.bool(true, "Show 7:00 AM Open", group=GRP_OPENS)
-open700Color = input.color(#474873, "7:00 AM Color", group=GRP_OPENS)
+open700Color = input.color(#474873, "  └ Color", group=GRP_OPENS)
+open700EndTime = input.string("Session End", "  └ Line Ends At", options=["Session End", "11:40", "14:00", "14:40", "15:00", "16:00", "Current Bar"], group=GRP_OPENS)
+
+GRP_CUSTOM_OPENS = "Custom Opening Prices"
+
+showCustomOpenA = input.bool(true, "Show Custom Open A (9:20 AM)", group=GRP_CUSTOM_OPENS)
+customOpenATime = input.session("0920-1140", "  └ Session", group=GRP_CUSTOM_OPENS)
+customOpenAColor = input.color(#801922, "  └ Color", group=GRP_CUSTOM_OPENS)
+customOpenAEndTime = input.string("Session End", "  └ Line Ends At", options=["Session End", "11:40", "14:00", "14:40", "15:00", "16:00", "Current Bar"], group=GRP_CUSTOM_OPENS)
+
+showCustomOpenB = input.bool(false, "Show Custom Open B", group=GRP_CUSTOM_OPENS)
+customOpenBTime = input.session("1054-1140", "  └ Session", group=GRP_CUSTOM_OPENS)
+customOpenBColor = input.color(#801922, "  └ Color", group=GRP_CUSTOM_OPENS)
+customOpenBEndTime = input.string("Session End", "  └ Line Ends At", options=["Session End", "11:40", "14:00", "14:40", "15:00", "16:00", "Current Bar"], group=GRP_CUSTOM_OPENS)
+
+showCustomOpenC = input.bool(false, "Show Custom Open C (8:40 PM)", group=GRP_CUSTOM_OPENS)
+customOpenCTime = input.session("2040-2340", "  └ Session", group=GRP_CUSTOM_OPENS)
+customOpenCColor = input.color(#f30a1e, "  └ Color", group=GRP_CUSTOM_OPENS)
+customOpenCEndTime = input.string("Session End", "  └ Line Ends At", options=["Session End", "11:40", "14:00", "14:40", "15:00", "16:00", "Current Bar"], group=GRP_CUSTOM_OPENS)
+
+showCustomOpenD = input.bool(false, "Show Custom Open D", group=GRP_CUSTOM_OPENS)
+customOpenDTime = input.session("0940-1500", "  └ Session", group=GRP_CUSTOM_OPENS)
+customOpenDColor = input.color(#801922, "  └ Color", group=GRP_CUSTOM_OPENS)
+customOpenDEndTime = input.string("Session End", "  └ Line Ends At", options=["Session End", "11:40", "14:00", "14:40", "15:00", "16:00", "Current Bar"], group=GRP_CUSTOM_OPENS)
+
+showCustomOpenE = input.bool(false, "Show Custom Open E", group=GRP_CUSTOM_OPENS)
+customOpenETime = input.session("1220-1400", "  └ Session", group=GRP_CUSTOM_OPENS)
+customOpenEColor = input.color(#801922, "  └ Color", group=GRP_CUSTOM_OPENS)
+customOpenEEndTime = input.string("Session End", "  └ Line Ends At", options=["Session End", "11:40", "14:00", "14:40", "15:00", "16:00", "Current Bar"], group=GRP_CUSTOM_OPENS)
+
+showCustomOpenF = input.bool(false, "Show Custom Open F", group=GRP_CUSTOM_OPENS)
+customOpenFTime = input.session("1150-1400", "  └ Session", group=GRP_CUSTOM_OPENS)
+customOpenFColor = input.color(#801922, "  └ Color", group=GRP_CUSTOM_OPENS)
+customOpenFEndTime = input.string("Session End", "  └ Line Ends At", options=["Session End", "11:40", "14:00", "14:40", "15:00", "16:00", "Current Bar"], group=GRP_CUSTOM_OPENS)
 
 GRP_DEBUG = "Debug"
 showHolidayWarning = input.bool(false, "Show Holiday Indicator", group=GRP_DEBUG, tooltip="Display a small marker when a CME holiday is detected (market closed)")
@@ -91,6 +150,15 @@ showHolidayWarning = input.bool(false, "Show Holiday Indicator", group=GRP_DEBUG
 // =============================================================================
 InSession(sessionTime, sessionTimeZone=syminfo.timezone) =>
     not na(time(timeframe.period, sessionTime, sessionTimeZone))
+
+// Helper: convert style string to line.style constant
+getLineStyle(styleStr) =>
+    styleStr == "Solid" ? line.style_solid : styleStr == "Dashed" ? line.style_dashed : line.style_dotted
+
+// Helper: calculate end bar for opening price lines based on end time setting
+// "Session End" = use stored session boundary, "Current Bar" = extend to current bar
+getTimeEndBar(endTimeSetting, storedEnd) =>
+    endTimeSetting == "Session End" ? storedEnd : endTimeSetting == "Current Bar" ? bar_index + lineExtension : storedEnd
 
 // =============================================================================
 // CME FUTURES HOLIDAY DETECTION
@@ -270,7 +338,7 @@ if tuesdaySessionEnd and currentTuesdayHigh > 0
         array.pop(tuesdayEnds)
 
 // Wednesday (Rebalance) - 2:00-4:40 AM ET
-wednesdaySessionTime = "0200-0440"
+wednesdaySessionTime = "0200-0700"
 var float currentWednesdayHigh = 0.0
 var float currentWednesdayLow = 0.0
 var int currentWednesdayStart = 0
@@ -303,6 +371,114 @@ if wednesdaySessionEnd and currentWednesdayHigh > 0
         array.pop(wednesdayLows)
         array.pop(wednesdayStarts)
         array.pop(wednesdayEnds)
+
+// =============================================================================
+// SUB-SESSION BOX TRACKING
+// =============================================================================
+// Early AM (2:00-4:40 AM) - first part of Wednesday
+earlyAMSessionTime = "0200-0440"
+var float currentEarlyAMHigh = 0.0
+var float currentEarlyAMLow = 0.0
+var int currentEarlyAMStart = 0
+
+var array<float> earlyAMHighs = array.new_float(0)
+var array<float> earlyAMLows = array.new_float(0)
+var array<int> earlyAMStarts = array.new_int(0)
+var array<int> earlyAMEnds = array.new_int(0)
+var array<box> earlyAMBoxes = array.new_box(0)
+
+inEarlyAMSession = InSession(earlyAMSessionTime, inputTimezone)
+earlyAMSessionStart = inEarlyAMSession and not inEarlyAMSession[1]
+earlyAMSessionEnd = not inEarlyAMSession and inEarlyAMSession[1]
+
+if earlyAMSessionStart
+    currentEarlyAMHigh := high
+    currentEarlyAMLow := low
+    currentEarlyAMStart := bar_index
+else if inEarlyAMSession
+    currentEarlyAMHigh := math.max(currentEarlyAMHigh, high)
+    currentEarlyAMLow := math.min(currentEarlyAMLow, low)
+
+if earlyAMSessionEnd and currentEarlyAMHigh > 0
+    array.unshift(earlyAMHighs, currentEarlyAMHigh)
+    array.unshift(earlyAMLows, currentEarlyAMLow)
+    array.unshift(earlyAMStarts, currentEarlyAMStart)
+    array.unshift(earlyAMEnds, bar_index)
+    while array.size(earlyAMHighs) > maxDays
+        array.pop(earlyAMHighs)
+        array.pop(earlyAMLows)
+        array.pop(earlyAMStarts)
+        array.pop(earlyAMEnds)
+
+// PM Box 1 (4:40-7:40 PM)
+pmBox1SessionTime = "1640-1940"
+var float currentPMBox1High = 0.0
+var float currentPMBox1Low = 0.0
+var int currentPMBox1Start = 0
+
+var array<float> pmBox1Highs = array.new_float(0)
+var array<float> pmBox1Lows = array.new_float(0)
+var array<int> pmBox1Starts = array.new_int(0)
+var array<int> pmBox1Ends = array.new_int(0)
+var array<box> pmBox1Boxes = array.new_box(0)
+
+inPMBox1Session = InSession(pmBox1SessionTime, inputTimezone)
+pmBox1SessionStart = inPMBox1Session and not inPMBox1Session[1]
+pmBox1SessionEnd = not inPMBox1Session and inPMBox1Session[1]
+
+if pmBox1SessionStart
+    currentPMBox1High := high
+    currentPMBox1Low := low
+    currentPMBox1Start := bar_index
+else if inPMBox1Session
+    currentPMBox1High := math.max(currentPMBox1High, high)
+    currentPMBox1Low := math.min(currentPMBox1Low, low)
+
+if pmBox1SessionEnd and currentPMBox1High > 0
+    array.unshift(pmBox1Highs, currentPMBox1High)
+    array.unshift(pmBox1Lows, currentPMBox1Low)
+    array.unshift(pmBox1Starts, currentPMBox1Start)
+    array.unshift(pmBox1Ends, bar_index)
+    while array.size(pmBox1Highs) > maxDays
+        array.pop(pmBox1Highs)
+        array.pop(pmBox1Lows)
+        array.pop(pmBox1Starts)
+        array.pop(pmBox1Ends)
+
+// PM Box 2 (6:00-7:40 PM) - nested
+pmBox2SessionTime = "1800-1940"
+var float currentPMBox2High = 0.0
+var float currentPMBox2Low = 0.0
+var int currentPMBox2Start = 0
+
+var array<float> pmBox2Highs = array.new_float(0)
+var array<float> pmBox2Lows = array.new_float(0)
+var array<int> pmBox2Starts = array.new_int(0)
+var array<int> pmBox2Ends = array.new_int(0)
+var array<box> pmBox2Boxes = array.new_box(0)
+
+inPMBox2Session = InSession(pmBox2SessionTime, inputTimezone)
+pmBox2SessionStart = inPMBox2Session and not inPMBox2Session[1]
+pmBox2SessionEnd = not inPMBox2Session and inPMBox2Session[1]
+
+if pmBox2SessionStart
+    currentPMBox2High := high
+    currentPMBox2Low := low
+    currentPMBox2Start := bar_index
+else if inPMBox2Session
+    currentPMBox2High := math.max(currentPMBox2High, high)
+    currentPMBox2Low := math.min(currentPMBox2Low, low)
+
+if pmBox2SessionEnd and currentPMBox2High > 0
+    array.unshift(pmBox2Highs, currentPMBox2High)
+    array.unshift(pmBox2Lows, currentPMBox2Low)
+    array.unshift(pmBox2Starts, currentPMBox2Start)
+    array.unshift(pmBox2Ends, bar_index)
+    while array.size(pmBox2Highs) > maxDays
+        array.pop(pmBox2Highs)
+        array.pop(pmBox2Lows)
+        array.pop(pmBox2Starts)
+        array.pop(pmBox2Ends)
 
 // =============================================================================
 // MATCHING WINDOW TRACKING - 4:40 PM - 11:40 PM ET
@@ -460,6 +636,171 @@ if open700End and current700Price > 0
         array.pop(open700Prices)
         array.pop(open700Starts)
         array.pop(open700Ends)
+
+// =============================================================================
+// CUSTOM OPENING PRICE TRACKING (A-F)
+// =============================================================================
+// Custom Open A (9:20 AM default)
+var float currentCustomAPrice = 0.0
+var int currentCustomAStart = 0
+
+var array<float> customAPrices = array.new_float(0)
+var array<int> customAStarts = array.new_int(0)
+var array<int> customAEnds = array.new_int(0)
+var array<line> customALines = array.new_line(0)
+var array<label> customALabels = array.new_label(0)
+
+inCustomA = InSession(customOpenATime, inputTimezone) and timeframe.isintraday
+customAStart = inCustomA and not inCustomA[1]
+customAEnd = not inCustomA and inCustomA[1]
+
+if customAStart
+    currentCustomAPrice := open
+    currentCustomAStart := bar_index
+
+if customAEnd and currentCustomAPrice > 0
+    array.unshift(customAPrices, currentCustomAPrice)
+    array.unshift(customAStarts, currentCustomAStart)
+    array.unshift(customAEnds, bar_index)
+    while array.size(customAPrices) > maxDays
+        array.pop(customAPrices)
+        array.pop(customAStarts)
+        array.pop(customAEnds)
+
+// Custom Open B
+var float currentCustomBPrice = 0.0
+var int currentCustomBStart = 0
+
+var array<float> customBPrices = array.new_float(0)
+var array<int> customBStarts = array.new_int(0)
+var array<int> customBEnds = array.new_int(0)
+var array<line> customBLines = array.new_line(0)
+var array<label> customBLabels = array.new_label(0)
+
+inCustomB = InSession(customOpenBTime, inputTimezone) and timeframe.isintraday
+customBStart = inCustomB and not inCustomB[1]
+customBEnd = not inCustomB and inCustomB[1]
+
+if customBStart
+    currentCustomBPrice := open
+    currentCustomBStart := bar_index
+
+if customBEnd and currentCustomBPrice > 0
+    array.unshift(customBPrices, currentCustomBPrice)
+    array.unshift(customBStarts, currentCustomBStart)
+    array.unshift(customBEnds, bar_index)
+    while array.size(customBPrices) > maxDays
+        array.pop(customBPrices)
+        array.pop(customBStarts)
+        array.pop(customBEnds)
+
+// Custom Open C (8:40 PM default)
+var float currentCustomCPrice = 0.0
+var int currentCustomCStart = 0
+
+var array<float> customCPrices = array.new_float(0)
+var array<int> customCStarts = array.new_int(0)
+var array<int> customCEnds = array.new_int(0)
+var array<line> customCLines = array.new_line(0)
+var array<label> customCLabels = array.new_label(0)
+
+inCustomC = InSession(customOpenCTime, inputTimezone) and timeframe.isintraday
+customCStart = inCustomC and not inCustomC[1]
+customCEnd = not inCustomC and inCustomC[1]
+
+if customCStart
+    currentCustomCPrice := open
+    currentCustomCStart := bar_index
+
+if customCEnd and currentCustomCPrice > 0
+    array.unshift(customCPrices, currentCustomCPrice)
+    array.unshift(customCStarts, currentCustomCStart)
+    array.unshift(customCEnds, bar_index)
+    while array.size(customCPrices) > maxDays
+        array.pop(customCPrices)
+        array.pop(customCStarts)
+        array.pop(customCEnds)
+
+// Custom Open D
+var float currentCustomDPrice = 0.0
+var int currentCustomDStart = 0
+
+var array<float> customDPrices = array.new_float(0)
+var array<int> customDStarts = array.new_int(0)
+var array<int> customDEnds = array.new_int(0)
+var array<line> customDLines = array.new_line(0)
+var array<label> customDLabels = array.new_label(0)
+
+inCustomD = InSession(customOpenDTime, inputTimezone) and timeframe.isintraday
+customDStart = inCustomD and not inCustomD[1]
+customDEnd = not inCustomD and inCustomD[1]
+
+if customDStart
+    currentCustomDPrice := open
+    currentCustomDStart := bar_index
+
+if customDEnd and currentCustomDPrice > 0
+    array.unshift(customDPrices, currentCustomDPrice)
+    array.unshift(customDStarts, currentCustomDStart)
+    array.unshift(customDEnds, bar_index)
+    while array.size(customDPrices) > maxDays
+        array.pop(customDPrices)
+        array.pop(customDStarts)
+        array.pop(customDEnds)
+
+// Custom Open E
+var float currentCustomEPrice = 0.0
+var int currentCustomEStart = 0
+
+var array<float> customEPrices = array.new_float(0)
+var array<int> customEStarts = array.new_int(0)
+var array<int> customEEnds = array.new_int(0)
+var array<line> customELines = array.new_line(0)
+var array<label> customELabels = array.new_label(0)
+
+inCustomE = InSession(customOpenETime, inputTimezone) and timeframe.isintraday
+customEStart = inCustomE and not inCustomE[1]
+customEEnd = not inCustomE and inCustomE[1]
+
+if customEStart
+    currentCustomEPrice := open
+    currentCustomEStart := bar_index
+
+if customEEnd and currentCustomEPrice > 0
+    array.unshift(customEPrices, currentCustomEPrice)
+    array.unshift(customEStarts, currentCustomEStart)
+    array.unshift(customEEnds, bar_index)
+    while array.size(customEPrices) > maxDays
+        array.pop(customEPrices)
+        array.pop(customEStarts)
+        array.pop(customEEnds)
+
+// Custom Open F
+var float currentCustomFPrice = 0.0
+var int currentCustomFStart = 0
+
+var array<float> customFPrices = array.new_float(0)
+var array<int> customFStarts = array.new_int(0)
+var array<int> customFEnds = array.new_int(0)
+var array<line> customFLines = array.new_line(0)
+var array<label> customFLabels = array.new_label(0)
+
+inCustomF = InSession(customOpenFTime, inputTimezone) and timeframe.isintraday
+customFStart = inCustomF and not inCustomF[1]
+customFEnd = not inCustomF and inCustomF[1]
+
+if customFStart
+    currentCustomFPrice := open
+    currentCustomFStart := bar_index
+
+if customFEnd and currentCustomFPrice > 0
+    array.unshift(customFPrices, currentCustomFPrice)
+    array.unshift(customFStarts, currentCustomFStart)
+    array.unshift(customFEnds, bar_index)
+    while array.size(customFPrices) > maxDays
+        array.pop(customFPrices)
+        array.pop(customFStarts)
+        array.pop(customFEnds)
 
 // =============================================================================
 // ARRAYS TO STORE MULTIPLE DAYS OF SR DATA
@@ -703,9 +1044,9 @@ if barstate.islast and showLines
         // SR Range lines - more visible with solid style and better width
         if showSRRange
             srHighLn = line.new(startBar, srH, bar_index + lineExtension, srH,
-                               color=color.new(srRangeColor, dayOpacity), width=2, style=line.style_solid)
+                               color=color.new(srRangeColor, dayOpacity), width=srRangeLineWidth, style=getLineStyle(srRangeLineStyle))
             srLowLn = line.new(startBar, srL, bar_index + lineExtension, srL,
-                              color=color.new(srRangeColor, dayOpacity), width=2, style=line.style_solid)
+                              color=color.new(srRangeColor, dayOpacity), width=srRangeLineWidth, style=getLineStyle(srRangeLineStyle))
             array.push(srHighLines, srHighLn)
             array.push(srLowLines, srLowLn)
 
@@ -720,7 +1061,7 @@ if barstate.islast and showLines
         // SR EQ (Equilibrium) line
         if showSREQ
             srEQLn = line.new(startBar, srEQ, bar_index + lineExtension, srEQ,
-                             color=color.new(srEQColor, dayOpacity), width=2, style=line.style_dashed)
+                             color=color.new(srEQColor, dayOpacity), width=srEQLineWidth, style=getLineStyle(srEQLineStyle))
             array.push(srEQLines, srEQLn)
 
             if showLabels
@@ -892,6 +1233,62 @@ if barstate.islast and showLines
             array.push(wednesdayBoxes, wBox)
 
     // =========================================================================
+    // DRAW SUB-SESSION BOXES
+    // =========================================================================
+    // Clear old sub-boxes
+    for bx in earlyAMBoxes
+        box.delete(bx)
+    for bx in pmBox1Boxes
+        box.delete(bx)
+    for bx in pmBox2Boxes
+        box.delete(bx)
+    array.clear(earlyAMBoxes)
+    array.clear(pmBox1Boxes)
+    array.clear(pmBox2Boxes)
+
+    // Draw Early AM boxes (2:00-4:40 AM)
+    if showEarlyAMBox
+        for i = 0 to math.min(array.size(earlyAMHighs) - 1, maxDays - 1)
+            eH = array.get(earlyAMHighs, i)
+            eL = array.get(earlyAMLows, i)
+            eStart = array.get(earlyAMStarts, i)
+            eEnd = array.get(earlyAMEnds, i)
+            extraOp = i * 5
+            eBox = box.new(eStart, eH, eEnd, eL,
+                border_color=color.new(earlyAMBoxBorderColor, extraOp),
+                bgcolor=color.new(earlyAMBoxBgColor, math.min(85 + extraOp, 95)),
+                border_width=2)
+            array.push(earlyAMBoxes, eBox)
+
+    // Draw PM Box 1 (4:40-7:40 PM)
+    if showPMBox1
+        for i = 0 to math.min(array.size(pmBox1Highs) - 1, maxDays - 1)
+            pH = array.get(pmBox1Highs, i)
+            pL = array.get(pmBox1Lows, i)
+            pStart = array.get(pmBox1Starts, i)
+            pEnd = array.get(pmBox1Ends, i)
+            extraOp = i * 5
+            pBox = box.new(pStart, pH, pEnd, pL,
+                border_color=color.new(pmBox1BorderColor, extraOp),
+                bgcolor=color.new(pmBox1BgColor, math.min(85 + extraOp, 95)),
+                border_width=2)
+            array.push(pmBox1Boxes, pBox)
+
+    // Draw PM Box 2 (6:00-7:40 PM)
+    if showPMBox2
+        for i = 0 to math.min(array.size(pmBox2Highs) - 1, maxDays - 1)
+            p2H = array.get(pmBox2Highs, i)
+            p2L = array.get(pmBox2Lows, i)
+            p2Start = array.get(pmBox2Starts, i)
+            p2End = array.get(pmBox2Ends, i)
+            extraOp = i * 5
+            p2Box = box.new(p2Start, p2H, p2End, p2L,
+                border_color=color.new(pmBox2BorderColor, extraOp),
+                bgcolor=color.new(pmBox2BgColor, math.min(85 + extraOp, 95)),
+                border_width=2)
+            array.push(pmBox2Boxes, p2Box)
+
+    // =========================================================================
     // DRAW MATCHING BOXES AND OVERLAY (THE BOOK)
     // =========================================================================
     // Clear old matching boxes and overlay
@@ -1009,6 +1406,31 @@ if barstate.islast and showLines
         line.delete(ln)
     for lb in open700Labels
         label.delete(lb)
+    // Clear custom opens
+    for ln in customALines
+        line.delete(ln)
+    for lb in customALabels
+        label.delete(lb)
+    for ln in customBLines
+        line.delete(ln)
+    for lb in customBLabels
+        label.delete(lb)
+    for ln in customCLines
+        line.delete(ln)
+    for lb in customCLabels
+        label.delete(lb)
+    for ln in customDLines
+        line.delete(ln)
+    for lb in customDLabels
+        label.delete(lb)
+    for ln in customELines
+        line.delete(ln)
+    for lb in customELabels
+        label.delete(lb)
+    for ln in customFLines
+        line.delete(ln)
+    for lb in customFLabels
+        label.delete(lb)
     array.clear(dailyCycleLines)
     array.clear(dailyCycleLabels)
     array.clear(amOpenLines)
@@ -1017,6 +1439,18 @@ if barstate.islast and showLines
     array.clear(open440Labels)
     array.clear(open700Lines)
     array.clear(open700Labels)
+    array.clear(customALines)
+    array.clear(customALabels)
+    array.clear(customBLines)
+    array.clear(customBLabels)
+    array.clear(customCLines)
+    array.clear(customCLabels)
+    array.clear(customDLines)
+    array.clear(customDLabels)
+    array.clear(customELines)
+    array.clear(customELabels)
+    array.clear(customFLines)
+    array.clear(customFLabels)
 
     // Draw Daily Cycle Open lines
     if showDailyCycleOpen
@@ -1024,11 +1458,19 @@ if barstate.islast and showLines
             dcPrice = array.get(dailyCyclePrices, i)
             dcStart = array.get(dailyCycleStarts, i)
             dcEnd = array.get(dailyCycleEnds, i)
+            dcEndBar = getTimeEndBar(dailyCycleEndTime, dcEnd)
             dayOp = i * 20
-            dcLn = line.new(dcStart, dcPrice, dcEnd, dcPrice, color=color.new(dailyCycleOpenColor, dayOp), width=1)
-            dcLbl = label.new(dcEnd, dcPrice, "Daily CYCLE OPEN", style=label.style_none, textcolor=color.new(dailyCycleOpenColor, dayOp), size=size.small, textalign=text.align_left)
+            dcLn = line.new(dcStart, dcPrice, dcEndBar, dcPrice, color=color.new(dailyCycleOpenColor, dayOp), width=1)
+            dcLbl = label.new(dcEndBar, dcPrice, "Daily CYCLE OPEN", style=label.style_none, textcolor=color.new(dailyCycleOpenColor, dayOp), size=size.small, textalign=text.align_left)
             array.push(dailyCycleLines, dcLn)
             array.push(dailyCycleLabels, dcLbl)
+
+        // Draw current day (while in session)
+        if inDailyCycle and currentDailyCyclePrice > 0
+            dcLnCurrent = line.new(currentDailyCycleStart, currentDailyCyclePrice, bar_index, currentDailyCyclePrice, color=dailyCycleOpenColor, width=1)
+            dcLblCurrent = label.new(bar_index, currentDailyCyclePrice, "Daily CYCLE OPEN", style=label.style_none, textcolor=dailyCycleOpenColor, size=size.small, textalign=text.align_left)
+            array.push(dailyCycleLines, dcLnCurrent)
+            array.push(dailyCycleLabels, dcLblCurrent)
 
     // Draw AM Open lines
     if showAMOpen
@@ -1036,11 +1478,19 @@ if barstate.islast and showLines
             amPrice = array.get(amOpenPrices, i)
             amStart = array.get(amOpenStarts, i)
             amEnd = array.get(amOpenEnds, i)
+            amEndBar = getTimeEndBar(amOpenEndTime, amEnd)
             dayOp = i * 20
-            amLn = line.new(amStart, amPrice, amEnd, amPrice, color=color.new(amOpenColor, dayOp), width=1)
-            amLbl = label.new(amEnd, amPrice, "AM Open", style=label.style_none, textcolor=color.new(amOpenColor, dayOp), size=size.small, textalign=text.align_left)
+            amLn = line.new(amStart, amPrice, amEndBar, amPrice, color=color.new(amOpenColor, dayOp), width=1)
+            amLbl = label.new(amEndBar, amPrice, "AM Open", style=label.style_none, textcolor=color.new(amOpenColor, dayOp), size=size.small, textalign=text.align_left)
             array.push(amOpenLines, amLn)
             array.push(amOpenLabels, amLbl)
+
+        // Draw current day (while in session)
+        if inAMOpen and currentAMOpenPrice > 0
+            amLnCurrent = line.new(currentAMOpenStart, currentAMOpenPrice, bar_index, currentAMOpenPrice, color=amOpenColor, width=1)
+            amLblCurrent = label.new(bar_index, currentAMOpenPrice, "AM Open", style=label.style_none, textcolor=amOpenColor, size=size.small, textalign=text.align_left)
+            array.push(amOpenLines, amLnCurrent)
+            array.push(amOpenLabels, amLblCurrent)
 
     // Draw 4:40 AM Open lines
     if show440Open
@@ -1048,11 +1498,19 @@ if barstate.islast and showLines
             p440 = array.get(open440Prices, i)
             s440 = array.get(open440Starts, i)
             e440 = array.get(open440Ends, i)
+            end440Bar = getTimeEndBar(open440EndTime, e440)
             dayOp = i * 20
-            ln440 = line.new(s440, p440, e440, p440, color=color.new(open440Color, dayOp), width=1)
-            lbl440 = label.new(e440, p440, "4:40 am", style=label.style_none, textcolor=color.new(open440Color, dayOp), size=size.small, textalign=text.align_left)
+            ln440 = line.new(s440, p440, end440Bar, p440, color=color.new(open440Color, dayOp), width=1)
+            lbl440 = label.new(end440Bar, p440, "4:40 am", style=label.style_none, textcolor=color.new(open440Color, dayOp), size=size.small, textalign=text.align_left)
             array.push(open440Lines, ln440)
             array.push(open440Labels, lbl440)
+
+        // Draw current day (while in session)
+        if inOpen440 and current440Price > 0
+            ln440Current = line.new(current440Start, current440Price, bar_index, current440Price, color=open440Color, width=1)
+            lbl440Current = label.new(bar_index, current440Price, "4:40 am", style=label.style_none, textcolor=open440Color, size=size.small, textalign=text.align_left)
+            array.push(open440Lines, ln440Current)
+            array.push(open440Labels, lbl440Current)
 
     // Draw 7:00 AM Open lines
     if show700Open
@@ -1060,18 +1518,155 @@ if barstate.islast and showLines
             p700 = array.get(open700Prices, i)
             s700 = array.get(open700Starts, i)
             e700 = array.get(open700Ends, i)
+            end700Bar = getTimeEndBar(open700EndTime, e700)
             dayOp = i * 20
-            ln700 = line.new(s700, p700, e700, p700, color=color.new(open700Color, dayOp), width=1)
-            lbl700 = label.new(e700, p700, "7:00 am", style=label.style_none, textcolor=color.new(open700Color, dayOp), size=size.small, textalign=text.align_left)
+            ln700 = line.new(s700, p700, end700Bar, p700, color=color.new(open700Color, dayOp), width=1)
+            lbl700 = label.new(end700Bar, p700, "7:00 am", style=label.style_none, textcolor=color.new(open700Color, dayOp), size=size.small, textalign=text.align_left)
             array.push(open700Lines, ln700)
             array.push(open700Labels, lbl700)
+
+        // Draw current day (while in session)
+        if inOpen700 and current700Price > 0
+            ln700Current = line.new(current700Start, current700Price, bar_index, current700Price, color=open700Color, width=1)
+            lbl700Current = label.new(bar_index, current700Price, "7:00 am", style=label.style_none, textcolor=open700Color, size=size.small, textalign=text.align_left)
+            array.push(open700Lines, ln700Current)
+            array.push(open700Labels, lbl700Current)
+
+    // =========================================================================
+    // DRAW CUSTOM OPENING PRICE LINES (A-F)
+    // =========================================================================
+    // Draw Custom Open A (9:20 AM default)
+    if showCustomOpenA
+        for i = 0 to math.min(array.size(customAPrices) - 1, maxDays - 1)
+            caPrice = array.get(customAPrices, i)
+            caStart = array.get(customAStarts, i)
+            caEnd = array.get(customAEnds, i)
+            caEndBar = getTimeEndBar(customOpenAEndTime, caEnd)
+            dayOp = i * 20
+            caLn = line.new(caStart, caPrice, caEndBar, caPrice, color=color.new(customOpenAColor, dayOp), width=1)
+            caLbl = label.new(caEndBar, caPrice, "9:20 am", style=label.style_none, textcolor=color.new(customOpenAColor, dayOp), size=size.small, textalign=text.align_left)
+            array.push(customALines, caLn)
+            array.push(customALabels, caLbl)
+
+        // Draw current day (while in session)
+        if inCustomA and currentCustomAPrice > 0
+            caLnCurrent = line.new(currentCustomAStart, currentCustomAPrice, bar_index, currentCustomAPrice, color=customOpenAColor, width=1)
+            caLblCurrent = label.new(bar_index, currentCustomAPrice, "9:20 am", style=label.style_none, textcolor=customOpenAColor, size=size.small, textalign=text.align_left)
+            array.push(customALines, caLnCurrent)
+            array.push(customALabels, caLblCurrent)
+
+    // Draw Custom Open B
+    if showCustomOpenB
+        for i = 0 to math.min(array.size(customBPrices) - 1, maxDays - 1)
+            cbPrice = array.get(customBPrices, i)
+            cbStart = array.get(customBStarts, i)
+            cbEnd = array.get(customBEnds, i)
+            cbEndBar = getTimeEndBar(customOpenBEndTime, cbEnd)
+            dayOp = i * 20
+            cbLn = line.new(cbStart, cbPrice, cbEndBar, cbPrice, color=color.new(customOpenBColor, dayOp), width=1)
+            cbLbl = label.new(cbEndBar, cbPrice, "Custom B", style=label.style_none, textcolor=color.new(customOpenBColor, dayOp), size=size.small, textalign=text.align_left)
+            array.push(customBLines, cbLn)
+            array.push(customBLabels, cbLbl)
+
+        // Draw current day (while in session)
+        if inCustomB and currentCustomBPrice > 0
+            cbLnCurrent = line.new(currentCustomBStart, currentCustomBPrice, bar_index, currentCustomBPrice, color=customOpenBColor, width=1)
+            cbLblCurrent = label.new(bar_index, currentCustomBPrice, "Custom B", style=label.style_none, textcolor=customOpenBColor, size=size.small, textalign=text.align_left)
+            array.push(customBLines, cbLnCurrent)
+            array.push(customBLabels, cbLblCurrent)
+
+    // Draw Custom Open C (8:40 PM default)
+    if showCustomOpenC
+        for i = 0 to math.min(array.size(customCPrices) - 1, maxDays - 1)
+            ccPrice = array.get(customCPrices, i)
+            ccStart = array.get(customCStarts, i)
+            ccEnd = array.get(customCEnds, i)
+            ccEndBar = getTimeEndBar(customOpenCEndTime, ccEnd)
+            dayOp = i * 20
+            ccLn = line.new(ccStart, ccPrice, ccEndBar, ccPrice, color=color.new(customOpenCColor, dayOp), width=1)
+            ccLbl = label.new(ccEndBar, ccPrice, "8:40 pm", style=label.style_none, textcolor=color.new(customOpenCColor, dayOp), size=size.small, textalign=text.align_left)
+            array.push(customCLines, ccLn)
+            array.push(customCLabels, ccLbl)
+
+        // Draw current day (while in session)
+        if inCustomC and currentCustomCPrice > 0
+            ccLnCurrent = line.new(currentCustomCStart, currentCustomCPrice, bar_index, currentCustomCPrice, color=customOpenCColor, width=1)
+            ccLblCurrent = label.new(bar_index, currentCustomCPrice, "8:40 pm", style=label.style_none, textcolor=customOpenCColor, size=size.small, textalign=text.align_left)
+            array.push(customCLines, ccLnCurrent)
+            array.push(customCLabels, ccLblCurrent)
+
+    // Draw Custom Open D
+    if showCustomOpenD
+        for i = 0 to math.min(array.size(customDPrices) - 1, maxDays - 1)
+            cdPrice = array.get(customDPrices, i)
+            cdStart = array.get(customDStarts, i)
+            cdEnd = array.get(customDEnds, i)
+            cdEndBar = getTimeEndBar(customOpenDEndTime, cdEnd)
+            dayOp = i * 20
+            cdLn = line.new(cdStart, cdPrice, cdEndBar, cdPrice, color=color.new(customOpenDColor, dayOp), width=1)
+            cdLbl = label.new(cdEndBar, cdPrice, "Custom D", style=label.style_none, textcolor=color.new(customOpenDColor, dayOp), size=size.small, textalign=text.align_left)
+            array.push(customDLines, cdLn)
+            array.push(customDLabels, cdLbl)
+
+        // Draw current day (while in session)
+        if inCustomD and currentCustomDPrice > 0
+            cdLnCurrent = line.new(currentCustomDStart, currentCustomDPrice, bar_index, currentCustomDPrice, color=customOpenDColor, width=1)
+            cdLblCurrent = label.new(bar_index, currentCustomDPrice, "Custom D", style=label.style_none, textcolor=customOpenDColor, size=size.small, textalign=text.align_left)
+            array.push(customDLines, cdLnCurrent)
+            array.push(customDLabels, cdLblCurrent)
+
+    // Draw Custom Open E
+    if showCustomOpenE
+        for i = 0 to math.min(array.size(customEPrices) - 1, maxDays - 1)
+            cePrice = array.get(customEPrices, i)
+            ceStart = array.get(customEStarts, i)
+            ceEnd = array.get(customEEnds, i)
+            ceEndBar = getTimeEndBar(customOpenEEndTime, ceEnd)
+            dayOp = i * 20
+            ceLn = line.new(ceStart, cePrice, ceEndBar, cePrice, color=color.new(customOpenEColor, dayOp), width=1)
+            ceLbl = label.new(ceEndBar, cePrice, "Custom E", style=label.style_none, textcolor=color.new(customOpenEColor, dayOp), size=size.small, textalign=text.align_left)
+            array.push(customELines, ceLn)
+            array.push(customELabels, ceLbl)
+
+        // Draw current day (while in session)
+        if inCustomE and currentCustomEPrice > 0
+            ceLnCurrent = line.new(currentCustomEStart, currentCustomEPrice, bar_index, currentCustomEPrice, color=customOpenEColor, width=1)
+            ceLblCurrent = label.new(bar_index, currentCustomEPrice, "Custom E", style=label.style_none, textcolor=customOpenEColor, size=size.small, textalign=text.align_left)
+            array.push(customELines, ceLnCurrent)
+            array.push(customELabels, ceLblCurrent)
+
+    // Draw Custom Open F
+    if showCustomOpenF
+        for i = 0 to math.min(array.size(customFPrices) - 1, maxDays - 1)
+            cfPrice = array.get(customFPrices, i)
+            cfStart = array.get(customFStarts, i)
+            cfEnd = array.get(customFEnds, i)
+            cfEndBar = getTimeEndBar(customOpenFEndTime, cfEnd)
+            dayOp = i * 20
+            cfLn = line.new(cfStart, cfPrice, cfEndBar, cfPrice, color=color.new(customOpenFColor, dayOp), width=1)
+            cfLbl = label.new(cfEndBar, cfPrice, "Custom F", style=label.style_none, textcolor=color.new(customOpenFColor, dayOp), size=size.small, textalign=text.align_left)
+            array.push(customFLines, cfLn)
+            array.push(customFLabels, cfLbl)
+
+        // Draw current day (while in session)
+        if inCustomF and currentCustomFPrice > 0
+            cfLnCurrent = line.new(currentCustomFStart, currentCustomFPrice, bar_index, currentCustomFPrice, color=customOpenFColor, width=1)
+            cfLblCurrent = label.new(bar_index, currentCustomFPrice, "Custom F", style=label.style_none, textcolor=customOpenFColor, size=size.small, textalign=text.align_left)
+            array.push(customFLines, cfLnCurrent)
+            array.push(customFLabels, cfLblCurrent)
 
 // =============================================================================
 // INFO BOX
 // =============================================================================
+// Size mappings for Normal vs Compact mode
+szLarge = infoBoxSize == "Compact" ? size.normal : size.large
+szNormal = infoBoxSize == "Compact" ? size.small : size.normal
+szSmall = infoBoxSize == "Compact" ? size.tiny : size.small
+szTiny = size.tiny
+
 var table infoBox = table.new(position.top_right, 3, 12, bgcolor=color.new(#2a2e39, 15), border_width=1, border_color=color.new(#363a45, 30))
 
-if barstate.islast and showInfoBox and array.size(srHighs) > 0
+if barstate.islast and infoBoxSize != "Hidden" and array.size(srHighs) > 0
     // Get most recent SR data
     srHigh = array.get(srHighs, 0)
     srLow = array.get(srLows, 0)
@@ -1088,89 +1683,89 @@ if barstate.islast and showInfoBox and array.size(srHighs) > 0
     // Header - Bias
     biasText = buying ? "▲ BULLISH" : "▼ BEARISH"
     biasCol = buying ? bullishColor : bearishColor
-    table.cell(infoBox, 0, 0, "BIAS", text_color=color.gray, text_size=size.normal, text_halign=text.align_left)
-    table.cell(infoBox, 1, 0, biasText, text_color=biasCol, text_size=size.large, text_halign=text.align_right)
+    table.cell(infoBox, 0, 0, "BIAS", text_color=color.gray, text_size=szNormal, text_halign=text.align_left)
+    table.cell(infoBox, 1, 0, biasText, text_color=biasCol, text_size=szLarge, text_halign=text.align_right)
     table.merge_cells(infoBox, 1, 0, 2, 0)
 
     // SR Range info with High, Low, EQ
-    table.cell(infoBox, 0, 1, "── SR RANGE ──", text_color=color.gray, text_size=size.small, text_halign=text.align_center)
+    table.cell(infoBox, 0, 1, "── SR RANGE ──", text_color=color.gray, text_size=szSmall, text_halign=text.align_center)
     table.merge_cells(infoBox, 0, 1, 2, 1)
 
-    table.cell(infoBox, 0, 2, "High", text_color=srRangeColor, text_size=size.small, text_halign=text.align_left)
-    table.cell(infoBox, 1, 2, str.tostring(srHigh, "#.##"), text_color=srRangeColor, text_size=size.normal, text_halign=text.align_right)
+    table.cell(infoBox, 0, 2, "High", text_color=srRangeColor, text_size=szSmall, text_halign=text.align_left)
+    table.cell(infoBox, 1, 2, str.tostring(srHigh, "#.##"), text_color=srRangeColor, text_size=szNormal, text_halign=text.align_right)
     table.merge_cells(infoBox, 1, 2, 2, 2)
 
-    table.cell(infoBox, 0, 3, "EQ", text_color=srEQColor, text_size=size.small, text_halign=text.align_left)
-    table.cell(infoBox, 1, 3, str.tostring(srEQPrice, "#.##"), text_color=srEQColor, text_size=size.normal, text_halign=text.align_right)
+    table.cell(infoBox, 0, 3, "EQ", text_color=srEQColor, text_size=szSmall, text_halign=text.align_left)
+    table.cell(infoBox, 1, 3, str.tostring(srEQPrice, "#.##"), text_color=srEQColor, text_size=szNormal, text_halign=text.align_right)
     table.merge_cells(infoBox, 1, 3, 2, 3)
 
-    table.cell(infoBox, 0, 4, "Low", text_color=srRangeColor, text_size=size.small, text_halign=text.align_left)
-    table.cell(infoBox, 1, 4, str.tostring(srLow, "#.##"), text_color=srRangeColor, text_size=size.normal, text_halign=text.align_right)
+    table.cell(infoBox, 0, 4, "Low", text_color=srRangeColor, text_size=szSmall, text_halign=text.align_left)
+    table.cell(infoBox, 1, 4, str.tostring(srLow, "#.##"), text_color=srRangeColor, text_size=szNormal, text_halign=text.align_right)
     table.merge_cells(infoBox, 1, 4, 2, 4)
 
     // Targets section with hit status
     if buying
         // Primary targets (Long)
-        table.cell(infoBox, 0, 5, "── TARGETS (LONG) ──", text_color=color.gray, text_size=size.small, text_halign=text.align_center)
+        table.cell(infoBox, 0, 5, "── TARGETS (LONG) ──", text_color=color.gray, text_size=szSmall, text_halign=text.align_center)
         table.merge_cells(infoBox, 0, 5, 2, 5)
 
         t1Status = longT1Hit ? "✓" : "○"
         t1Color = longT1Hit ? hitColor : bullishColor
-        table.cell(infoBox, 0, 6, t1Status, text_color=t1Color, text_size=size.normal, text_halign=text.align_center)
-        table.cell(infoBox, 1, 6, str.tostring(target1STDMultiplier, "#.#") + " STD", text_color=t1Color, text_size=size.normal, text_halign=text.align_left)
-        table.cell(infoBox, 2, 6, str.tostring(longT1Price, "#.##"), text_color=t1Color, text_size=size.normal, text_halign=text.align_right)
+        table.cell(infoBox, 0, 6, t1Status, text_color=t1Color, text_size=szNormal, text_halign=text.align_center)
+        table.cell(infoBox, 1, 6, str.tostring(target1STDMultiplier, "#.#") + " STD", text_color=t1Color, text_size=szNormal, text_halign=text.align_left)
+        table.cell(infoBox, 2, 6, str.tostring(longT1Price, "#.##"), text_color=t1Color, text_size=szNormal, text_halign=text.align_right)
 
         t2Status = longT2Hit ? "✓" : "○"
         t2Color = longT2Hit ? hitColor : bullishColor
-        table.cell(infoBox, 0, 7, t2Status, text_color=t2Color, text_size=size.normal, text_halign=text.align_center)
-        table.cell(infoBox, 1, 7, str.tostring(target2STDMultiplier, "#.#") + " STD", text_color=t2Color, text_size=size.normal, text_halign=text.align_left)
-        table.cell(infoBox, 2, 7, str.tostring(longT2Price, "#.##"), text_color=t2Color, text_size=size.normal, text_halign=text.align_right)
+        table.cell(infoBox, 0, 7, t2Status, text_color=t2Color, text_size=szNormal, text_halign=text.align_center)
+        table.cell(infoBox, 1, 7, str.tostring(target2STDMultiplier, "#.#") + " STD", text_color=t2Color, text_size=szNormal, text_halign=text.align_left)
+        table.cell(infoBox, 2, 7, str.tostring(longT2Price, "#.##"), text_color=t2Color, text_size=szNormal, text_halign=text.align_right)
 
         if longT2Hit
-            table.cell(infoBox, 0, 8, "→ SCALP SHORT", text_color=bearishColor, text_size=size.small, text_halign=text.align_center)
+            table.cell(infoBox, 0, 8, "→ SCALP SHORT", text_color=bearishColor, text_size=szSmall, text_halign=text.align_center)
             table.merge_cells(infoBox, 0, 8, 2, 8)
 
-        table.cell(infoBox, 0, 9, "── MAX LOW (REVERSAL) ──", text_color=color.gray, text_size=size.small, text_halign=text.align_center)
+        table.cell(infoBox, 0, 9, "── MAX LOW (REVERSAL) ──", text_color=color.gray, text_size=szSmall, text_halign=text.align_center)
         table.merge_cells(infoBox, 0, 9, 2, 9)
 
         revStatus = shortT2Hit ? "✓" : "○"
         revColor = shortT2Hit ? hitColor : color.new(bearishColor, 50)
-        table.cell(infoBox, 0, 10, revStatus, text_color=revColor, text_size=size.normal, text_halign=text.align_center)
-        table.cell(infoBox, 1, 10, str.tostring(target2STDMultiplier, "#.#") + " STD", text_color=revColor, text_size=size.normal, text_halign=text.align_left)
-        table.cell(infoBox, 2, 10, str.tostring(shortT2Price, "#.##"), text_color=revColor, text_size=size.normal, text_halign=text.align_right)
+        table.cell(infoBox, 0, 10, revStatus, text_color=revColor, text_size=szNormal, text_halign=text.align_center)
+        table.cell(infoBox, 1, 10, str.tostring(target2STDMultiplier, "#.#") + " STD", text_color=revColor, text_size=szNormal, text_halign=text.align_left)
+        table.cell(infoBox, 2, 10, str.tostring(shortT2Price, "#.##"), text_color=revColor, text_size=szNormal, text_halign=text.align_right)
     else
         // Primary targets (Short)
-        table.cell(infoBox, 0, 5, "── TARGETS (SHORT) ──", text_color=color.gray, text_size=size.small, text_halign=text.align_center)
+        table.cell(infoBox, 0, 5, "── TARGETS (SHORT) ──", text_color=color.gray, text_size=szSmall, text_halign=text.align_center)
         table.merge_cells(infoBox, 0, 5, 2, 5)
 
         t1Status = shortT1Hit ? "✓" : "○"
         t1Color = shortT1Hit ? hitColor : bearishColor
-        table.cell(infoBox, 0, 6, t1Status, text_color=t1Color, text_size=size.normal, text_halign=text.align_center)
-        table.cell(infoBox, 1, 6, str.tostring(target1STDMultiplier, "#.#") + " STD", text_color=t1Color, text_size=size.normal, text_halign=text.align_left)
-        table.cell(infoBox, 2, 6, str.tostring(shortT1Price, "#.##"), text_color=t1Color, text_size=size.normal, text_halign=text.align_right)
+        table.cell(infoBox, 0, 6, t1Status, text_color=t1Color, text_size=szNormal, text_halign=text.align_center)
+        table.cell(infoBox, 1, 6, str.tostring(target1STDMultiplier, "#.#") + " STD", text_color=t1Color, text_size=szNormal, text_halign=text.align_left)
+        table.cell(infoBox, 2, 6, str.tostring(shortT1Price, "#.##"), text_color=t1Color, text_size=szNormal, text_halign=text.align_right)
 
         t2Status = shortT2Hit ? "✓" : "○"
         t2Color = shortT2Hit ? hitColor : bearishColor
-        table.cell(infoBox, 0, 7, t2Status, text_color=t2Color, text_size=size.normal, text_halign=text.align_center)
-        table.cell(infoBox, 1, 7, str.tostring(target2STDMultiplier, "#.#") + " STD", text_color=t2Color, text_size=size.normal, text_halign=text.align_left)
-        table.cell(infoBox, 2, 7, str.tostring(shortT2Price, "#.##"), text_color=t2Color, text_size=size.normal, text_halign=text.align_right)
+        table.cell(infoBox, 0, 7, t2Status, text_color=t2Color, text_size=szNormal, text_halign=text.align_center)
+        table.cell(infoBox, 1, 7, str.tostring(target2STDMultiplier, "#.#") + " STD", text_color=t2Color, text_size=szNormal, text_halign=text.align_left)
+        table.cell(infoBox, 2, 7, str.tostring(shortT2Price, "#.##"), text_color=t2Color, text_size=szNormal, text_halign=text.align_right)
 
         if shortT2Hit
-            table.cell(infoBox, 0, 8, "→ SCALP LONG", text_color=bullishColor, text_size=size.small, text_halign=text.align_center)
+            table.cell(infoBox, 0, 8, "→ SCALP LONG", text_color=bullishColor, text_size=szSmall, text_halign=text.align_center)
             table.merge_cells(infoBox, 0, 8, 2, 8)
 
-        table.cell(infoBox, 0, 9, "── MAX HIGH (REVERSAL) ──", text_color=color.gray, text_size=size.small, text_halign=text.align_center)
+        table.cell(infoBox, 0, 9, "── MAX HIGH (REVERSAL) ──", text_color=color.gray, text_size=szSmall, text_halign=text.align_center)
         table.merge_cells(infoBox, 0, 9, 2, 9)
 
         revStatus = longT2Hit ? "✓" : "○"
         revColor = longT2Hit ? hitColor : color.new(bullishColor, 50)
-        table.cell(infoBox, 0, 10, revStatus, text_color=revColor, text_size=size.normal, text_halign=text.align_center)
-        table.cell(infoBox, 1, 10, str.tostring(target2STDMultiplier, "#.#") + " STD", text_color=revColor, text_size=size.normal, text_halign=text.align_left)
-        table.cell(infoBox, 2, 10, str.tostring(longT2Price, "#.##"), text_color=revColor, text_size=size.normal, text_halign=text.align_right)
+        table.cell(infoBox, 0, 10, revStatus, text_color=revColor, text_size=szNormal, text_halign=text.align_center)
+        table.cell(infoBox, 1, 10, str.tostring(target2STDMultiplier, "#.#") + " STD", text_color=revColor, text_size=szNormal, text_halign=text.align_left)
+        table.cell(infoBox, 2, 10, str.tostring(longT2Price, "#.##"), text_color=revColor, text_size=szNormal, text_halign=text.align_right)
 
     // Timeframe warning for 1H+ (SR range fetched from 5m data)
     if useHigherTFCorrection
-        table.cell(infoBox, 0, 11, "ℹ SR from 5m data", text_color=color.new(color.orange, 30), text_size=size.tiny, text_halign=text.align_center)
+        table.cell(infoBox, 0, 11, "ℹ SR from 5m data", text_color=color.new(color.orange, 30), text_size=szTiny, text_halign=text.align_center)
         table.merge_cells(infoBox, 0, 11, 2, 11)
 
 // =============================================================================
