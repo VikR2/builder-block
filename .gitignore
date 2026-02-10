@@ -36,6 +36,21 @@ venv/
 *.local.json
 *.local.md
 
+# Large media files
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.wav
+*.mp3
+*.zip
+*.tar.gz
+*.ytdl
+
+# Video data directories
+data/video-frames/*/video.*
+data/local-videos/
+
 # Temporary video frames (keep .gitkeep)
 data/temp-frames/*
 !data/temp-frames/.gitkeep
