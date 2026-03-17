@@ -1,7 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import { join, dirname } from 'path';
-import { existsSync } from 'fs';
 import { EventEmitter } from 'events';
+import { existsSync } from 'fs';
 import {
   getJobById,
   updateJob,
@@ -11,25 +11,40 @@ import {
   ProcessingJob
 } from './db';
 import { resetFAISSCache } from '../tcm-faiss.server';
+import { getVideoArtifactStatus } from '../tcm-video-artifacts';
 
 const SCRIPTS_PATH = join(process.cwd(), '..', 'scripts');
 
-// Helper function to generate FAISS embeddings with proper error handling
-async function generateEmbeddings(videoDir: string): Promise<void> {
+async function runPythonJsonScript(args: string[]): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    const proc = spawn('python', [
-      join(SCRIPTS_PATH, 'embed_transcripts.py')
-    ], {
+    const proc = spawn('python', args, {
       cwd: join(process.cwd(), '..'),
       env: { ...process.env }
     });
 
+    let stdout = '';
     let stderr = '';
+    proc.stdout?.on('data', (data) => { stdout += data.toString(); });
     proc.stderr?.on('data', (data) => { stderr += data.toString(); });
 
     proc.on('close', (code) => {
       if (code === 0) {
-        resolve();
+        const jsonLine = stdout
+          .split('\n')
+          .map(line => line.trim())
+          .reverse()
+          .find(line => line.startsWith('{'));
+
+        if (!jsonLine) {
+          resolve({});
+          return;
+        }
+
+        try {
+          resolve(JSON.parse(jsonLine) as Record<string, unknown>);
+        } catch (error) {
+          reject(new Error(`Failed to parse JSON output: ${error instanceof Error ? error.message : 'Unknown error'}`));
+        }
       } else {
         reject(new Error(`Embedding process exited with code ${code}: ${stderr}`));
       }
@@ -37,6 +52,31 @@ async function generateEmbeddings(videoDir: string): Promise<void> {
 
     proc.on('error', reject);
   });
+}
+
+// Helper function to generate FAISS embeddings with proper error handling
+async function generateEmbeddings(videoDir: string): Promise<Record<string, unknown>> {
+  return runPythonJsonScript([
+    join(SCRIPTS_PATH, 'embed_transcripts.py'),
+    '--video-dir', videoDir,
+    '--json'
+  ]);
+}
+
+async function generateLesson(videoDir: string): Promise<Record<string, unknown>> {
+  return runPythonJsonScript([
+    join(SCRIPTS_PATH, 'generate_video_lesson.py'),
+    '--video-dir', videoDir,
+    '--json'
+  ]);
+}
+
+async function generateShortsBrief(videoDir: string): Promise<Record<string, unknown>> {
+  return runPythonJsonScript([
+    join(SCRIPTS_PATH, 'generate_shorts_brief.py'),
+    '--video-dir', videoDir,
+    '--json'
+  ]);
 }
 
 // Global process registry for active jobs
@@ -64,6 +104,58 @@ function broadcastProgress(update: ProgressUpdate) {
   addProcessingEvent(update.jobId, 'progress', update);
 }
 
+interface ExtractionResult {
+  status?: string;
+  output_dir?: string;
+  duration_sec?: number;
+  frame_count?: number;
+  transcript_method?: string;
+  whisper_model?: string;
+  transcript_path?: string;
+  file_hash?: string;
+  file_size?: number;
+  error?: string;
+}
+
+function setStage(jobId: number, videoId: number, stage: string, progressPercent: number, message: string) {
+  updateJob(jobId, {
+    current_step: stage,
+    progress_percent: progressPercent
+  });
+  updateVideo(videoId, {
+    processing_status: stage,
+    error_message: null
+  });
+  broadcastProgress({
+    jobId,
+    videoId,
+    status: 'running',
+    currentStep: stage,
+    progressPercent,
+    message
+  });
+}
+
+function failProcessing(jobId: number, videoId: number, error: string) {
+  updateJob(jobId, {
+    status: 'failed',
+    error_message: error
+  });
+  updateVideo(videoId, {
+    processing_status: 'failed',
+    error_message: error,
+    is_published: 0
+  });
+  broadcastProgress({
+    jobId,
+    videoId,
+    status: 'failed',
+    currentStep: 'failed',
+    progressPercent: 0,
+    error
+  });
+}
+
 // Start processing a job
 export async function startProcessing(jobId: number): Promise<{ success: boolean; error?: string }> {
   const job = getJobById(jobId);
@@ -84,37 +176,140 @@ export async function startProcessing(jobId: number): Promise<{ success: boolean
   updateJob(jobId, {
     status: 'running',
     started_at: new Date().toISOString(),
-    current_step: 'transcribe',
+    current_step: 'extracting',
     progress_percent: 0
-  });
-
-  // Update video status
-  updateVideo(video.id, { processing_status: 'processing' });
-
-  broadcastProgress({
-    jobId,
-    videoId: video.id,
-    status: 'running',
-    currentStep: 'transcribe',
-    progressPercent: 0,
-    message: 'Starting processing...'
   });
 
   // Spawn Python processing script
   // Use system Python directly (faster-whisper is installed there)
   // Don't use 'uv run' as it tries to install openai-whisper which has numba compatibility issues
   try {
-    // Use the video's directory (where it was uploaded) instead of parent directory
-    // This ensures frames are extracted to the same folder as the video file
-    const videoDir = dirname(video.file_path);
+    const artifacts = getVideoArtifactStatus(video);
+    const videoDir = artifacts.videoDir || dirname(video.file_path);
+    let extractionResult: ExtractionResult | null = null;
+    const finalizeLessonReadyVideo = async () => {
+      if (extractionResult?.status === 'error') {
+        failProcessing(jobId, video.id, extractionResult.error || 'Extraction failed');
+        return;
+      }
+
+      updateVideo(video.id, {
+        file_hash: extractionResult?.file_hash ?? video.file_hash,
+        file_size_bytes: typeof extractionResult?.file_size === 'number' ? extractionResult.file_size : video.file_size_bytes,
+        duration_sec: typeof extractionResult?.duration_sec === 'number' ? extractionResult.duration_sec : video.duration_sec,
+        frame_count: typeof extractionResult?.frame_count === 'number' ? extractionResult.frame_count : video.frame_count,
+        transcript_method: typeof extractionResult?.transcript_method === 'string' ? extractionResult.transcript_method : video.transcript_method,
+        whisper_model: typeof extractionResult?.whisper_model === 'string' ? extractionResult.whisper_model : video.whisper_model,
+        transcript_path: typeof extractionResult?.transcript_path === 'string' ? extractionResult.transcript_path : video.transcript_path,
+        is_published: 0
+      });
+
+      const extractionArtifacts = getVideoArtifactStatus({ file_path: video.file_path, folder_id: video.folder_id });
+      if (!extractionArtifacts.manifest || !extractionArtifacts.transcript || !extractionArtifacts.frames) {
+        failProcessing(jobId, video.id, 'Processing requires transcript, manifest, and frame artifacts before publishing');
+        return;
+      }
+
+      try {
+        if (!extractionArtifacts.embeddings) {
+          setStage(jobId, video.id, 'embedding', 92, 'Generating transcript embeddings...');
+          await generateEmbeddings(videoDir);
+          resetFAISSCache();
+        }
+      } catch (embedError) {
+        failProcessing(jobId, video.id, `Embedding failed: ${embedError instanceof Error ? embedError.message : 'Unknown error'}`);
+        return;
+      }
+
+      try {
+        const lessonArtifacts = getVideoArtifactStatus({ file_path: video.file_path, folder_id: video.folder_id });
+        if (!lessonArtifacts.lesson) {
+          setStage(jobId, video.id, 'lesson_building', 97, 'Building lesson guide...');
+          await generateLesson(videoDir);
+        }
+      } catch (lessonError) {
+        failProcessing(jobId, video.id, `Lesson generation failed: ${lessonError instanceof Error ? lessonError.message : 'Unknown error'}`);
+        return;
+      }
+
+      try {
+        const shortsArtifacts = getVideoArtifactStatus({ file_path: video.file_path, folder_id: video.folder_id });
+        if (!shortsArtifacts.shortsBrief) {
+          setStage(jobId, video.id, 'shorts_packaging', 99, 'Packaging educational shorts brief...');
+          await generateShortsBrief(videoDir);
+        }
+      } catch (shortsError) {
+        failProcessing(jobId, video.id, `Shorts brief generation failed: ${shortsError instanceof Error ? shortsError.message : 'Unknown error'}`);
+        return;
+      }
+
+      const readyArtifacts = getVideoArtifactStatus({ file_path: video.file_path, folder_id: video.folder_id });
+      if (!readyArtifacts.ready) {
+        failProcessing(jobId, video.id, 'Processing finished but one or more lesson-ready artifacts are missing');
+        return;
+      }
+
+      if (!readyArtifacts.shortsBrief) {
+        failProcessing(jobId, video.id, 'Processing finished but shorts_brief.json is missing');
+        return;
+      }
+
+      if (!existsSync(video.file_path)) {
+        failProcessing(jobId, video.id, 'Lesson artifacts are ready but the managed video file is missing');
+        return;
+      }
+
+      updateJob(jobId, {
+        status: 'completed',
+        current_step: 'ready',
+        completed_at: new Date().toISOString(),
+        progress_percent: 100
+      });
+      updateVideo(video.id, {
+        processing_status: 'ready',
+        processed_at: new Date().toISOString(),
+        error_message: null,
+        is_published: 1
+      });
+      broadcastProgress({
+        jobId,
+        videoId: video.id,
+        status: 'completed',
+        currentStep: 'ready',
+        progressPercent: 100,
+        message: 'Lesson-ready video is now published to the library'
+      });
+    };
+
+    if (!existsSync(video.file_path)) {
+      failProcessing(jobId, video.id, 'Managed video file is missing');
+      return { success: false, error: 'Managed video file is missing' };
+    }
+
+    if (artifacts.ready) {
+      setStage(jobId, video.id, 'lesson_building', 97, 'Recovered lesson-ready artifacts found. Publishing...');
+      void finalizeLessonReadyVideo();
+      return { success: true };
+    }
+
+    if (artifacts.transcript && artifacts.manifest && artifacts.frames) {
+      setStage(jobId, video.id, 'extracting', 70, 'Transcript, manifest, and frames already exist. Reusing artifacts...');
+      void finalizeLessonReadyVideo();
+      return { success: true };
+    }
+
+    setStage(jobId, video.id, 'extracting', 0, 'Starting extraction...');
 
     const pythonProcess = spawn('python', [
       join(SCRIPTS_PATH, 'process_local_mp4.py'),
-      video.file_path,  // positional argument, not --video-path
-      '--output-dir', videoDir,  // Use video's actual directory
+      video.file_path,
+      '--output-dir', videoDir,
       '--whisper-model', job.whisper_model,
       '--frame-interval', job.frame_interval.toString(),
-      '--json'  // Output JSON for progress parsing
+      '--existing-video-id', video.id.toString(),
+      '--skip-duplicate-check',
+      '--skip-db-insert',
+      '--emit-progress-json'
     ], {
       cwd: join(process.cwd(), '..'),
       env: { ...process.env }
@@ -122,154 +317,66 @@ export async function startProcessing(jobId: number): Promise<{ success: boolean
 
     activeProcesses.set(jobId, pythonProcess);
 
-    // Handle stdout (progress updates as JSON lines)
     let buffer = '';
     pythonProcess.stdout?.on('data', (data: Buffer) => {
       buffer += data.toString();
       const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+      buffer = lines.pop() || '';
 
       for (const line of lines) {
         if (line.trim().startsWith('{')) {
           try {
-            const update = JSON.parse(line.trim());
-            handleProgressUpdate(jobId, video.id, update);
+            const update = JSON.parse(line.trim()) as Record<string, unknown>;
+            if (update.event === 'result') {
+              extractionResult = update as ExtractionResult;
+            } else {
+              handleProgressUpdate(jobId, video.id, update as {
+                step?: string;
+                progress?: number;
+                message?: string;
+                checkpoint?: { type: string; data: object };
+                skills_extracted?: number;
+                error?: string;
+              });
+            }
           } catch {
-            // Not JSON, log as message
             addProcessingEvent(jobId, 'log', { message: line.trim() });
           }
         }
       }
     });
 
-    // Handle stderr
     pythonProcess.stderr?.on('data', (data: Buffer) => {
       const message = data.toString().trim();
       console.error(`[Job ${jobId}] stderr:`, message);
       addProcessingEvent(jobId, 'log', { message, level: 'error' });
     });
 
-    // Handle process exit
-    pythonProcess.on('close', (code: number | null) => {
+    pythonProcess.on('close', async (code: number | null) => {
       activeProcesses.delete(jobId);
 
       if (code === 0) {
-        // Check if job was paused for checkpoint
         const currentJob = getJobById(jobId);
         if (currentJob?.status !== 'paused') {
-          // VERIFY manifest.json was created before marking complete
-          const manifestPath = join(videoDir, 'manifest.json');
-          if (!existsSync(manifestPath)) {
-            // Processing "succeeded" but didn't produce expected output
-            updateJob(jobId, {
-              status: 'failed',
-              error_message: 'Processing completed but manifest.json was not created'
-            });
-            updateVideo(video.id, {
-              processing_status: 'failed',
-              error_message: 'Missing manifest.json after processing'
-            });
-            broadcastProgress({
-              jobId,
-              videoId: video.id,
-              status: 'failed',
-              currentStep: 'error',
-              progressPercent: 0,
-              error: 'Processing completed but manifest.json was not created'
-            });
-            return;
-          }
-
-          updateJob(jobId, {
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            progress_percent: 100
-          });
-          updateVideo(video.id, {
-            processing_status: 'completed',
-            processed_at: new Date().toISOString()
-          });
-          broadcastProgress({
-            jobId,
-            videoId: video.id,
-            status: 'completed',
-            currentStep: 'complete',
-            progressPercent: 100,
-            message: 'Processing complete'
-          });
-
-          // Generate FAISS embeddings for semantic search (async, non-blocking for job status)
-          (async () => {
-            addProcessingEvent(jobId, 'log', { message: 'Generating FAISS embeddings...', level: 'info' });
-            try {
-              await generateEmbeddings(videoDir);
-
-              // Verify embeddings were created
-              const embeddingsPath = join(videoDir, 'embeddings.faiss');
-              if (existsSync(embeddingsPath)) {
-                addProcessingEvent(jobId, 'log', { message: 'FAISS embeddings generated successfully', level: 'info' });
-                // Reset FAISS cache so new embeddings are discoverable
-                resetFAISSCache();
-              } else {
-                addProcessingEvent(jobId, 'log', { message: 'FAISS embeddings file not created', level: 'warn' });
-              }
-            } catch (embedError) {
-              // Non-blocking - log but don't fail the job
-              addProcessingEvent(jobId, 'log', {
-                message: `FAISS embedding failed: ${embedError instanceof Error ? embedError.message : 'Unknown error'}`,
-                level: 'warn'
-              });
-            }
-          })();
+          await finalizeLessonReadyVideo();
         }
       } else {
         const currentJob = getJobById(jobId);
         if (currentJob?.status !== 'paused') {
-          updateJob(jobId, {
-            status: 'failed',
-            error_message: `Process exited with code ${code}`
-          });
-          updateVideo(video.id, {
-            processing_status: 'failed',
-            error_message: `Process exited with code ${code}`
-          });
-          broadcastProgress({
-            jobId,
-            videoId: video.id,
-            status: 'failed',
-            currentStep: 'error',
-            progressPercent: 0,
-            error: `Process exited with code ${code}`
-          });
+          failProcessing(jobId, video.id, `Process exited with code ${code}`);
         }
       }
     });
 
     pythonProcess.on('error', (err: Error) => {
       activeProcesses.delete(jobId);
-      updateJob(jobId, {
-        status: 'failed',
-        error_message: err.message
-      });
-      updateVideo(video.id, {
-        processing_status: 'failed',
-        error_message: err.message
-      });
-      broadcastProgress({
-        jobId,
-        videoId: video.id,
-        status: 'failed',
-        currentStep: 'error',
-        progressPercent: 0,
-        error: err.message
-      });
+      failProcessing(jobId, video.id, err.message);
     });
 
     return { success: true };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Failed to start process';
-    updateJob(jobId, { status: 'failed', error_message: errorMsg });
-    updateVideo(video.id, { processing_status: 'failed', error_message: errorMsg });
+    failProcessing(jobId, video.id, errorMsg);
     return { success: false, error: errorMsg };
   }
 }
@@ -305,23 +412,7 @@ function handleProgressUpdate(jobId: number, videoId: number, update: {
       checkpointData: update.checkpoint.data
     });
   } else if (update.error) {
-    updateJob(jobId, {
-      status: 'failed',
-      error_message: update.error
-    });
-    updateVideo(videoId, {
-      processing_status: 'failed',
-      error_message: update.error
-    });
-
-    broadcastProgress({
-      jobId,
-      videoId,
-      status: 'failed',
-      currentStep: 'error',
-      progressPercent: 0,
-      error: update.error
-    });
+    failProcessing(jobId, videoId, update.error);
   } else {
     // Normal progress update
     const jobUpdate: Partial<ProcessingJob> = {};
@@ -331,6 +422,13 @@ function handleProgressUpdate(jobId: number, videoId: number, update: {
 
     if (Object.keys(jobUpdate).length > 0) {
       updateJob(jobId, jobUpdate);
+    }
+
+    if (update.step === 'extracting') {
+      updateVideo(videoId, {
+        processing_status: 'extracting',
+        error_message: null
+      });
     }
 
     broadcastProgress({
