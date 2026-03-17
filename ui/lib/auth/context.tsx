@@ -1,12 +1,14 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { clearTCMChatSessions } from '@/lib/tcm-chat-session';
 
 export interface ClientUser {
   id: number;
   email: string;
   role: 'user' | 'admin';
   isPremium: boolean;
+  hasStripeSubscription: boolean;
   isAdmin: boolean;
   emailVerified: boolean;
 }
@@ -56,6 +58,7 @@ export function AuthProvider({ children, initialUser = null }: AuthProviderProps
   const logout = useCallback(async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      clearTCMChatSessions();
       setUser(null);
       window.location.href = '/';
     } catch (err) {

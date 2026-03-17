@@ -7,6 +7,7 @@ export interface AuthUser {
   email: string;
   role: 'user' | 'admin';
   isPremium: boolean;
+  hasStripeSubscription: boolean;
   isAdmin: boolean;
   emailVerified: boolean;
 }
@@ -34,6 +35,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     email: user.email,
     role: user.role,
     isPremium: hasManualPremium || hasActiveSubscription,
+    hasStripeSubscription: hasActiveSubscription,
     isAdmin: user.role === 'admin',
     emailVerified: user.email_verified === 1,
   };

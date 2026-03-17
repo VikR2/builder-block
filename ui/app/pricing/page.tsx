@@ -109,12 +109,21 @@ function PricingContent() {
             >
               Browse Video Courses
             </Link>
-            <Link
-              href="/account/subscription"
-              className="px-6 py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-lg transition-colors"
-            >
-              Manage Subscription
-            </Link>
+            {user.hasStripeSubscription ? (
+              <Link
+                href="/account/subscription"
+                className="px-6 py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Manage Subscription
+              </Link>
+            ) : (
+              <Link
+                href="/account"
+                className="px-6 py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Account Settings
+              </Link>
+            )}
           </div>
         </div>
       </div>

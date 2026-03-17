@@ -69,6 +69,45 @@ export default function SubscriptionPage() {
     );
   }
 
+  if (!user.hasStripeSubscription) {
+    return (
+      <div className="container py-12 max-w-2xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <Link
+            href="/account"
+            className="text-neutral-400 hover:text-white transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Link>
+          <h1 className="text-2xl font-bold text-white">Subscription</h1>
+        </div>
+
+        <div className="bg-[#12121a] border border-amber-500/20 rounded-xl p-8">
+          <h2 className="text-xl font-semibold text-white mb-3">Premium access is active</h2>
+          <p className="text-neutral-400 mb-6">
+            This account has premium access, but it is not managed through Stripe, so there is no billing portal to open.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              href="/account"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-lg transition-colors"
+            >
+              Back to Account
+            </Link>
+            <Link
+              href="/tcm/library"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-medium rounded-lg transition-colors"
+            >
+              Browse Video Courses
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container py-12 max-w-2xl mx-auto">
       <div className="flex items-center gap-4 mb-8">

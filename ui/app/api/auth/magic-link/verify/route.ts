@@ -6,6 +6,7 @@ import {
   updateUserEmailVerified,
   createSession,
 } from '@/lib/auth';
+import { getSafeRedirectPath } from '@/lib/auth/redirects';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     await createSession(user.id);
 
     // Redirect to home or intended destination
-    const redirect = searchParams.get('redirect') || '/';
+    const redirect = getSafeRedirectPath(searchParams.get('redirect'), '/');
     return NextResponse.redirect(new URL(redirect, request.url));
   } catch (error) {
     console.error('Magic link verify error:', error);

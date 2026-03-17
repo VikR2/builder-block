@@ -1,16 +1,16 @@
 import { test, expect } from '@playwright/test';
+import { attachSessionCookie, createSession, deleteSession } from '../helpers/session';
 
 test.describe('Library Page - Video Organization', () => {
+  let sessionId: string;
+
   test.beforeEach(async ({ page }) => {
-    // Mock auth for premium access
-    await page.context().addCookies([
-      {
-        name: 'auth_token',
-        value: 'test-premium-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    sessionId = createSession(3);
+    await attachSessionCookie(page, sessionId);
+  });
+
+  test.afterEach(async () => {
+    deleteSession(sessionId);
   });
 
   test('should load library page', async ({ page }) => {
@@ -379,15 +379,15 @@ test.describe('Library Page - Video Organization', () => {
 });
 
 test.describe('Playlist Page', () => {
+  let sessionId: string;
+
   test.beforeEach(async ({ page }) => {
-    await page.context().addCookies([
-      {
-        name: 'auth_token',
-        value: 'test-premium-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    sessionId = createSession(3);
+    await attachSessionCookie(page, sessionId);
+  });
+
+  test.afterEach(async () => {
+    deleteSession(sessionId);
   });
 
   test('should load playlist page with videos', async ({ page }) => {

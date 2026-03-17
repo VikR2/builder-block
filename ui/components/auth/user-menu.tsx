@@ -118,7 +118,7 @@ export function UserMenu() {
               Account
             </Link>
 
-            {user.isPremium && (
+            {user.hasStripeSubscription && (
               <Link
                 href="/account/subscription"
                 onClick={() => setIsOpen(false)}

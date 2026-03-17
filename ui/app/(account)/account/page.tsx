@@ -1,18 +1,10 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/context';
 
 export default function AccountPage() {
   const { user, loading, logout } = useAuth();
-
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   // Server-side layout handles auth, show loading while hydrating
   if (loading || !user) {
@@ -26,24 +18,6 @@ export default function AccountPage() {
       </div>
     );
   }
-
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordLoading(true);
-    setPasswordError(null);
-    setPasswordSuccess(false);
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords do not match');
-      setPasswordLoading(false);
-      return;
-    }
-
-    // Note: Implement password change endpoint if needed
-    // For now, redirect to reset password flow
-    setPasswordError('Please use the password reset flow to change your password.');
-    setPasswordLoading(false);
-  };
 
   return (
     <div className="container py-12 max-w-2xl mx-auto">
@@ -102,8 +76,8 @@ export default function AccountPage() {
         </div>
       </div>
 
-      {/* Subscription Section (for premium users) */}
-      {user?.isPremium && (
+      {/* Subscription Section (for Stripe-managed subscriptions) */}
+      {user.hasStripeSubscription && (
         <div className="bg-[#12121a] border border-neutral-800 rounded-xl p-6 mb-6">
           <h2 className="text-lg font-semibold text-white mb-4">Subscription</h2>
 
@@ -120,6 +94,18 @@ export default function AccountPage() {
             </svg>
             Manage Subscription
           </Link>
+        </div>
+      )}
+
+      {/* Premium access that is not managed through Stripe */}
+      {user.isPremium && !user.hasStripeSubscription && (
+        <div className="bg-[#12121a] border border-amber-500/20 rounded-xl p-6 mb-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Premium Access</h2>
+
+          <p className="text-neutral-400">
+            Your premium access is active, but it is not managed through the Stripe billing portal.
+            If you need billing help or access changes, please contact support.
+          </p>
         </div>
       )}
 

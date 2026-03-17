@@ -1,5 +1,5 @@
 import { stripe } from './client';
-import { updateUserStripeCustomerId, getUserById } from '@/lib/auth/db';
+import { updateUserStripeCustomerId } from '@/lib/auth/db';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -62,13 +62,4 @@ export async function createCheckoutSession({
   }
 
   return session.url;
-}
-
-/**
- * Retrieve a checkout session by ID
- */
-export async function getCheckoutSession(sessionId: string) {
-  return stripe.checkout.sessions.retrieve(sessionId, {
-    expand: ['subscription', 'customer'],
-  });
 }

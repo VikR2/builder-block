@@ -1,16 +1,16 @@
 import { test, expect } from '@playwright/test';
+import { attachSessionCookie, createSession, deleteSession } from '../helpers/session';
 
 test.describe('Admin Organization Dashboard', () => {
+  let sessionId: string;
+
   test.beforeEach(async ({ page }) => {
-    // Mock auth for admin access
-    await page.context().addCookies([
-      {
-        name: 'auth_token',
-        value: 'test-admin-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    sessionId = createSession(1);
+    await attachSessionCookie(page, sessionId);
+  });
+
+  test.afterEach(async () => {
+    deleteSession(sessionId);
   });
 
   test('should load organization dashboard', async ({ page }) => {
@@ -81,15 +81,15 @@ test.describe('Admin Organization Dashboard', () => {
 });
 
 test.describe('Admin Videos Page - Organization Filters', () => {
+  let sessionId: string;
+
   test.beforeEach(async ({ page }) => {
-    await page.context().addCookies([
-      {
-        name: 'auth_token',
-        value: 'test-admin-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    sessionId = createSession(1);
+    await attachSessionCookie(page, sessionId);
+  });
+
+  test.afterEach(async () => {
+    deleteSession(sessionId);
   });
 
   test('should show category filter dropdown', async ({ page }) => {
@@ -134,18 +134,18 @@ test.describe('Admin Videos Page - Organization Filters', () => {
 });
 
 test.describe('Category Manager Component', () => {
+  let sessionId: string;
+
   test.beforeEach(async ({ page }) => {
-    await page.context().addCookies([
-      {
-        name: 'auth_token',
-        value: 'test-admin-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    sessionId = createSession(1);
+    await attachSessionCookie(page, sessionId);
 
     await page.goto('/tcm/admin/organize');
     await page.click('button:has-text("Manage"):near(:text("Categories"))');
+  });
+
+  test.afterEach(async () => {
+    deleteSession(sessionId);
   });
 
   test('should show add category form', async ({ page }) => {
@@ -172,18 +172,18 @@ test.describe('Category Manager Component', () => {
 });
 
 test.describe('Tag Manager Component', () => {
+  let sessionId: string;
+
   test.beforeEach(async ({ page }) => {
-    await page.context().addCookies([
-      {
-        name: 'auth_token',
-        value: 'test-admin-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    sessionId = createSession(1);
+    await attachSessionCookie(page, sessionId);
 
     await page.goto('/tcm/admin/organize');
     await page.click('button:has-text("Manage"):near(:text("Tags"))');
+  });
+
+  test.afterEach(async () => {
+    deleteSession(sessionId);
   });
 
   test('should show add tag form', async ({ page }) => {

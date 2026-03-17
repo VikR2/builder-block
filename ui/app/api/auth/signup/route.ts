@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         role: user.role,
         isPremium: false,
+        hasStripeSubscription: false,
         isAdmin: false,
         emailVerified: false,
       },

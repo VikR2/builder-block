@@ -5,7 +5,6 @@ import {
   updateUserPassword,
   hashPassword,
   validatePassword,
-  deleteUserSessions,
   createSession,
 } from '@/lib/auth';
 import { deleteUserSessions as dbDeleteUserSessions } from '@/lib/auth/db';

@@ -41,6 +41,10 @@ export async function POST() {
         id: user.id,
         email: user.email,
         role: user.role,
+        isPremium: true,
+        hasStripeSubscription: false,
+        isAdmin: user.role === 'admin',
+        emailVerified: true,
       },
       message: 'Dev login successful',
     });

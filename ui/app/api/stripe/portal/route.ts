@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { createPortalSession, isStripeConfigured } from '@/lib/stripe';
 import { getUserById } from '@/lib/auth/db';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // Check if Stripe is configured
     if (!isStripeConfigured()) {

@@ -1,7 +1,6 @@
 import Stripe from 'stripe';
 import { stripe } from './client';
 import { syncSubscription, getUserIdFromSubscription, linkStripeCustomer } from './sync';
-import { getUserByStripeCustomerId, updateUserStripeCustomerId } from '@/lib/auth/db';
 
 /**
  * Verify and construct Stripe webhook event
@@ -20,7 +19,7 @@ export function constructWebhookEvent(
 /**
  * Handle checkout.session.completed event
  */
-export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log('Checkout completed:', session.id);
 
   // Get user ID from metadata
@@ -49,7 +48,7 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
 /**
  * Handle customer.subscription.created event
  */
-export async function handleSubscriptionCreated(
+async function handleSubscriptionCreated(
   subscription: Stripe.Subscription
 ) {
   console.log('Subscription created:', subscription.id);
@@ -67,7 +66,7 @@ export async function handleSubscriptionCreated(
 /**
  * Handle customer.subscription.updated event
  */
-export async function handleSubscriptionUpdated(
+async function handleSubscriptionUpdated(
   subscription: Stripe.Subscription
 ) {
   console.log('Subscription updated:', subscription.id);
@@ -85,7 +84,7 @@ export async function handleSubscriptionUpdated(
 /**
  * Handle customer.subscription.deleted event
  */
-export async function handleSubscriptionDeleted(
+async function handleSubscriptionDeleted(
   subscription: Stripe.Subscription
 ) {
   console.log('Subscription deleted:', subscription.id);

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/context';
+import { getSafeRedirectPath } from '@/lib/auth/redirects';
 
-export default function LoginPage() {
+function LoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,7 +17,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { refresh } = useAuth();
-  const redirect = searchParams.get('redirect') || '/home';
+  const redirect = getSafeRedirectPath(searchParams.get('redirect'), '/home');
 
   // Handle URL error/success messages
   useEffect(() => {
@@ -248,5 +249,25 @@ export default function LoginPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="bg-[#12121a] border border-neutral-800 rounded-xl p-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-neutral-800 rounded w-2/3"></div>
+            <div className="h-4 bg-neutral-800 rounded w-1/2"></div>
+            <div className="h-10 bg-neutral-800 rounded"></div>
+            <div className="h-10 bg-neutral-800 rounded"></div>
+            <div className="h-12 bg-neutral-800 rounded"></div>
+          </div>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }
