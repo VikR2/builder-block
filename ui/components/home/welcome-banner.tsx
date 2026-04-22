@@ -90,13 +90,6 @@ export function WelcomeBanner({ userName, lastActivity }: WelcomeBannerProps) {
               Watch Videos
             </Link>
             <Link
-              href="/skills"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-card hover:bg-muted border border-border text-foreground font-medium transition-all"
-            >
-              <span className="text-emerald-500">◆</span>
-              Browse Skills
-            </Link>
-            <Link
               href="/tcm"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-card hover:bg-muted border border-border text-foreground font-medium transition-all"
             >

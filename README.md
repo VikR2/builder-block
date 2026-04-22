@@ -38,6 +38,10 @@ Claude: [Extracts patterns and saves to database]
 
 See [SETUP.md](SETUP.md) for complete documentation.
 
+Deployment and release workflow:
+
+- [Render Deployment Plan](docs/render-deployment.md)
+
 ## Structure
 
 - `data/` - SQLite database with skills, projects, scripts

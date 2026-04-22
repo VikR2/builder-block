@@ -1,12 +1,14 @@
 import { redirect } from 'next/navigation';
 import { getSession, type SessionUser } from './session';
-import { getActiveSubscriptionByUserId } from './db';
+import { getActiveSubscriptionByUserId, getUserCreditBalance } from './db';
 
 export interface AuthUser {
   id: number;
   email: string;
   role: 'user' | 'admin';
   isPremium: boolean;
+  creditBalance: number;
+  hasChatAccess: boolean;
   hasStripeSubscription: boolean;
   isAdmin: boolean;
   emailVerified: boolean;
@@ -29,14 +31,19 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   const hasManualPremium = user.manual_premium === 1;
   const subscription = getActiveSubscriptionByUserId(user.id);
   const hasActiveSubscription = subscription !== undefined;
+  const creditBalance = getUserCreditBalance(user.id);
+  const isAdmin = user.role === 'admin';
+  const isPremium = hasManualPremium || hasActiveSubscription;
 
   return {
     id: user.id,
     email: user.email,
     role: user.role,
-    isPremium: hasManualPremium || hasActiveSubscription,
+    isPremium,
+    creditBalance,
+    hasChatAccess: isAdmin || isPremium || creditBalance > 0,
     hasStripeSubscription: hasActiveSubscription,
-    isAdmin: user.role === 'admin',
+    isAdmin,
     emailVerified: user.email_verified === 1,
   };
 }

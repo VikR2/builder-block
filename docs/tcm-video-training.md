@@ -1,14 +1,19 @@
 # TCM Video Training Workflow
 
-Guide for adding new TCM (The Currency Merchant) videos to the knowledge bot's database.
+Guide for adding new TCM (The Currency Merchant) videos to the tutor-style chat and lesson pipeline.
 
 ## Overview
 
-The TCM Knowledge Bot learns from video content through a multi-step pipeline:
+The TCM mentor chat learns from video content through a multi-step pipeline:
 
 ```
-Video File → Transcription → Frame Extraction → Skill Extraction → Database
+Video File → Transcription → Frame Extraction → Embeddings → Lesson + Tutor Pack → Skill Linking → Database
 ```
+
+For the current local extraction and noisy-audio cleanup workflow, see:
+
+- [Video Extraction And Audio Cleanup](../.Codex/rules/video-extraction.md)
+- [TCM ElevenLabs Audio Cleanup Implementation](./tcm-elevenlabs-audio-cleanup-implementation.md)
 
 ## Prerequisites
 
@@ -34,7 +39,38 @@ uv run python scripts/process_local_mp4.py video.mp4 \
   --whisper-model small \
   --frame-interval 45 \
   --title "TCM Order Fulfillment Lesson 1"
+
+# ElevenLabs transcription backend
+uv run python scripts/process_local_mp4.py video.mp4 \
+  --transcription-backend elevenlabs \
+  --elevenlabs-key "$ELEVENLABS_API_KEY"
+
+# ElevenLabs transcription with Voice Isolator noise reduction
+uv run python scripts/process_local_mp4.py video.mp4 \
+  --transcription-backend elevenlabs \
+  --audio-cleanup-mode voice_isolator \
+  --elevenlabs-key "$ELEVENLABS_API_KEY"
+
+# Rebuild transcript embeddings with the project's default multimodal model
+uv run python scripts/embed_transcripts.py --profiles coarse,fine
 ```
+
+## Embedding Strategy
+
+The current production embedding choice for this project is Google
+`gemini-embedding-2-preview`.
+
+Reason:
+
+- the retrieval roadmap includes transcript text today plus PDFs, images, and
+  video-aware retrieval later
+- the current FAISS corpus on disk is already built with the Gemini preview
+  multimodal embedding space
+- keeping the same embedding family avoids mixed-corpus incompatibilities unless
+  we do an intentional full rebuild
+
+If you intentionally want to rebuild onto another embedding model, do it as a
+full corpus migration, not as an incremental partial re-embed.
 
 ### 2. Verify Output
 
@@ -46,6 +82,8 @@ data/local-videos/VideoName_abc12345/
 │   ├── frame_001.jpg
 │   ├── frame_002.jpg
 │   └── ...
+├── embeddings.faiss         # Vector index for transcript retrieval
+├── lesson.json              # Lesson guide + tutorPack coaching artifact
 ├── manifest.json           # Frame metadata with transcript segments
 ├── transcript.txt          # Full plain text transcript
 └── transcript_timed.json   # Timestamped transcript segments
@@ -106,8 +144,27 @@ Links frames to transcript segments for visual context:
 When users ask questions, the bot:
 
 1. Searches `transcript_timed.json` for matching text
-2. Identifies relevant timestamps
-3. Returns corresponding frames from `frames/` directory
+2. Pulls lesson and `tutorPack` guidance from `lesson.json`
+3. Prioritizes mentor-style notes, misconceptions, and chart-reading rules for lesson-specific questions
+4. Identifies relevant timestamps and recommended clips
+5. Returns corresponding frames from `frames/` directory when useful
+
+### Tutor Pack
+
+Each processed lesson now produces a `tutorPack` inside `lesson.json` with:
+
+- mentor approach
+- prerequisites
+- teaching sequence
+- core concepts
+- common misconceptions
+- chart-reading rules
+- if-you-see-this-then-that coaching cues
+- diagnostic questions
+- practice prompts
+- glossary
+
+The chat uses this artifact before falling back to raw transcript fragments, which makes answers feel more like a tutor working from the video rather than a transcript search.
 
 ### Frame Display
 
@@ -181,3 +238,4 @@ For videos longer than 60 minutes:
 3. **Backup**: Keep original video files separate from processing output
 4. **Verification**: Review transcript for accuracy after processing
 5. **Skills**: Extract 3-5 key concepts per video section
+6. **Noisy uploads**: Use the ElevenLabs `voice_isolator` path when you need denoising before transcription

@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { TranscriptSegment, getVideoTranscript, formatTimestamp } from './tcm-db';
+import { TranscriptSegment, getVideoTranscript, formatTimestamp, getLocalVideos } from './tcm-db';
 
 const LOCAL_VIDEOS_PATH = join(process.cwd(), '..', 'data', 'local-videos');
 
@@ -169,31 +169,11 @@ export function getVideosWithFrames(): Array<{
   title: string;
   frameCount: number;
 }> {
-  if (!existsSync(LOCAL_VIDEOS_PATH)) {
-    return [];
-  }
-
-  const folders = readdirSync(LOCAL_VIDEOS_PATH, { withFileTypes: true })
-    .filter(d => d.isDirectory());
-
-  const results: Array<{ videoId: string; title: string; frameCount: number }> = [];
-
-  for (const folder of folders) {
-    const framesPath = join(LOCAL_VIDEOS_PATH, folder.name, 'frames');
-    if (existsSync(framesPath)) {
-      const frameCount = readdirSync(framesPath).filter(f =>
-        f.endsWith('.jpg') || f.endsWith('.png')
-      ).length;
-
-      const title = folder.name.replace(/_[a-f0-9]+$/, '').replace(/_/g, ' ');
-
-      results.push({
-        videoId: folder.name,
-        title,
-        frameCount,
-      });
-    }
-  }
-
-  return results;
+  return getLocalVideos()
+    .map((video) => ({
+      videoId: video.id,
+      title: video.title,
+      frameCount: getVideoFrames(video.id).length
+    }))
+    .filter((video) => video.frameCount > 0);
 }

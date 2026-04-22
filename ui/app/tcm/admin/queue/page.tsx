@@ -165,7 +165,7 @@ export default function QueuePage() {
           </div>
           <div>
             <div className="text-2xl font-bold">{historyJobs.filter(j => j.status === 'completed').length}</div>
-            <div className="text-xs text-muted-foreground">Completed</div>
+            <div className="text-xs text-muted-foreground">Lesson Ready</div>
           </div>
         </div>
       </div>
@@ -293,7 +293,9 @@ export default function QueuePage() {
                     </Link>
                     <div className="text-xs text-muted-foreground">
                       {job.status === 'completed'
-                        ? `${job.skills_extracted} skills extracted`
+                        ? job.skills_extracted > 0
+                          ? `Lesson ready • ${job.skills_extracted} skills extracted`
+                          : 'Lesson ready'
                         : job.error_message || 'Failed'}
                     </div>
                   </div>

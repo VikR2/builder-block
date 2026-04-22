@@ -42,6 +42,8 @@ export async function POST() {
         email: user.email,
         role: user.role,
         isPremium: true,
+        creditBalance: 0,
+        hasChatAccess: true,
         hasStripeSubscription: false,
         isAdmin: user.role === 'admin',
         emailVerified: true,

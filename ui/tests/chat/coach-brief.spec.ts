@@ -58,9 +58,11 @@ test.describe('TCM chat Coach Brief rendering', () => {
 
     await expect(page.getByText(/Book building is the overlap between submitted orders/i)).toBeVisible();
     await expect(page.getByText(/Submitted orders show intent, but the book only becomes actionable/i)).toBeVisible();
-    await expect(page.getByText('Why this clip')).toBeVisible();
+    await expect(page.getByText('Mentor take')).toBeVisible();
+    await expect(page.getByText('Key takeaways')).toBeVisible();
+    await expect(page.getByText('Why this watch helps')).toBeVisible();
     await expect(page.getByText(/Watch the clip around the matching window transition/i)).toBeVisible();
-    await expect(page.getByText('Broader context')).toBeVisible();
+    await expect(page.getByText('How it fits')).toBeVisible();
     await expect(page.getByText(/Across TCM material, the same rule holds/i)).toBeVisible();
     await expect(page.getByText(/\| New Skill \| Category \| Description \|/)).toHaveCount(0);
   });

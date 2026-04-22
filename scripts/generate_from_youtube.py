@@ -146,7 +146,7 @@ CONCEPT_KEYWORDS = {
         "break of structure", "bos", "change of character", "choch",
         "order block", "ob", "bullish order block", "bearish order block",
         "fair value gap", "fvg", "imbalance",
-        "cisd", "change in state of delivery",
+        "csd", "cisd", "change in state of delivery",
         "breaker", "breaker block", "mitigation block",
         "inducement", "equal highs", "equal lows",
         "turtle soup", "failure swing",
@@ -1755,7 +1755,7 @@ def _build_entry_section(concepts: dict, skills: list, transcript: str) -> str:
     # Check for reversal patterns (Scenario A type)
     if "entry_patterns" in concepts:
         patterns = concepts["entry_patterns"]
-        reversal_keywords = ["sweep", "liquidity", "stop hunt", "cisd", "change in state"]
+        reversal_keywords = ["sweep", "liquidity", "stop hunt", "csd", "cisd", "change in state"]
         continuation_keywords = ["breakout", "break of structure", "bos", "continuation"]
 
         reversal_patterns = [p for p in patterns if any(k in p.lower() for k in reversal_keywords)]
@@ -1829,7 +1829,7 @@ def _build_entry_conditions(patterns: list, entry_type: str) -> str:
         if "sweep" in pattern_lower or "liquidity" in pattern_lower:
             conditions.append(f"- Price sweeps key level ({pattern})")
             conditions.append("- Wait for rejection/reversal candle")
-        elif "cisd" in pattern_lower or "change in state" in pattern_lower:
+        elif "csd" in pattern_lower or "cisd" in pattern_lower or "change in state" in pattern_lower:
             conditions.append(f"- CISD confirmed (close through reference candle open)")
         elif "breakout" in pattern_lower or "bos" in pattern_lower:
             conditions.append(f"- Price breaks structure level ({pattern})")

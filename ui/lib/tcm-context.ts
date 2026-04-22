@@ -7,6 +7,7 @@ import {
   getArchitectureDocuments,
   getTCMSkills,
 } from './tcm-db';
+import { buildStructuredCoachBrief, renderStructuredCoachBrief } from './tcm-coach-brief';
 
 // Assembled context for answering a question
 export interface AssembledContext {
@@ -111,51 +112,22 @@ export function generateContextBasedResponse(context: AssembledContext): string 
     return generateNoResultsResponse(query);
   }
 
-  const parts: string[] = [];
+  const brief = buildStructuredCoachBrief({
+    context,
+    mode: 'knowledge'
+  });
 
-  // Check for built-in definition first (gives better explanation)
+  // Prefer the built-in definition when it is available because it gives the
+  // cleanest top-line explanation for fallback answers.
   const builtInDef = getBuiltInDefinition(query);
   if (builtInDef) {
-    parts.push(builtInDef);
+    return renderStructuredCoachBrief({
+      ...brief,
+      lead: builtInDef.replace(/\*\*/g, '')
+    });
   }
 
-  // Primary answer from skills (most authoritative)
-  if (skills.length > 0) {
-    const primarySkill = skills[0];
-    // Only add skill if we didn't have a built-in definition
-    if (!builtInDef) {
-      parts.push(`**${primarySkill.title}**\n\n${primarySkill.content}`);
-    }
-
-    // Add related concepts briefly
-    if (skills.length > 1) {
-      const related = skills.slice(1, 3)
-        .map(s => `**${s.title}**: ${s.content.substring(0, 80)}...`)
-        .join('\n- ');
-      parts.push(`\n**Related Concepts:**\n- ${related}`);
-    }
-  }
-
-  // Add document excerpts for more detail (without --- separators)
-  if (documents.length > 0) {
-    const doc = documents[0];
-    const excerpt = doc.content.substring(0, 350);
-    parts.push(`\n**From Study Materials:**\n\n${excerpt}${doc.content.length > 350 ? '...' : ''}\n\n*Source: ${doc.title}*`);
-  }
-
-  // Add transcript references when we have no skills
-  if (transcripts.length > 0 && skills.length === 0 && !builtInDef) {
-    const t = transcripts[0];
-    parts.push(`\n**From Video Training:**\n\n"${t.content}"\n\n*${t.source} - ${t.title}*`);
-  }
-
-  // If we only have transcripts
-  if (parts.length === 0 && transcripts.length > 0) {
-    const t = transcripts[0];
-    parts.push(`This concept is discussed in the TCM videos:\n\n"${t.content}"\n\n*${t.source}*`);
-  }
-
-  return parts.join('\n') || generateNoResultsResponse(query);
+  return renderStructuredCoachBrief(brief);
 }
 
 // Response when no results found

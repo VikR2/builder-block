@@ -25,7 +25,7 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
     }
 
-    const items = getPlaylistItems(playlist.id);
+    const items = getPlaylistItems(playlist.id, { publishedOnly: true });
 
     // Transform items to match frontend's expected video structure
     const videos = items.map(item => ({

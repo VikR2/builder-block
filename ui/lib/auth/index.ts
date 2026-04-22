@@ -3,6 +3,7 @@
 // Database operations
 export {
   getAuthDb,
+  ensureAuthTables,
   createUser,
   getUserByEmail,
   getUserById,
@@ -18,10 +19,17 @@ export {
   getAllUsers,
   searchUsers,
   getUserCount,
+  getUserCreditAccount,
+  getUserCreditBalance,
+  grantUserCredits,
+  consumeUserCredits,
+  getUserCreditTransactions,
   type User,
   type Session,
   type Subscription,
   type AuthToken,
+  type UserCreditAccount,
+  type UserCreditTransaction,
   type UserWithSubscription,
 } from './db';
 

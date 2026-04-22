@@ -26,20 +26,13 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    // Handle duplicate videos - return success with isDuplicate flag
-    if (result.isDuplicate) {
-      return NextResponse.json({
-        success: true,
-        videoId: result.videoId,
-        isDuplicate: true,
-        message: result.error // Contains the "Video already exists" message
-      });
-    }
-
     return NextResponse.json({
       success: true,
       videoId: result.videoId,
-      jobId: result.jobId
+      jobId: result.jobId,
+      isDuplicate: result.isDuplicate ?? false,
+      reusedExisting: result.reusedExisting ?? false,
+      message: result.error
     });
   } catch (error) {
     console.error('Error finalizing upload:', error);

@@ -10,6 +10,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 // Allowed file types
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+const POST_UPLOADS_DIR = join(process.cwd(), '..', 'data', 'post-uploads');
 
 // Generate unique filename
 function generateFilename(originalName: string): string {
@@ -53,9 +54,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Ensure uploads directory exists
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'posts');
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
+    if (!existsSync(POST_UPLOADS_DIR)) {
+      await mkdir(POST_UPLOADS_DIR, { recursive: true });
     }
 
     const uploadedUrls: string[] = [];
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
       // Generate unique filename and save
       const filename = generateFilename(file.name);
-      const filepath = join(uploadsDir, filename);
+      const filepath = join(POST_UPLOADS_DIR, filename);
 
       const buffer = Buffer.from(await file.arrayBuffer());
       await writeFile(filepath, buffer);

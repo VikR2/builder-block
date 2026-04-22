@@ -85,6 +85,9 @@ export function VideoPlayer({
   // Clip position in full video (for timeline indicator)
   const clipStartPercent = fullDuration > 0 ? (clip.startTime / fullDuration) * 100 : 0;
   const clipEndPercent = fullDuration > 0 ? (clip.endTime / fullDuration) * 100 : 100;
+  const clipEndDelta = fullDuration > 0 ? Math.abs(clip.endTime - fullDuration) : 0;
+  const hasPartialClipContext =
+    clip.startTime > 0 || (fullDuration > 0 && clip.endTime < fullDuration && clipEndDelta > 1);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -595,7 +598,7 @@ export function VideoPlayer({
         </button>
 
         {/* Clip context badge (in full mode) */}
-        {playbackMode === 'full' && (
+        {playbackMode === 'full' && hasPartialClipContext && (
           <div className={`absolute top-3 left-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-black/70 backdrop-blur-sm border border-yellow-500/30 transition-opacity duration-300 ${!controlsVisible && isPlaying ? 'opacity-0' : 'opacity-100'}`} onClick={(e) => e.stopPropagation()}>
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
@@ -626,7 +629,7 @@ export function VideoPlayer({
             <div className="absolute inset-0 h-1 group-hover:h-1.5 transition-all bg-white/30 rounded-full" />
 
             {/* Clip region indicator (in full mode) */}
-            {playbackMode === 'full' && (
+            {playbackMode === 'full' && hasPartialClipContext && (
               <div
                 className="absolute h-1 group-hover:h-1.5 transition-all bg-yellow-500/40 rounded-full"
                 style={{ left: `${clipStartPercent}%`, width: `${clipEndPercent - clipStartPercent}%` }}
@@ -646,7 +649,7 @@ export function VideoPlayer({
             />
 
             {/* Clip boundary markers (in full mode) */}
-            {playbackMode === 'full' && (
+            {playbackMode === 'full' && hasPartialClipContext && (
               <>
                 <button
                   onClick={(e) => { e.stopPropagation(); jumpToClipStart(); }}

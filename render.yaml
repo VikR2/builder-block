@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: builder-block-ui
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    healthCheckPath: /api/health
+    disk:
+      name: app-data
+      mountPath: /app/data
+      sizeGB: 10
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: NEXT_PUBLIC_BASE_URL
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: TCM_LLM_PROVIDER
+        sync: false
+      - key: TCM_CHAT_MODEL
+        sync: false
+      - key: TCM_CHAT_TIMEOUT_MS
+        sync: false
+      - key: TCM_LESSON_MODEL
+        sync: false
+      - key: TCM_EMBEDDING_PROVIDER
+        sync: false
+      - key: TCM_EMBEDDING_MODEL
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false

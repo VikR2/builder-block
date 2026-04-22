@@ -5,7 +5,7 @@ import { UserMenu } from "@/components/auth/user-menu";
 import { MainNav } from "@/components/main-nav";
 
 export const metadata: Metadata = {
-  title: "The Currency Merchant Opus",
+  title: "The Currency Merchant",
   description: "Master trading concepts with TCM's comprehensive learning platform",
 };
 
@@ -43,12 +43,11 @@ export default function RootLayout({
             <footer className="border-t border-amber-500/20 bg-background/95">
               <div className="container flex items-center justify-between h-14">
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-amber-500 font-medium">TCM Opus</span> · Trading Education Platform
+                  <span className="text-amber-500 font-medium">TCM</span> · Trading Education Platform
                 </p>
                 <nav className="flex items-center gap-6 text-xs">
                   <a href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
                   <a href="/account" className="text-muted-foreground hover:text-foreground transition-colors">Account</a>
-                  <a href="/tcm/guides" className="text-muted-foreground hover:text-foreground transition-colors">Study Guides</a>
                   <a href="/skills" className="text-muted-foreground hover:text-foreground transition-colors">Skills Library</a>
                   <span className="text-muted-foreground/50">|</span>
                   <span className="text-muted-foreground">v2.0</span>

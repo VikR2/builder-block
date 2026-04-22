@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from 'crypto';
 import { join } from 'path';
-import { existsSync, mkdirSync, writeFileSync, appendFileSync, renameSync, unlinkSync, readdirSync, statSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, appendFileSync, renameSync, unlinkSync, readdirSync, statSync, copyFileSync, readFileSync, rmSync } from 'fs';
 import {
   createUploadSession,
   getUploadSession,
@@ -9,8 +9,12 @@ import {
   deleteUploadSession,
   createVideo,
   createJob,
-  getVideoByHash
+  getVideoByHash,
+  getVideoByFolderId,
+  getJobByVideoId,
+  updateVideo
 } from './db';
+import { getVideoArtifactStatus } from '../tcm-video-artifacts';
 
 const TEMP_UPLOADS_PATH = join(process.cwd(), '..', 'data', 'uploads-temp');
 const LOCAL_VIDEOS_PATH = join(process.cwd(), '..', 'data', 'local-videos');
@@ -22,6 +26,12 @@ export function ensureTempDir() {
   }
 }
 
+function ensureLocalVideosDir() {
+  if (!existsSync(LOCAL_VIDEOS_PATH)) {
+    mkdirSync(LOCAL_VIDEOS_PATH, { recursive: true });
+  }
+}
+
 // Generate unique upload session ID
 export function generateUploadId(): string {
   return randomBytes(16).toString('hex');
@@ -29,7 +39,6 @@ export function generateUploadId(): string {
 
 // Calculate file hash
 export function calculateFileHash(filePath: string): string {
-  const { readFileSync } = require('fs');
   const content = readFileSync(filePath);
   return createHash('sha256').update(content).digest('hex');
 }
@@ -42,6 +51,147 @@ export function slugifyFilename(filename: string): string {
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
     .substring(0, 50);
+}
+
+function isSupportedVideoFile(filePath: string): boolean {
+  return /\.(mp4|mov|mkv|webm)$/i.test(filePath);
+}
+
+function getManagedFolderName(filename: string, fileHash: string): string {
+  const shortHash = fileHash.substring(0, 8);
+  ensureLocalVideosDir();
+
+  const existingByHash = readdirSync(LOCAL_VIDEOS_PATH, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .find((name) => name.endsWith(`_${shortHash}`));
+
+  if (existingByHash) {
+    return existingByHash;
+  }
+
+  return `${slugifyFilename(filename)}_${shortHash}`;
+}
+
+function getManagedVideoPath(folderName: string, filename: string): string {
+  return join(LOCAL_VIDEOS_PATH, folderName, filename);
+}
+
+function ensureManagedVideoCopy(sourcePath: string, folderName: string, filename: string): string {
+  ensureLocalVideosDir();
+  const targetFolder = join(LOCAL_VIDEOS_PATH, folderName);
+  if (!existsSync(targetFolder)) {
+    mkdirSync(targetFolder, { recursive: true });
+  }
+
+  const targetPath = getManagedVideoPath(folderName, filename);
+  if (sourcePath !== targetPath) {
+    copyFileSync(sourcePath, targetPath);
+  }
+
+  return targetPath;
+}
+
+function getOrCreateProcessingJob(videoId: number): number {
+  const existingJob = getJobByVideoId(videoId);
+  if (existingJob && ['queued', 'running', 'paused'].includes(existingJob.status)) {
+    return existingJob.id;
+  }
+
+  return createJob({ video_id: videoId });
+}
+
+async function autoStartProcessing(jobId: number): Promise<void> {
+  const { startProcessing } = await import('./processor');
+  await startProcessing(jobId);
+}
+
+function reconcileExistingVideo(args: {
+  existingVideo: ReturnType<typeof getVideoByHash>;
+  filename: string;
+  title?: string;
+  sourceType?: string;
+  fileHash: string;
+  sourceFilePath: string;
+  fileSizeBytes: number;
+  autoProcess?: boolean;
+}): {
+  success: boolean;
+  videoId?: number;
+  jobId?: number;
+  isDuplicate?: boolean;
+  reusedExisting?: boolean;
+  error?: string;
+} {
+  const {
+    existingVideo,
+    filename,
+    title,
+    sourceType,
+    fileHash,
+    sourceFilePath,
+    fileSizeBytes,
+    autoProcess,
+  } = args;
+
+  if (!existingVideo) {
+    return { success: false, error: 'Existing video not found' };
+  }
+
+  const folderName = existingVideo.folder_id || getManagedFolderName(filename, fileHash);
+  const managedVideoPath = ensureManagedVideoCopy(sourceFilePath, folderName, filename);
+
+  updateVideo(existingVideo.id, {
+    filename,
+    file_path: managedVideoPath,
+    file_hash: fileHash,
+    file_size_bytes: fileSizeBytes,
+    folder_id: folderName,
+    title: title || existingVideo.title || filename.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '),
+    source_type: sourceType || existingVideo.source_type || 'other',
+    error_message: null
+  });
+
+  const refreshedVideo = getVideoByFolderId(folderName) || existingVideo;
+  const artifactStatus = getVideoArtifactStatus({
+    file_path: managedVideoPath,
+    folder_id: folderName
+  });
+
+  if (artifactStatus.ready) {
+    updateVideo(existingVideo.id, {
+      processing_status: 'ready',
+      is_published: 1,
+      processed_at: new Date().toISOString(),
+      error_message: null
+    });
+
+    return {
+      success: true,
+      videoId: existingVideo.id,
+      isDuplicate: refreshedVideo.processing_status === 'ready' && (refreshedVideo.is_published ?? 0) === 1,
+      reusedExisting: true,
+      error: refreshedVideo.processing_status === 'ready' && (refreshedVideo.is_published ?? 0) === 1
+        ? `Video already exists: "${refreshedVideo.title || refreshedVideo.filename}"`
+        : 'Reused existing video and published the recovered lesson-ready assets'
+    };
+  }
+
+  let jobId: number | undefined;
+  if (autoProcess !== false) {
+    jobId = getOrCreateProcessingJob(existingVideo.id);
+    autoStartProcessing(jobId).catch((err) => {
+      console.error('Failed to start processing:', err);
+    });
+  }
+
+  return {
+    success: true,
+    videoId: existingVideo.id,
+    jobId,
+    reusedExisting: true,
+    error: 'Reused existing video and resumed lesson pipeline'
+  };
 }
 
 // Initialize upload session
@@ -124,6 +274,7 @@ export function finalizeUpload(uploadId: string, options?: {
   videoId?: number;
   jobId?: number;
   isDuplicate?: boolean;
+  reusedExisting?: boolean;
   error?: string;
 } {
   const session = getUploadSession(uploadId);
@@ -153,10 +304,22 @@ export function finalizeUpload(uploadId: string, options?: {
     // Calculate hash and check for duplicates
     const fileHash = calculateFileHash(tempFilePath);
     
+    const combinedStats = statSync(tempFilePath);
+
     // Check if video with this hash already exists
     const existingVideo = getVideoByHash(fileHash);
     if (existingVideo) {
-      // Clean up temp files since we won't be using them
+      const reusedResult = reconcileExistingVideo({
+        existingVideo,
+        filename: session.filename,
+        title: options?.title,
+        sourceType: options?.sourceType,
+        fileHash,
+        sourceFilePath: tempFilePath,
+        fileSizeBytes: combinedStats.size,
+        autoProcess: options?.autoProcess
+      });
+
       for (const chunkFile of chunkFiles) {
         try {
           unlinkSync(join(session.temp_path!, chunkFile));
@@ -164,28 +327,20 @@ export function finalizeUpload(uploadId: string, options?: {
       }
       try {
         unlinkSync(tempFilePath);
-        require('fs').rmdirSync(session.temp_path!);
       } catch { /* ignore cleanup errors */ }
-      
+      try {
+        rmSync(session.temp_path!, { recursive: true, force: true });
+      } catch { /* ignore cleanup errors */ }
+
       updateUploadSession(uploadId, { status: 'duplicate' });
-      
-      return { 
-        success: true, 
-        videoId: existingVideo.id, 
-        isDuplicate: true,
-        error: `Video already exists: "${existingVideo.title || existingVideo.filename}"`
-      };
+
+      return reusedResult;
     }
-    
-    const slug = slugifyFilename(session.filename);
-    const shortHash = fileHash.substring(0, 8);
-    const folderName = `${slug}_${shortHash}`;
+
+    const folderName = getManagedFolderName(session.filename, fileHash);
     const finalFolder = join(LOCAL_VIDEOS_PATH, folderName);
 
-    // Ensure local-videos directory exists
-    if (!existsSync(LOCAL_VIDEOS_PATH)) {
-      mkdirSync(LOCAL_VIDEOS_PATH, { recursive: true });
-    }
+    ensureLocalVideosDir();
 
     // Create final folder
     if (!existsSync(finalFolder)) {
@@ -206,18 +361,17 @@ export function finalizeUpload(uploadId: string, options?: {
       require('fs').rmdirSync(session.temp_path!);
     } catch { /* ignore cleanup errors */ }
 
-    // Get file stats
-    const stats = statSync(finalFilePath);
-
     // Create database record with folder_id for library resolution
     const videoId = createVideo({
       filename: session.filename,
       file_path: finalFilePath,
       file_hash: fileHash,
-      file_size_bytes: stats.size,
+      file_size_bytes: combinedStats.size,
       title: options?.title || session.filename.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '),
       source_type: options?.sourceType || 'other',
-      folder_id: folderName  // Store folder name for ID resolution
+      folder_id: folderName,  // Store folder name for ID resolution
+      processing_status: 'uploaded',
+      is_published: false
     });
 
     // Update session status
@@ -230,13 +384,8 @@ export function finalizeUpload(uploadId: string, options?: {
 
       // Actually start processing - fire and forget
       if (jobId) {
-        // Import dynamically to avoid circular dependency
-        import('./processor').then(({ startProcessing }) => {
-          startProcessing(jobId!).catch(err => {
-            console.error('Failed to start processing:', err);
-          });
-        }).catch(err => {
-          console.error('Failed to import processor:', err);
+        autoStartProcessing(jobId).catch(err => {
+          console.error('Failed to start processing:', err);
         });
       }
     }
@@ -246,6 +395,86 @@ export function finalizeUpload(uploadId: string, options?: {
     updateUploadSession(uploadId, { status: 'failed' });
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
+}
+
+export function importLocalVideo(params: {
+  filePath: string;
+  title?: string;
+  sourceType?: string;
+  autoProcess?: boolean;
+}): {
+  success: boolean;
+  videoId?: number;
+  jobId?: number;
+  isDuplicate?: boolean;
+  reusedExisting?: boolean;
+  error?: string;
+} {
+  ensureAdminTablesIfNeeded();
+
+  const sourcePath = params.filePath.trim();
+  if (!sourcePath) {
+    return { success: false, error: 'filePath is required' };
+  }
+
+  if (!existsSync(sourcePath)) {
+    return { success: false, error: 'Source file does not exist' };
+  }
+
+  if (!isSupportedVideoFile(sourcePath)) {
+    return { success: false, error: 'Only video files (mp4, mov, mkv, webm) are supported' };
+  }
+
+  const sourceStats = statSync(sourcePath);
+  if (!sourceStats.isFile()) {
+    return { success: false, error: 'Source path must be a file' };
+  }
+
+  const filename = sourcePath.split(/[\\/]/).pop() || 'video.mp4';
+  const fileHash = calculateFileHash(sourcePath);
+  const existingVideo = getVideoByHash(fileHash);
+
+  if (existingVideo) {
+    return reconcileExistingVideo({
+      existingVideo,
+      filename,
+      title: params.title,
+      sourceType: params.sourceType,
+      fileHash,
+      sourceFilePath: sourcePath,
+      fileSizeBytes: sourceStats.size,
+      autoProcess: params.autoProcess
+    });
+  }
+
+  const folderName = getManagedFolderName(filename, fileHash);
+  const managedVideoPath = ensureManagedVideoCopy(sourcePath, folderName, filename);
+  const videoId = createVideo({
+    filename,
+    file_path: managedVideoPath,
+    file_hash: fileHash,
+    file_size_bytes: sourceStats.size,
+    title: params.title || filename.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '),
+    source_type: params.sourceType || 'admin_local',
+    folder_id: folderName,
+    processing_status: 'uploaded',
+    is_published: false
+  });
+
+  let jobId: number | undefined;
+  if (params.autoProcess !== false) {
+    jobId = getOrCreateProcessingJob(videoId);
+    autoStartProcessing(jobId).catch((err) => {
+      console.error('Failed to start processing:', err);
+    });
+  }
+
+  return { success: true, videoId, jobId };
+}
+
+function ensureAdminTablesIfNeeded() {
+  const { ensureAdminTables } = require('./db');
+  ensureAdminTables();
 }
 
 // Cancel an upload session

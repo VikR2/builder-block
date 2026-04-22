@@ -16,7 +16,9 @@ import {
   FileText,
   Image,
   Database,
-  Sparkles
+  Sparkles,
+  BookOpen,
+  FolderOpen
 } from 'lucide-react';
 import { ProcessingCard } from '@/components/admin/processing-card';
 import { CheckpointIntent } from '@/components/admin/checkpoint-intent';
@@ -28,6 +30,7 @@ interface ProcessedVideo {
   file_path: string;
   file_hash: string | null;
   file_size_bytes: number | null;
+  folder_id: string | null;
   duration_sec: number | null;
   frame_count: number | null;
   resolution: string | null;
@@ -42,6 +45,7 @@ interface ProcessedVideo {
   title: string | null;
   description: string | null;
   source_type: string | null;
+  is_published: number | null;
   created_at: string;
   updated_at: string | null;
   processed_at: string | null;
@@ -59,6 +63,28 @@ interface ProcessingJob {
   error_message: string | null;
   created_at: string;
 }
+
+interface ArtifactStatus {
+  videoDir: string | null;
+  transcript: boolean;
+  frames: boolean;
+  manifest: boolean;
+  embeddings: boolean;
+  lesson: boolean;
+  ready: boolean;
+}
+
+const statusMeta: Record<string, { icon: React.ReactNode; label: string }> = {
+  uploaded: { icon: <Clock className="h-5 w-5 text-muted-foreground" />, label: 'Uploaded' },
+  extracting: { icon: <Loader2 className="h-5 w-5 text-sky-500 animate-spin" />, label: 'Extracting' },
+  embedding: { icon: <Loader2 className="h-5 w-5 text-violet-500 animate-spin" />, label: 'Embedding' },
+  lesson_building: { icon: <Loader2 className="h-5 w-5 text-amber-500 animate-spin" />, label: 'Lesson Building' },
+  ready: { icon: <CheckCircle className="h-5 w-5 text-emerald-500" />, label: 'Ready' },
+  failed: { icon: <AlertCircle className="h-5 w-5 text-rose-500" />, label: 'Failed' },
+  pending: { icon: <Clock className="h-5 w-5 text-muted-foreground" />, label: 'Pending' },
+  processing: { icon: <Loader2 className="h-5 w-5 text-sky-500 animate-spin" />, label: 'Processing' },
+  completed: { icon: <CheckCircle className="h-5 w-5 text-emerald-500" />, label: 'Completed' },
+};
 
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return 'Unknown';
@@ -81,18 +107,34 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleString();
 }
 
-const statusIcons: Record<string, React.ReactNode> = {
-  pending: <Clock className="h-5 w-5 text-muted-foreground" />,
-  processing: <Loader2 className="h-5 w-5 text-sky-500 animate-spin" />,
-  completed: <CheckCircle className="h-5 w-5 text-emerald-500" />,
-  failed: <AlertCircle className="h-5 w-5 text-rose-500" />
-};
+function ArtifactRow({
+  label,
+  ready,
+  icon
+}: {
+  label: string;
+  ready: boolean;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className={`flex items-center gap-2 p-3 rounded-lg ${ready ? 'bg-emerald-500/10' : 'bg-muted/20'}`}>
+      <span className={ready ? 'text-emerald-500' : 'text-muted-foreground'}>{icon}</span>
+      <span className="text-sm">{label}</span>
+      {ready ? (
+        <CheckCircle className="h-4 w-4 text-emerald-500 ml-auto" />
+      ) : (
+        <Clock className="h-4 w-4 text-muted-foreground ml-auto" />
+      )}
+    </div>
+  );
+}
 
 export default function VideoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
   const [video, setVideo] = useState<ProcessedVideo | null>(null);
   const [job, setJob] = useState<ProcessingJob | null>(null);
+  const [artifactStatus, setArtifactStatus] = useState<ArtifactStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCheckpoint, setShowCheckpoint] = useState(false);
@@ -104,6 +146,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         const data = await res.json();
         setVideo(data.video);
         setJob(data.job);
+        setArtifactStatus(data.artifactStatus);
       } else if (res.status === 404) {
         router.push('/tcm/admin/videos');
       }
@@ -117,7 +160,6 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     fetchData();
 
-    // Poll for updates if processing
     const interval = setInterval(() => {
       if (job?.status === 'running' || job?.status === 'queued') {
         fetchData();
@@ -128,7 +170,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
   }, [fetchData, job?.status]);
 
   const handleReprocess = async () => {
-    if (!confirm('Start processing this video again?')) return;
+    if (!confirm('Start the lesson-ready processing pipeline again for this video?')) return;
     setIsProcessing(true);
 
     try {
@@ -196,9 +238,14 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
+  const status = statusMeta[video.processing_status] || statusMeta.failed;
+  const isReady = video.processing_status === 'ready';
+  const isPublished = Boolean(video.is_published);
+  const publicVideoPath = `/tcm/library/${encodeURIComponent(video.folder_id || String(video.id))}`;
+  const lessonPath = `${publicVideoPath}/lesson`;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <Link
@@ -214,9 +261,15 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div>
               <h1 className="text-2xl font-bold">{video.title || video.filename}</h1>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                {statusIcons[video.processing_status]}
-                <span className="capitalize">{video.processing_status}</span>
+              <div className="flex items-center gap-2 text-muted-foreground flex-wrap">
+                {status.icon}
+                <span>{status.label}</span>
+                <span>·</span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  isPublished ? 'bg-emerald-500/10 text-emerald-500' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {isPublished ? 'Published' : 'Hidden from members'}
+                </span>
                 {video.skills_extracted > 0 && (
                   <>
                     <span>·</span>
@@ -228,15 +281,24 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {video.processing_status === 'completed' && (
-            <Link
-              href={`/tcm/library/${video.id}`}
-              className="flex items-center gap-2 px-4 py-2 border border-border bg-card text-foreground rounded-lg hover:bg-accent transition-colors"
-            >
-              <ExternalLink className="h-4 w-4" />
-              View in Library
-            </Link>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {isReady && isPublished && (
+            <>
+              <Link
+                href={publicVideoPath}
+                className="flex items-center gap-2 px-4 py-2 border border-border bg-card text-foreground rounded-lg hover:bg-accent transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Watch
+              </Link>
+              <Link
+                href={lessonPath}
+                className="flex items-center gap-2 px-4 py-2 border border-amber-500/30 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-colors"
+              >
+                <BookOpen className="h-4 w-4" />
+                Lesson Guide
+              </Link>
+            </>
           )}
           <button
             onClick={handleReprocess}
@@ -248,7 +310,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
             ) : (
               <Play className="h-4 w-4" />
             )}
-            {job?.status === 'running' ? 'Processing...' : 'Reprocess'}
+            {job?.status === 'running' ? 'Processing...' : 'Retry / Reindex'}
           </button>
           <button
             onClick={handleDelete}
@@ -260,7 +322,6 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      {/* Active Job */}
       {job && (job.status === 'running' || job.status === 'queued' || job.status === 'paused') && (
         <ProcessingCard
           job={job}
@@ -269,29 +330,30 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         />
       )}
 
-      {/* Error Message */}
-      {video.error_message && (
+      {(video.error_message || job?.error_message) && (
         <div className="p-4 rounded-xl border border-rose-500/50 bg-rose-500/10">
           <div className="flex items-center gap-2 text-rose-500 font-medium mb-1">
             <AlertCircle className="h-5 w-5" />
-            Error
+            Last Error
           </div>
-          <p className="text-sm text-muted-foreground">{video.error_message}</p>
+          <p className="text-sm text-muted-foreground">{video.error_message || job?.error_message}</p>
         </div>
       )}
 
-      {/* Info Grid */}
       <div className="grid md:grid-cols-2 gap-6">
-        {/* File Info */}
         <div className="rounded-xl border border-border/50 bg-card p-4">
           <h2 className="font-semibold mb-4 flex items-center gap-2">
             <Film className="h-5 w-5 text-rose-500" />
             File Information
           </h2>
           <dl className="space-y-3 text-sm">
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Filename</dt>
-              <dd className="font-mono text-xs truncate max-w-[200px]">{video.filename}</dd>
+              <dd className="font-mono text-xs truncate max-w-[240px]">{video.filename}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">Folder ID</dt>
+              <dd className="font-mono text-xs truncate max-w-[240px]">{video.folder_id || 'Missing'}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">File Size</dt>
@@ -305,23 +367,30 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
               <dt className="text-muted-foreground">Resolution</dt>
               <dd>{video.resolution || 'Unknown'}</dd>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Hash</dt>
-              <dd className="font-mono text-xs truncate max-w-[150px]">{video.file_hash || 'N/A'}</dd>
+              <dd className="font-mono text-xs truncate max-w-[240px]">{video.file_hash || 'N/A'}</dd>
             </div>
           </dl>
         </div>
 
-        {/* Processing Info */}
         <div className="rounded-xl border border-border/50 bg-card p-4">
           <h2 className="font-semibold mb-4 flex items-center gap-2">
             <Database className="h-5 w-5 text-sky-500" />
-            Processing Details
+            Readiness State
           </h2>
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Status</dt>
-              <dd className="capitalize">{video.processing_status}</dd>
+              <dt className="text-muted-foreground">Processing Status</dt>
+              <dd>{status.label}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Published</dt>
+              <dd>{isPublished ? 'Yes' : 'No'}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Artifact Ready</dt>
+              <dd>{artifactStatus?.ready ? 'Yes' : 'No'}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Transcript Method</dt>
@@ -332,17 +401,12 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
               <dd>{video.whisper_model || 'N/A'}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Frame Count</dt>
-              <dd>{video.frame_count || 0}</dd>
-            </div>
-            <div className="flex justify-between">
               <dt className="text-muted-foreground">Skills Extracted</dt>
               <dd className="text-emerald-500">{video.skills_extracted}</dd>
             </div>
           </dl>
         </div>
 
-        {/* Timestamps */}
         <div className="rounded-xl border border-border/50 bg-card p-4">
           <h2 className="font-semibold mb-4 flex items-center gap-2">
             <Clock className="h-5 w-5 text-amber-500" />
@@ -358,51 +422,31 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
               <dd>{formatDate(video.updated_at)}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Processed</dt>
+              <dt className="text-muted-foreground">Lesson Ready At</dt>
               <dd>{formatDate(video.processed_at)}</dd>
             </div>
           </dl>
         </div>
 
-        {/* Generated Files */}
         <div className="rounded-xl border border-border/50 bg-card p-4">
           <h2 className="font-semibold mb-4 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-emerald-500" />
-            Generated Files
+            <FolderOpen className="h-5 w-5 text-violet-500" />
+            Artifact Checklist
           </h2>
           <div className="space-y-2">
-            <div className={`flex items-center gap-2 p-2 rounded-lg ${video.transcript_path ? 'bg-emerald-500/10' : 'bg-muted/20'}`}>
-              <FileText className={`h-4 w-4 ${video.transcript_path ? 'text-emerald-500' : 'text-muted-foreground'}`} />
-              <span className="text-sm">Transcript</span>
-              {video.transcript_path ? (
-                <CheckCircle className="h-4 w-4 text-emerald-500 ml-auto" />
-              ) : (
-                <Clock className="h-4 w-4 text-muted-foreground ml-auto" />
-              )}
-            </div>
-            <div className={`flex items-center gap-2 p-2 rounded-lg ${video.frame_count ? 'bg-emerald-500/10' : 'bg-muted/20'}`}>
-              <Image className={`h-4 w-4 ${video.frame_count ? 'text-emerald-500' : 'text-muted-foreground'}`} />
-              <span className="text-sm">Frames ({video.frame_count || 0})</span>
-              {video.frame_count ? (
-                <CheckCircle className="h-4 w-4 text-emerald-500 ml-auto" />
-              ) : (
-                <Clock className="h-4 w-4 text-muted-foreground ml-auto" />
-              )}
-            </div>
-            <div className={`flex items-center gap-2 p-2 rounded-lg ${video.skills_extracted > 0 ? 'bg-emerald-500/10' : 'bg-muted/20'}`}>
-              <Sparkles className={`h-4 w-4 ${video.skills_extracted > 0 ? 'text-emerald-500' : 'text-muted-foreground'}`} />
-              <span className="text-sm">Skills ({video.skills_extracted})</span>
-              {video.skills_extracted > 0 ? (
-                <CheckCircle className="h-4 w-4 text-emerald-500 ml-auto" />
-              ) : (
-                <Clock className="h-4 w-4 text-muted-foreground ml-auto" />
-              )}
-            </div>
+            <ArtifactRow label="Transcript" ready={Boolean(artifactStatus?.transcript)} icon={<FileText className="h-4 w-4" />} />
+            <ArtifactRow label="Manifest" ready={Boolean(artifactStatus?.manifest)} icon={<Database className="h-4 w-4" />} />
+            <ArtifactRow label={`Frames (${video.frame_count || 0})`} ready={Boolean(artifactStatus?.frames)} icon={<Image className="h-4 w-4" />} />
+            <ArtifactRow label="Embeddings" ready={Boolean(artifactStatus?.embeddings)} icon={<Sparkles className="h-4 w-4" />} />
+            <ArtifactRow label="Lesson Guide" ready={Boolean(artifactStatus?.lesson)} icon={<BookOpen className="h-4 w-4" />} />
+            <ArtifactRow label="Published to members" ready={isPublished} icon={<ExternalLink className="h-4 w-4" />} />
           </div>
+          {artifactStatus?.videoDir && (
+            <p className="mt-3 text-xs text-muted-foreground break-all">{artifactStatus.videoDir}</p>
+          )}
         </div>
       </div>
 
-      {/* Checkpoint Modal */}
       {showCheckpoint && job?.checkpoint_type && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-xl">

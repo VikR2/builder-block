@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   getAllPlaylists,
+  getPlaylistItems,
   ensureOrganizationTables
 } from '@/lib/tcm-admin/organization';
 
@@ -9,11 +10,16 @@ export async function GET() {
   try {
     ensureOrganizationTables();
 
-    // Only get published playlists
-    const playlists = getAllPlaylists(false);
-
-    // Only return playlists that have videos
-    const playlistsWithVideos = playlists.filter(p => (p.video_count || 0) > 0);
+    const playlistsWithVideos = getAllPlaylists(false)
+      .map((playlist) => {
+        const items = getPlaylistItems(playlist.id, { publishedOnly: true });
+        return {
+          ...playlist,
+          video_count: items.length,
+          total_duration: items.reduce((sum, item) => sum + (item.video_duration || 0), 0)
+        };
+      })
+      .filter((playlist) => (playlist.video_count || 0) > 0);
 
     return NextResponse.json({ playlists: playlistsWithVideos });
   } catch (error) {

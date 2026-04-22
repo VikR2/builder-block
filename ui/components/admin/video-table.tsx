@@ -17,6 +17,7 @@ import {
 interface ProcessedVideo {
   id: number;
   filename: string;
+  folder_id?: string | null;
   title: string | null;
   processing_status: string;
   skills_extracted: number;
@@ -25,6 +26,7 @@ interface ProcessedVideo {
   created_at: string;
   processed_at: string | null;
   category_id?: number | null;
+  is_published?: number | null;
 }
 
 interface Category {
@@ -44,6 +46,11 @@ interface VideoTableProps {
 }
 
 const statusIcons: Record<string, React.ReactNode> = {
+  uploaded: <Clock className="h-4 w-4 text-muted-foreground" />,
+  extracting: <Loader2 className="h-4 w-4 text-sky-500 animate-spin" />,
+  embedding: <Loader2 className="h-4 w-4 text-violet-500 animate-spin" />,
+  lesson_building: <Loader2 className="h-4 w-4 text-amber-500 animate-spin" />,
+  ready: <CheckCircle className="h-4 w-4 text-emerald-500" />,
   pending: <Clock className="h-4 w-4 text-muted-foreground" />,
   processing: <Loader2 className="h-4 w-4 text-sky-500 animate-spin" />,
   completed: <CheckCircle className="h-4 w-4 text-emerald-500" />,
@@ -51,11 +58,18 @@ const statusIcons: Record<string, React.ReactNode> = {
 };
 
 const statusLabels: Record<string, string> = {
+  uploaded: 'Uploaded',
+  extracting: 'Extracting',
+  embedding: 'Embedding',
+  lesson_building: 'Lesson Building',
+  ready: 'Ready',
   pending: 'Pending',
   processing: 'Processing',
   completed: 'Completed',
   failed: 'Failed'
 };
+
+const ACTIVE_STATUSES = new Set(['uploaded', 'extracting', 'embedding', 'lesson_building', 'pending', 'processing']);
 
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return '-';
@@ -192,9 +206,18 @@ export function VideoTable({ videos, categories, onReprocess, onDelete, onCatego
                 </td>
               )}
               <td className="py-3 px-4">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {statusIcons[video.processing_status] || statusIcons.pending}
                   <span className="text-sm">{statusLabels[video.processing_status] || 'Unknown'}</span>
+                  {video.processing_status === 'ready' && (
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                      video.is_published
+                        ? 'bg-emerald-500/10 text-emerald-500'
+                        : 'bg-amber-500/10 text-amber-500'
+                    }`}>
+                      {video.is_published ? 'Published' : 'Hidden'}
+                    </span>
+                  )}
                 </div>
               </td>
               <td className="py-3 px-4 text-sm text-muted-foreground">
@@ -239,7 +262,7 @@ export function VideoTable({ videos, categories, onReprocess, onDelete, onCatego
                           <ExternalLink className="h-4 w-4" />
                           View Details
                         </Link>
-                        {onReprocess && video.processing_status !== 'processing' && (
+                        {onReprocess && !ACTIVE_STATUSES.has(video.processing_status) && (
                           <button
                             onClick={() => {
                               onReprocess(video.id);
@@ -248,7 +271,7 @@ export function VideoTable({ videos, categories, onReprocess, onDelete, onCatego
                             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent transition-colors"
                           >
                             <Play className="h-4 w-4" />
-                            Reprocess
+                            Retry / Reindex
                           </button>
                         )}
                         {onDelete && (

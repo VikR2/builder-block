@@ -23,6 +23,12 @@ interface ProcessingCardProps {
 }
 
 const stepLabels: Record<string, string> = {
+  uploaded: 'Upload received',
+  extracting: 'Extracting transcript and frames...',
+  embedding: 'Generating FAISS embeddings...',
+  lesson_building: 'Building lesson guide...',
+  ready: 'Lesson ready',
+  failed: 'Processing failed',
   transcribe: 'Transcribing audio...',
   frames: 'Extracting frames...',
   embeddings: 'Generating embeddings...',
@@ -48,7 +54,9 @@ const statusColors: Record<string, string> = {
 };
 
 export function ProcessingCard({ job, videoTitle, onCheckpoint }: ProcessingCardProps) {
-  const stepLabel = job.current_step ? stepLabels[job.current_step] || job.current_step : 'Starting...';
+  const stepLabel = job.current_step
+    ? stepLabels[job.current_step] || job.current_step.replace(/_/g, ' ')
+    : 'Starting...';
 
   return (
     <div className="rounded-lg border border-border/50 bg-card overflow-hidden">
@@ -131,8 +139,8 @@ export function ProcessingCard({ job, videoTitle, onCheckpoint }: ProcessingCard
             <CheckCircle className="h-4 w-4" />
             <span>
               {job.skills_extracted > 0
-                ? `${job.skills_extracted} skills extracted`
-                : 'Processing complete'}
+                ? `Lesson ready • ${job.skills_extracted} skills extracted`
+                : 'Lesson ready'}
             </span>
           </div>
         )}

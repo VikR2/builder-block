@@ -76,6 +76,12 @@ export function LibraryContent({ initialVideos }: LibraryContentProps) {
   const [isVideosExpanded, setIsVideosExpanded] = useState(false);
 
   useEffect(() => {
+    if (!isLoading && playlists.length === 0) {
+      setIsVideosExpanded(true);
+    }
+  }, [isLoading, playlists.length]);
+
+  useEffect(() => {
     const fetchOrganization = async () => {
       try {
         const [categoriesRes, tagsRes, playlistsRes] = await Promise.all([
@@ -155,18 +161,20 @@ export function LibraryContent({ initialVideos }: LibraryContentProps) {
   return (
     <div className="flex flex-col gap-8">
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="p-4 rounded-xl bg-card border border-border/50">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-              <ListVideo className="w-5 h-5 text-amber-500" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold">{playlists.length}</h3>
-              <p className="text-sm text-muted-foreground">{playlists.length === 1 ? 'Course' : 'Courses'} Available</p>
+      <div className={`grid gap-4 ${playlists.length > 0 ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}>
+        {playlists.length > 0 && (
+          <div className="p-4 rounded-xl bg-card border border-border/50">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <ListVideo className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold">{playlists.length}</h3>
+                <p className="text-sm text-muted-foreground">{playlists.length === 1 ? 'Course' : 'Courses'} Available</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <div className="p-4 rounded-xl bg-card border border-border/50">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
@@ -254,7 +262,7 @@ export function LibraryContent({ initialVideos }: LibraryContentProps) {
                             {previewVideos.map((video) => (
                               <Link
                                 key={video.id}
-                                href={`/tcm/library/${video.id}`}
+                                href={`/tcm/library/${video.id}?playlist=${playlist.id}&playlistSlug=${encodeURIComponent(playlist.slug)}`}
                                 className="flex items-center gap-3 px-5 py-3 hover:bg-accent/5 transition-colors group/video"
                               >
                                 <span className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center text-xs font-medium text-amber-500 shrink-0">
@@ -316,7 +324,7 @@ export function LibraryContent({ initialVideos }: LibraryContentProps) {
             <div className="text-left">
               <h2 className="text-xl font-bold">All Videos</h2>
               <p className="text-sm text-muted-foreground">
-                {filteredVideos.length} video{filteredVideos.length !== 1 ? 's' : ''} • Click to browse
+                {filteredVideos.length} video{filteredVideos.length !== 1 ? 's' : ''} {playlists.length > 0 ? '• Click to browse' : 'ready to watch'}
               </p>
             </div>
           </div>

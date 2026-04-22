@@ -5,6 +5,7 @@ const LOCAL_VIDEOS_DIR = path.join(process.cwd(), '..', 'data', 'local-videos');
 
 export interface VideoArtifactStatus {
   videoDir: string | null;
+  videoFile: boolean;
   transcript: boolean;
   frames: boolean;
   manifest: boolean;
@@ -58,6 +59,7 @@ export function getVideoArtifactStatus(video: VideoLocator): VideoArtifactStatus
   if (!videoDir || !fs.existsSync(videoDir)) {
     return {
       videoDir: null,
+      videoFile: false,
       transcript: false,
       frames: false,
       manifest: false,
@@ -68,16 +70,18 @@ export function getVideoArtifactStatus(video: VideoLocator): VideoArtifactStatus
     };
   }
 
+  const videoFile = fs.existsSync(video.file_path);
   const transcript = fs.existsSync(path.join(videoDir, 'transcript_timed.json'));
   const manifest = fs.existsSync(path.join(videoDir, 'manifest.json'));
   const embeddings = fs.existsSync(path.join(videoDir, 'embeddings.faiss')) && fs.existsSync(path.join(videoDir, 'segments.json'));
   const lesson = fs.existsSync(path.join(videoDir, 'lesson.json'));
   const shortsBrief = fs.existsSync(path.join(videoDir, 'shorts_brief.json'));
   const frames = hasFrameArtifacts(videoDir, manifest);
-  const ready = transcript && frames && manifest && embeddings && lesson;
+  const ready = videoFile && transcript && frames && manifest && embeddings && lesson;
 
   return {
     videoDir,
+    videoFile,
     transcript,
     frames,
     manifest,

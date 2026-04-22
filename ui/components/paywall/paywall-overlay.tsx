@@ -9,7 +9,7 @@ interface PaywallOverlayProps {
 export function PaywallOverlay({
   returnUrl,
   title = 'Premium Content',
-  description = 'Subscribe to access videos, guides, and the full skills library.',
+  description = 'Subscribe to access videos, premium resources, and the full skills library.',
 }: PaywallOverlayProps) {
   const loginUrl = returnUrl
     ? `/login?redirect=${encodeURIComponent(returnUrl)}`
@@ -84,7 +84,7 @@ export function PaywallOverlay({
               <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Study guides
+              Premium learning resources
             </li>
           </ul>
         </div>

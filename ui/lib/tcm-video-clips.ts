@@ -12,6 +12,10 @@ export interface VideoClipInfo {
   startTime: number; // seconds
   endTime: number;   // seconds
   description?: string;
+  relevanceScore?: number;
+  source?: string;
+  watchLink?: string;
+  lessonLink?: string;
 }
 
 export interface ConceptVideoMap {

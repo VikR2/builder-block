@@ -159,7 +159,7 @@ export async function sendWelcomeEmail(to: string): Promise<EmailResult> {
             <li>Trading video courses with synchronized transcripts</li>
             <li>Comprehensive skills library</li>
             <li>AI-powered Knowledge Bot</li>
-            <li>Study guides and documentation</li>
+            <li>Premium trading documentation and learning resources</li>
           </ul>
           <p>Get started by exploring our content library!</p>
           <p style="color: #666; font-size: 14px;">

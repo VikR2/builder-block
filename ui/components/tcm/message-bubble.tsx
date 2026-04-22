@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { ReactNode, useState } from "react";
 import Image from "next/image";
 import { TCMSearchResult } from "@/lib/tcm-db";
 import { ChartConfig } from "@/lib/tcm-chart-data";
+import { StructuredCoachBrief } from "@/lib/tcm-coach-brief";
 import { ChartViewer } from "./chart-viewer";
 import { VideoPlayer, VideoModal, WatchExplanationButton } from "./video-player";
 import { VideoClipInfo } from "@/lib/tcm-video-clips";
@@ -13,11 +15,16 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  structuredAnswer?: StructuredCoachBrief;
   sources?: TCMSearchResult[];
   isLoading?: boolean;
   frames?: FrameReference[];
   chartData?: ChartConfig;
   videoClip?: VideoClipInfo;
+  primaryClip?: VideoClipInfo;
+  recommendedClips?: VideoClipInfo[];
+  watchLink?: string;
+  lessonLink?: string;
 }
 
 // Re-export VideoClipInfo for external use
@@ -37,50 +44,259 @@ interface MessageBubbleProps {
   onSourceClick?: (source: TCMSearchResult) => void;
 }
 
-// Lightweight markdown renderer for chat messages
-function renderMarkdown(content: string): string {
+function renderStructuredAnswer(answer: StructuredCoachBrief, isLoading: boolean): ReactNode {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+        Mentor take
+      </div>
+
+      <p className="text-[15px] leading-7 text-foreground">{answer.lead}</p>
+
+      {answer.bullets.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Key takeaways</div>
+          <ul className="space-y-2.5">
+            {answer.bullets.map((bullet) => (
+              <li key={bullet} className="flex items-start gap-2 text-sm leading-relaxed text-foreground/90">
+                <span className="mt-1.5 text-[0.55rem] text-primary">●</span>
+                <span>{bullet}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {answer.bestClipReason && (
+        <div className="rounded-xl border border-primary/15 bg-primary/5 px-3 py-3">
+          <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Why this watch helps</div>
+          <p className="mt-1 text-sm leading-relaxed text-foreground/85">{answer.bestClipReason}</p>
+        </div>
+      )}
+
+      {answer.broaderContext && (
+        <div className="rounded-xl border border-border/50 bg-background/30 px-3 py-3">
+          <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">How it fits</div>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{answer.broaderContext}</p>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+          <span>Refining answer...</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function normalizeAssistantContent(content: string): string {
   return content
-    // Remove leading/trailing horizontal rules and whitespace
-    .replace(/^[\s\n]*---[\s\n]*/g, '')
-    .replace(/[\s\n]*---[\s\n]*$/g, '')
-    // Remove blockquote markers and style the text better
-    .replace(/^>\s*(.*)$/gm, '<blockquote class="border-l-2 border-primary/50 pl-3 my-2 text-muted-foreground italic">$1</blockquote>')
-    // Headers
-    .replace(/^### (.*)$/gm, '<h3 class="font-semibold text-base mt-3 mb-1">$1</h3>')
-    .replace(/^## (.*)$/gm, '<h2 class="font-semibold text-lg mt-3 mb-1">$2</h2>')
-    // Bold
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
-    // Italic
-    .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code class="bg-background/50 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
-    // Unordered lists with proper styling
-    .replace(/^- (.*)$/gm, '<li class="flex items-start gap-2 ml-1"><span class="text-primary mt-1.5 text-xs">●</span><span>$1</span></li>')
-    // Numbered lists
-    .replace(/^(\d+)\.\s+(.*)$/gm, '<li class="flex items-start gap-2 ml-1"><span class="text-primary font-medium">$1.</span><span>$2</span></li>')
-    // Wrap consecutive list items
-    .replace(/(<li[^>]*>.*?<\/li>\n?)+/g, '<ul class="space-y-1 my-2">$&</ul>')
-    // Clean up multiple blockquotes into one
-    .replace(/(<\/blockquote>\s*<blockquote[^>]*>)/g, '<br />')
-    // Line breaks
-    .replace(/\n\n/g, '</p><p class="my-3">')
-    .replace(/\n/g, '<br />');
+    .replace(/\r\n/g, "\n")
+    .replace(/^[\s\n]*---+\s*/g, "")
+    .replace(/\s*---+\s*$/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function renderInlineMarkdown(text: string): ReactNode[] {
+  return text
+    .split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g)
+    .filter(Boolean)
+    .map((token, index) => {
+      if (token.startsWith("**") && token.endsWith("**")) {
+        return (
+          <strong key={`strong-${index}`} className="font-semibold text-foreground">
+            {token.slice(2, -2)}
+          </strong>
+        );
+      }
+
+      if (token.startsWith("`") && token.endsWith("`")) {
+        return (
+          <code key={`code-${index}`} className="rounded bg-background/60 px-1.5 py-0.5 font-mono text-[0.95em]">
+            {token.slice(1, -1)}
+          </code>
+        );
+      }
+
+      if (token.startsWith("*") && token.endsWith("*")) {
+        return (
+          <em key={`em-${index}`} className="italic">
+            {token.slice(1, -1)}
+          </em>
+        );
+      }
+
+      return token;
+    });
+}
+
+function isBulletLine(line: string): boolean {
+  return /^\s*[-*]\s+/.test(line);
+}
+
+function isNumberedLine(line: string): boolean {
+  return /^\s*\d+\.\s+/.test(line);
+}
+
+function renderAssistantContent(content: string): ReactNode[] {
+  const normalized = normalizeAssistantContent(content);
+
+  if (!normalized) {
+    return [];
+  }
+
+  const lines = normalized.split("\n");
+  const blocks: ReactNode[] = [];
+  let index = 0;
+  let key = 0;
+
+  while (index < lines.length) {
+    const trimmed = lines[index].trim();
+
+    if (!trimmed) {
+      index += 1;
+      continue;
+    }
+
+    if (/^###\s+/.test(trimmed)) {
+      blocks.push(
+        <h3 key={`h3-${key += 1}`} className="text-base font-semibold text-foreground">
+          {renderInlineMarkdown(trimmed.replace(/^###\s+/, ""))}
+        </h3>
+      );
+      index += 1;
+      continue;
+    }
+
+    if (/^##\s+/.test(trimmed)) {
+      blocks.push(
+        <h2 key={`h2-${key += 1}`} className="text-lg font-semibold text-foreground">
+          {renderInlineMarkdown(trimmed.replace(/^##\s+/, ""))}
+        </h2>
+      );
+      index += 1;
+      continue;
+    }
+
+    if (/^>\s*/.test(trimmed)) {
+      const quoteLines: string[] = [];
+      while (index < lines.length && /^>\s*/.test(lines[index].trim())) {
+        quoteLines.push(lines[index].trim().replace(/^>\s*/, ""));
+        index += 1;
+      }
+
+      blocks.push(
+        <blockquote
+          key={`quote-${key += 1}`}
+          className="border-l-2 border-primary/50 pl-3 italic text-muted-foreground"
+        >
+          {renderInlineMarkdown(quoteLines.join(" "))}
+        </blockquote>
+      );
+      continue;
+    }
+
+    if (isBulletLine(trimmed)) {
+      const items: string[] = [];
+      while (index < lines.length && isBulletLine(lines[index])) {
+        items.push(lines[index].trim().replace(/^[-*]\s+/, ""));
+        index += 1;
+      }
+
+      blocks.push(
+        <ul key={`ul-${key += 1}`} className="space-y-2">
+          {items.map((item, itemIndex) => (
+            <li key={`ul-item-${itemIndex}`} className="flex items-start gap-2">
+              <span className="mt-1.5 text-[0.55rem] text-primary">●</span>
+              <span>{renderInlineMarkdown(item)}</span>
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    if (isNumberedLine(trimmed)) {
+      const items: Array<{ marker: string; content: string }> = [];
+      while (index < lines.length && isNumberedLine(lines[index])) {
+        const match = lines[index].trim().match(/^(\d+\.)\s+(.*)$/);
+        if (match) {
+          items.push({ marker: match[1], content: match[2] });
+        }
+        index += 1;
+      }
+
+      blocks.push(
+        <ol key={`ol-${key += 1}`} className="space-y-2">
+          {items.map((item, itemIndex) => (
+            <li key={`ol-item-${itemIndex}`} className="flex items-start gap-2">
+              <span className="min-w-[1.75rem] font-medium text-primary">{item.marker}</span>
+              <span>{renderInlineMarkdown(item.content)}</span>
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    const paragraphLines = [trimmed];
+    index += 1;
+
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !/^##\s+/.test(lines[index].trim()) &&
+      !/^###\s+/.test(lines[index].trim()) &&
+      !/^>\s*/.test(lines[index].trim()) &&
+      !isBulletLine(lines[index]) &&
+      !isNumberedLine(lines[index])
+    ) {
+      paragraphLines.push(lines[index].trim());
+      index += 1;
+    }
+
+    blocks.push(
+      <p key={`p-${key += 1}`} className="text-sm leading-relaxed text-foreground/95">
+        {renderInlineMarkdown(paragraphLines.join(" "))}
+      </p>
+    );
+  }
+
+  return blocks;
 }
 
 export function MessageBubble({ message, onSourceClick }: MessageBubbleProps) {
   const isUser = message.role === "user";
+  const primaryClip = message.primaryClip || message.videoClip;
+  const extraClips = (message.recommendedClips || []).filter((clip, index) => {
+    if (!primaryClip) return true;
+    if (index === 0 && clip.videoId === primaryClip.videoId && clip.startTime === primaryClip.startTime) {
+      return false;
+    }
+    return clip.videoId !== primaryClip.videoId || clip.startTime !== primaryClip.startTime;
+  });
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
       <div
-        className={`max-w-[85%] rounded-xl px-4 py-3 shadow-sm ${
+        className={`max-w-[84%] rounded-2xl px-4 py-4 shadow-sm ${
           isUser
             ? "bg-primary text-primary-foreground"
-            : "bg-card border border-border"
+            : "border border-border/70 bg-card/95 shadow-[0_12px_30px_rgba(0,0,0,0.12)]"
         }`}
       >
         {/* Message Content */}
-        {message.isLoading ? (
+        {message.structuredAnswer ? (
+          renderStructuredAnswer(message.structuredAnswer, Boolean(message.isLoading))
+        ) : message.isLoading ? (
           <div className="flex items-center gap-2">
             <div className="flex gap-1">
               <span className="w-2 h-2 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }} />
@@ -92,10 +308,9 @@ export function MessageBubble({ message, onSourceClick }: MessageBubbleProps) {
         ) : isUser ? (
           <div className="whitespace-pre-wrap">{message.content}</div>
         ) : (
-          <div
-            className="text-sm leading-relaxed [&_ul]:list-none [&_p]:my-0"
-            dangerouslySetInnerHTML={{ __html: `<p>${renderMarkdown(message.content)}</p>` }}
-          />
+          <div className="space-y-3 text-sm leading-relaxed">
+            {renderAssistantContent(message.content)}
+          </div>
         )}
 
         {/* Interactive Chart - HIDDEN: user feedback indicates charts are difficult to conceptualize
@@ -107,8 +322,55 @@ export function MessageBubble({ message, onSourceClick }: MessageBubbleProps) {
         */}
 
         {/* Video Clip */}
-        {message.videoClip && (
-          <VideoClipSection clip={message.videoClip} />
+        {primaryClip && (
+          <VideoClipSection
+            clip={primaryClip}
+            watchLink={message.watchLink || primaryClip.watchLink}
+            lessonLink={message.lessonLink || primaryClip.lessonLink}
+          />
+        )}
+
+        {extraClips.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-border/50">
+            <div className="text-xs text-muted-foreground mb-2">Keep going with:</div>
+            <div className="space-y-2">
+              {extraClips.slice(0, 3).map((clip) => (
+                <div
+                  key={`${clip.videoId}-${clip.startTime}`}
+                  className="rounded-xl border border-border/50 bg-background/40 px-3 py-3"
+                >
+                  <div className="text-sm font-medium">{clip.videoTitle}</div>
+                  {clip.description && (
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{clip.description}</p>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    {clip.watchLink && (
+                      <Link
+                        href={clip.watchLink}
+                        className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-1 font-medium text-rose-500 hover:bg-rose-500/20 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        Watch clip
+                      </Link>
+                    )}
+                    {clip.lessonLink && (
+                      <Link
+                        href={clip.lessonLink}
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 font-medium text-amber-500 hover:bg-amber-500/20 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                        Lesson guide
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Frame Previews */}
@@ -131,7 +393,7 @@ export function MessageBubble({ message, onSourceClick }: MessageBubbleProps) {
         {/* Sources */}
         {message.sources && message.sources.length > 0 && (
           <div className="mt-3 pt-3 border-t border-border/50">
-            <div className="text-xs text-muted-foreground mb-2">Sources:</div>
+            <div className="text-xs text-muted-foreground mb-2">Backed by:</div>
             <div className="flex flex-wrap gap-2">
               {message.sources.map((source) => (
                 <button
@@ -191,7 +453,15 @@ function formatTime(date: Date): string {
   });
 }
 
-function VideoClipSection({ clip }: { clip: VideoClipInfo }) {
+function VideoClipSection({
+  clip,
+  watchLink,
+  lessonLink
+}: {
+  clip: VideoClipInfo;
+  watchLink?: string;
+  lessonLink?: string;
+}) {
   const [showModal, setShowModal] = useState(false);
   const [showInline, setShowInline] = useState(false);
 
@@ -201,7 +471,7 @@ function VideoClipSection({ clip }: { clip: VideoClipInfo }) {
         <svg className="w-3.5 h-3.5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
         </svg>
-        Video Explanation:
+        Best watch:
       </div>
 
       {showInline ? (
@@ -217,6 +487,28 @@ function VideoClipSection({ clip }: { clip: VideoClipInfo }) {
       ) : (
         <div className="flex flex-wrap gap-2">
           <WatchExplanationButton clip={clip} onWatch={() => setShowInline(true)} />
+          {watchLink && (
+            <Link
+              href={watchLink}
+              className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-1 text-xs font-medium text-rose-500 hover:bg-rose-500/20 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Open watch page
+            </Link>
+          )}
+          {lessonLink && (
+            <Link
+              href={lessonLink}
+              className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-500 hover:bg-amber-500/20 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              Read lesson guide
+            </Link>
+          )}
           <button
             onClick={() => setShowModal(true)}
             className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-background/50 transition-colors"

@@ -4,13 +4,14 @@ import { SkillsSearch } from "@/components/skills-search";
 import Link from "next/link";
 import { getCurrentUser } from '@/lib/auth';
 import { PaywallOverlay } from '@/components/paywall';
+import { normalizeSkillCategories, normalizeSkillRecord } from '@/lib/skills-display';
 
 export const dynamic = 'force-dynamic';
 
 // Server action for search
 async function searchSkillsAction(query: string) {
   "use server";
-  return searchSkills(query);
+  return searchSkills(query).map(normalizeSkillRecord);
 }
 
 export default async function SkillsPage() {
@@ -29,8 +30,8 @@ export default async function SkillsPage() {
     />;
   }
 
-  const skills = getAllSkills();
-  const categories = getSkillCategories();
+  const skills = getAllSkills().map(normalizeSkillRecord);
+  const categories = normalizeSkillCategories(getSkillCategories());
 
   return (
     <div className="min-h-screen">

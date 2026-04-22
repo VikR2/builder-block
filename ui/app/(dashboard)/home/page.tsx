@@ -2,7 +2,6 @@ import { getCurrentUser } from '@/lib/auth';
 import { getAdminPosts } from '@/lib/posts-db';
 import { getStats } from '@/lib/db';
 import { getLibraryVideos } from '@/lib/tcm-library';
-import { getAllStudyGuides } from '@/lib/tcm-db';
 import { WelcomeBanner } from '@/components/home/welcome-banner';
 import { StatsSidebar } from '@/components/home/stats-sidebar';
 import { PostCard } from '@/components/home/post-card';
@@ -15,17 +14,15 @@ export default async function HomePage() {
   const user = await getCurrentUser();
 
   // Fetch data in parallel
-  const [posts, stats, videos, guides] = await Promise.all([
+  const [posts, stats, videos] = await Promise.all([
     Promise.resolve(getAdminPosts(20)),
     Promise.resolve(getStats()),
     getLibraryVideos(),
-    Promise.resolve(getAllStudyGuides()),
   ]);
 
   const statsData = {
     skillsCount: stats.skills,
     videosCount: videos.length,
-    guidesCount: guides.length,
   };
 
   return (
@@ -44,8 +41,8 @@ export default async function HomePage() {
             {/* Welcome banner */}
             <WelcomeBanner userName={user?.email} />
 
-            {/* Post composer (admin only - component handles auth check) */}
-            <PostComposer />
+            {/* Post composer stays available for admins without cluttering learner home */}
+            {user?.isAdmin ? <PostComposer /> : null}
 
             {/* Posts feed */}
             <section>
@@ -79,43 +76,6 @@ export default async function HomePage() {
             <div className="sticky top-24 space-y-6">
               {/* Stats widget */}
               <StatsSidebar stats={statsData} />
-
-              {/* Quick links card */}
-              <div className="rounded-xl border border-border/50 bg-card/30 p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-amber-500">&#9889;</span>
-                  <h3 className="font-semibold text-foreground">Quick Actions</h3>
-                </div>
-                <div className="space-y-2">
-                  <a
-                    href="/tcm"
-                    className="flex items-center gap-3 p-3 rounded-lg bg-card/50 hover:bg-card border border-border/50 hover:border-border transition-all group"
-                  >
-                    <span className="text-violet-500">&#9679;</span>
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                      Ask the Knowledge Bot
-                    </span>
-                  </a>
-                  <a
-                    href="/tcm/library"
-                    className="flex items-center gap-3 p-3 rounded-lg bg-card/50 hover:bg-card border border-border/50 hover:border-border transition-all group"
-                  >
-                    <span className="text-rose-500">&#9654;</span>
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                      Browse Video Courses
-                    </span>
-                  </a>
-                  <a
-                    href="/tcm/guides"
-                    className="flex items-center gap-3 p-3 rounded-lg bg-card/50 hover:bg-card border border-border/50 hover:border-border transition-all group"
-                  >
-                    <span className="text-sky-500">&#9678;</span>
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                      Generate Study Guide
-                    </span>
-                  </a>
-                </div>
-              </div>
 
               {/* Warm accent card */}
               <div className="rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-950/20 to-transparent p-5">

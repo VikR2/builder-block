@@ -5,7 +5,6 @@ import Link from 'next/link';
 interface StatsData {
   skillsCount: number;
   videosCount: number;
-  guidesCount: number;
   modelsCount?: number;
 }
 
@@ -66,13 +65,6 @@ export function StatsSidebar({ stats }: StatsSidebarProps) {
           value={stats.videosCount}
           href="/tcm/library"
           color="text-rose-500"
-        />
-        <StatItem
-          icon="◎"
-          label="Guides"
-          value={stats.guidesCount}
-          href="/tcm/guides"
-          color="text-sky-500"
         />
         {stats.modelsCount !== undefined && stats.modelsCount > 0 && (
           <StatItem

@@ -63,7 +63,7 @@ function PricingContent() {
     'Full access to video courses with synchronized transcripts',
     'Complete trading skills library with code snippets',
     'AI-powered Knowledge Bot for instant answers',
-    'Comprehensive study guides and documentation',
+    'Comprehensive trading documentation and platform resources',
     'Pine Script and NinjaTrader C# code examples',
     'New content added regularly',
   ];

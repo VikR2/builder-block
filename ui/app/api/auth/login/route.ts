@@ -4,6 +4,7 @@ import {
   verifyPassword,
   createSession,
   getActiveSubscriptionByUserId,
+  getUserCreditBalance,
 } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -50,6 +51,8 @@ export async function POST(request: NextRequest) {
     const hasManualPremium = user.manual_premium === 1;
     const subscription = getActiveSubscriptionByUserId(user.id);
     const isPremium = hasManualPremium || !!subscription;
+    const creditBalance = getUserCreditBalance(user.id);
+    const isAdmin = user.role === 'admin';
 
     return NextResponse.json({
       success: true,
@@ -58,8 +61,10 @@ export async function POST(request: NextRequest) {
         email: user.email,
         role: user.role,
         isPremium,
+        creditBalance,
+        hasChatAccess: isAdmin || isPremium || creditBalance > 0,
         hasStripeSubscription: !!subscription,
-        isAdmin: user.role === 'admin',
+        isAdmin,
         emailVerified: user.email_verified === 1,
       },
     });

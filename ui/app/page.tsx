@@ -4,6 +4,8 @@ import { getStats, getAllSkills } from "@/lib/db";
 import { getTCMSkills, getArchitectureDocuments, getLocalVideos } from "@/lib/tcm-db";
 import { getCurrentUser } from "@/lib/auth";
 
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   // Redirect authenticated users to /home
   const user = await getCurrentUser();
@@ -33,8 +35,6 @@ export default async function HomePage() {
 
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-tight mb-6">
               <span className="text-amber-500">The Currency Merchant</span>
-              <br />
-              <span className="text-foreground">Opus</span>
             </h1>
 
             <p className="text-xl text-muted-foreground max-w-2xl leading-relaxed mb-10">
@@ -68,7 +68,7 @@ export default async function HomePage() {
 
       {/* Features Grid */}
       <div className="container py-16">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Link href="/tcm" className="group p-6 rounded-2xl bg-card border border-border hover:border-amber-500/50 transition-all">
             <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mb-4 group-hover:bg-amber-500/20 transition-colors">
               <svg className="w-6 h-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -123,23 +123,6 @@ export default async function HomePage() {
             </div>
           </Link>
 
-          <Link href="/tcm/guides" className="group p-6 rounded-2xl bg-card border border-border hover:border-sky-500/50 transition-all">
-            <div className="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center mb-4 group-hover:bg-sky-500/20 transition-colors">
-              <svg className="w-6 h-6 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-lg mb-2">Study Guides</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              In-depth guides and documentation for trading concepts and strategies.
-            </p>
-            <div className="mt-4 flex items-center gap-2 text-sm text-sky-500 font-medium">
-              <span>{studyGuides.length} guides</span>
-              <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-          </Link>
         </div>
       </div>
 

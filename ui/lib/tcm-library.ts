@@ -5,7 +5,13 @@
 
 import fs from 'fs';
 import path from 'path';
-import { getFolderIdByDbId, getVideoByFolderId } from './tcm-admin/db';
+import {
+  ensureAdminTables,
+  getPublishedReadyVideoByFolderId,
+  getPublishedReadyVideoById,
+  getPublishedReadyVideos
+} from './tcm-admin/db';
+import { readVideoLesson } from './tcm-lessons';
 
 // Local videos directory path
 const LOCAL_VIDEOS_DIR = path.join(process.cwd(), '..', 'data', 'local-videos');
@@ -20,35 +26,13 @@ const LOCAL_VIDEOS_DIR = path.join(process.cwd(), '..', 'data', 'local-videos');
  * @returns The folder ID string, or null if not found
  */
 export function resolveVideoId(id: string): string | null {
-  // If id looks like a folder (contains underscore followed by hex hash pattern)
-  // Pattern: slug_xxxxxxxx where x is hex
-  if (/^[a-z0-9_]+_[a-f0-9]{8}$/i.test(id)) {
-    // Verify the folder exists
-    const folderPath = path.join(LOCAL_VIDEOS_DIR, id);
-    try {
-      fs.accessSync(folderPath);
-      return id;
-    } catch {
-      // Folder doesn't exist, try database lookup in case it's a coincidental pattern
-      const dbVideo = getVideoByFolderId(id);
-      return dbVideo?.folder_id || null;
-    }
-  }
+  ensureAdminTables();
 
-  // If numeric, look up folder_id from database
   if (/^\d+$/.test(id)) {
-    const folderId = getFolderIdByDbId(parseInt(id, 10));
-    return folderId;
+    return getPublishedReadyVideoById(parseInt(id, 10))?.folder_id || null;
   }
 
-  // Try as folder ID directly (might be a slug without the hash)
-  const folderPath = path.join(LOCAL_VIDEOS_DIR, id);
-  try {
-    fs.accessSync(folderPath);
-    return id;
-  } catch {
-    return null;
-  }
+  return getPublishedReadyVideoByFolderId(id)?.folder_id || null;
 }
 
 export interface VideoDetails {
@@ -89,32 +73,26 @@ export interface VideoManifest {
   }[];
 }
 
+const GENERIC_CHAPTER_TITLE_RE = /^(key teaching moment|lesson section|chapter|\d+:\d{2}(?::\d{2})?)$/i;
+
+function cleanVideoTitle(title: string): string {
+  return title
+    .replace(/_/g, ' ')
+    .replace(/-/g, ' ')
+    .replace(/\bFufilment\b/gi, 'Fulfillment')
+    .replace(/\bInsighst\b/gi, 'Insights')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Get all available video IDs from the local-videos directory
  */
 export async function getVideoIds(): Promise<string[]> {
-  try {
-    const entries = await fs.promises.readdir(LOCAL_VIDEOS_DIR, { withFileTypes: true });
-    const videoIds: string[] = [];
-
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        // Check if manifest.json exists
-        const manifestPath = path.join(LOCAL_VIDEOS_DIR, entry.name, 'manifest.json');
-        try {
-          await fs.promises.access(manifestPath);
-          videoIds.push(entry.name);
-        } catch {
-          // No manifest, skip this directory
-        }
-      }
-    }
-
-    return videoIds;
-  } catch (error) {
-    console.error('Error reading video directory:', error);
-    return [];
-  }
+  ensureAdminTables();
+  return getPublishedReadyVideos()
+    .map(video => video.folder_id)
+    .filter((folderId): folderId is string => Boolean(folderId));
 }
 
 /**
@@ -139,11 +117,7 @@ export async function getVideoDetails(videoId: string): Promise<VideoDetails | n
   if (!manifest) return null;
 
   // Clean up the title (remove underscores, clean up formatting)
-  const cleanTitle = manifest.source_title
-    .replace(/_/g, ' ')
-    .replace(/-/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const cleanTitle = cleanVideoTitle(manifest.source_title);
 
   // Use frame 3 or 4 as thumbnail (usually more representative)
   const thumbnailFrame = manifest.frames[3] || manifest.frames[2] || manifest.frames[0];
@@ -179,28 +153,145 @@ export async function getLibraryVideos(): Promise<VideoDetails[]> {
 }
 
 /**
- * Generate chapters from manifest frames
- * Uses frame timestamps and transcript segments
+ * Generate chapters from lesson sections when available.
+ * Falls back to a coarse manifest-derived list when lesson data is missing.
  */
 export async function getVideoChapters(videoId: string): Promise<VideoChapter[]> {
   const manifest = await getVideoManifest(videoId);
   if (!manifest) return [];
 
-  const chapters: VideoChapter[] = [];
-
-  for (const frame of manifest.frames) {
-    // Extract first sentence or meaningful phrase from transcript segment
-    const title = extractChapterTitle(frame.transcript_segment, frame.timestamp_sec);
-    const frameNumber = parseInt(frame.file.replace('frame_', '').replace('.jpg', ''));
-
-    chapters.push({
-      timestamp: frame.timestamp_sec,
-      title,
-      frameUrl: `/api/tcm/frames/${encodeURIComponent(videoId)}/${frameNumber}`
-    });
+  const lessonChapters = buildLessonChapters(videoId, manifest);
+  if (lessonChapters.length > 0) {
+    return lessonChapters;
   }
 
-  return chapters;
+  return buildFallbackChaptersFromManifest(videoId, manifest);
+}
+
+function buildLessonChapters(videoId: string, manifest: VideoManifest): VideoChapter[] {
+  const lesson = readVideoLesson(path.join(LOCAL_VIDEOS_DIR, videoId));
+  if (!lesson || lesson.sections.length === 0) {
+    return [];
+  }
+
+  const usedTitles = new Set<string>();
+  const chapters = lesson.sections
+    .slice()
+    .sort((left, right) => left.startTime - right.startTime)
+    .map((section) => ({
+      timestamp: section.startTime,
+      title: buildLessonChapterTitle(
+        section.title,
+        section.summary,
+        section.transcriptExcerpt,
+        section.startTime,
+        usedTitles
+      ),
+      frameUrl: getNearestFrameUrl(videoId, manifest, section.startTime),
+    }))
+    .filter((chapter) => chapter.title);
+
+  return dedupeChapters(chapters);
+}
+
+function buildFallbackChaptersFromManifest(videoId: string, manifest: VideoManifest): VideoChapter[] {
+  const duration = Math.max(0, manifest.video_duration_sec || 0);
+  const minGap = Math.max(120, Math.floor(duration / 6) || 120);
+  const chapters: VideoChapter[] = [];
+  const seenTitles = new Set<string>();
+  let lastTimestamp = -Infinity;
+
+  for (const frame of manifest.frames) {
+    const timestamp = frame.timestamp_sec;
+    const title = extractChapterTitle(frame.transcript_segment, timestamp);
+    const normalizedTitle = title.toLowerCase();
+
+    if (chapters.length > 0 && timestamp - lastTimestamp < minGap) {
+      continue;
+    }
+
+    if (seenTitles.has(normalizedTitle) && chapters.length > 0) {
+      continue;
+    }
+
+    chapters.push({
+      timestamp,
+      title,
+      frameUrl: getNearestFrameUrl(videoId, manifest, timestamp),
+    });
+
+    seenTitles.add(normalizedTitle);
+    lastTimestamp = timestamp;
+
+    if (chapters.length >= 8) {
+      break;
+    }
+  }
+
+  return dedupeChapters(chapters);
+}
+
+function getNearestFrameUrl(videoId: string, manifest: VideoManifest, timestamp: number): string | undefined {
+  if (!manifest.frames.length) {
+    return undefined;
+  }
+
+  const nearestFrame = manifest.frames
+    .slice()
+    .sort((left, right) => Math.abs(left.timestamp_sec - timestamp) - Math.abs(right.timestamp_sec - timestamp))[0];
+
+  if (!nearestFrame) {
+    return undefined;
+  }
+
+  const frameNumber = parseInt(nearestFrame.file.replace('frame_', '').replace('.jpg', ''), 10);
+  if (!Number.isFinite(frameNumber)) {
+    return undefined;
+  }
+
+  return `/api/tcm/frames/${encodeURIComponent(videoId)}/${frameNumber}`;
+}
+
+function buildLessonChapterTitle(
+  title: string,
+  summary: string,
+  transcriptExcerpt: string,
+  timestampSec: number,
+  usedTitles: Set<string>
+): string {
+  const normalizedTitle = title.replace(/\s+/g, ' ').trim();
+  const titleKey = normalizedTitle.toLowerCase();
+  const needsFallback = !normalizedTitle
+    || GENERIC_CHAPTER_TITLE_RE.test(normalizedTitle)
+    || usedTitles.has(titleKey);
+
+  let candidate = needsFallback
+    ? extractChapterTitle(summary || transcriptExcerpt, timestampSec)
+    : normalizedTitle;
+
+  if (usedTitles.has(candidate.toLowerCase())) {
+    candidate = `${candidate} (${formatTimestamp(timestampSec)})`;
+  }
+
+  usedTitles.add(candidate.toLowerCase());
+  return candidate;
+}
+
+function dedupeChapters(chapters: VideoChapter[]): VideoChapter[] {
+  const seen = new Set<string>();
+
+  return chapters
+    .slice()
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .filter((chapter) => {
+      const key = `${Math.round(chapter.timestamp)}:${chapter.title.toLowerCase()}`;
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
 }
 
 /**

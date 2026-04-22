@@ -57,6 +57,8 @@ export async function POST(request: NextRequest) {
         email: user.email,
         role: user.role,
         isPremium: false,
+        creditBalance: 0,
+        hasChatAccess: false,
         hasStripeSubscription: false,
         isAdmin: false,
         emailVerified: false,

@@ -8,6 +8,8 @@ export interface ClientUser {
   email: string;
   role: 'user' | 'admin';
   isPremium: boolean;
+  creditBalance: number;
+  hasChatAccess: boolean;
   hasStripeSubscription: boolean;
   isAdmin: boolean;
   emailVerified: boolean;

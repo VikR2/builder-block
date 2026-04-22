@@ -254,7 +254,7 @@ export function getAllPlaylists(includeUnpublished = true): VideoPlaylist[] {
       FROM video_playlists p
       ${whereClause}
       ORDER BY p.display_order ASC, p.name ASC
-    `).all() as (VideoPlaylist & { is_published: number })[];
+    `).all() as (Omit<VideoPlaylist, 'is_published'> & { is_published: number })[];
 
     // Convert SQLite boolean
     return playlists.map(p => ({
@@ -277,7 +277,7 @@ export function getPlaylistById(id: number): VideoPlaylist | null {
          WHERE pi.playlist_id = p.id) as total_duration
       FROM video_playlists p
       WHERE p.id = ?
-    `).get(id) as (VideoPlaylist & { is_published: number }) | undefined;
+    `).get(id) as (Omit<VideoPlaylist, 'is_published'> & { is_published: number }) | undefined;
 
     if (!playlist) return null;
     return { ...playlist, is_published: Boolean(playlist.is_published) };
@@ -297,7 +297,7 @@ export function getPlaylistBySlug(slug: string): VideoPlaylist | null {
          WHERE pi.playlist_id = p.id) as total_duration
       FROM video_playlists p
       WHERE p.slug = ?
-    `).get(slug) as (VideoPlaylist & { is_published: number }) | undefined;
+    `).get(slug) as (Omit<VideoPlaylist, 'is_published'> & { is_published: number }) | undefined;
 
     if (!playlist) return null;
     return { ...playlist, is_published: Boolean(playlist.is_published) };
@@ -400,14 +400,18 @@ export function reorderPlaylists(orderedIds: number[]): boolean {
 
 // ============ Playlist Item Operations ============
 
-export function getPlaylistItems(playlistId: number): PlaylistItem[] {
+export function getPlaylistItems(playlistId: number, options?: { publishedOnly?: boolean }): PlaylistItem[] {
   const db = getDb();
   try {
+    const publishedFilter = options?.publishedOnly
+      ? "AND v.processing_status = 'ready' AND COALESCE(v.is_published, 0) = 1"
+      : '';
     const items = db.prepare(`
       SELECT pi.*, v.title as video_title, v.duration_sec as video_duration, v.folder_id as video_folder_id, v.frame_count as video_frame_count
       FROM playlist_items pi
       JOIN processed_local_videos v ON pi.video_id = v.id
       WHERE pi.playlist_id = ?
+      ${publishedFilter}
       ORDER BY pi.position ASC
     `).all(playlistId) as PlaylistItem[];
     return items;

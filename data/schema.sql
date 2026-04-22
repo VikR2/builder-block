@@ -232,6 +232,8 @@ CREATE TABLE IF NOT EXISTS skill_sources (
 CREATE INDEX IF NOT EXISTS idx_skill_sources_skill ON skill_sources(skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_sources_type ON skill_sources(source_type);
 CREATE INDEX IF NOT EXISTS idx_skill_sources_url ON skill_sources(source_url);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_sources_unique_skill_source
+  ON skill_sources(skill_id, source_type, source_url);
 
 -- Track commonly used skill combinations (enhanced for full model intelligence)
 CREATE TABLE IF NOT EXISTS skill_combinations (

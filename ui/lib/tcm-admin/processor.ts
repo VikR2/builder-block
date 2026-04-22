@@ -12,6 +12,7 @@ import {
 } from './db';
 import { resetFAISSCache } from '../tcm-faiss.server';
 import { getVideoArtifactStatus } from '../tcm-video-artifacts';
+import { syncVideoSkillLinks } from '../tcm-video-skill-sync';
 
 const SCRIPTS_PATH = join(process.cwd(), '..', 'scripts');
 
@@ -254,6 +255,8 @@ export async function startProcessing(jobId: number): Promise<{ success: boolean
         return;
       }
 
+      const skillSync = syncVideoSkillLinks(video);
+
       if (!existsSync(video.file_path)) {
         failProcessing(jobId, video.id, 'Lesson artifacts are ready but the managed video file is missing');
         return;
@@ -269,7 +272,11 @@ export async function startProcessing(jobId: number): Promise<{ success: boolean
         processing_status: 'ready',
         processed_at: new Date().toISOString(),
         error_message: null,
-        is_published: 1
+        is_published: 1,
+        skills_extracted: skillSync.linkedSkillIds.length
+      });
+      updateJob(jobId, {
+        skills_extracted: skillSync.linkedSkillIds.length
       });
       broadcastProgress({
         jobId,
@@ -277,7 +284,7 @@ export async function startProcessing(jobId: number): Promise<{ success: boolean
         status: 'completed',
         currentStep: 'ready',
         progressPercent: 100,
-        message: 'Lesson-ready video is now published to the library'
+        message: `Lesson-ready video is now published to the library with ${skillSync.linkedSkillIds.length} linked skills`
       });
     };
 

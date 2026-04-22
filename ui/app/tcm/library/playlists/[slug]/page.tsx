@@ -139,7 +139,7 @@ export default async function PlaylistPage({ params }: PageProps) {
           {/* Start Course CTA */}
           {playlist.videos.length > 0 && (
             <Link
-              href={`/tcm/library/${playlist.videos[0].folder_id}`}
+              href={`/tcm/library/${playlist.videos[0].folder_id}?playlist=${playlist.id}&playlistSlug=${encodeURIComponent(playlist.slug)}`}
               className="flex items-center justify-center gap-3 w-full py-4 mb-8 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 text-white font-semibold text-lg hover:from-amber-400 hover:to-rose-400 transition-all shadow-lg shadow-amber-500/20"
             >
               <Play className="w-5 h-5" />
@@ -153,7 +153,7 @@ export default async function PlaylistPage({ params }: PageProps) {
             {playlist.videos.map((video, index) => (
               <Link
                 key={video.id}
-                href={`/tcm/library/${video.folder_id}`}
+                href={`/tcm/library/${video.folder_id}?playlist=${playlist.id}&playlistSlug=${encodeURIComponent(playlist.slug)}`}
                 className="group flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-amber-500/30 transition-all"
               >
                 {/* Position Number */}

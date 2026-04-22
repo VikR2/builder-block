@@ -1,13 +1,12 @@
 /**
- * TCM FAISS Search - Server-Side Semantic Search
+ * Warm FAISS search worker for TCM transcript retrieval.
  *
- * Provides semantic search across video transcripts using FAISS embeddings.
- * Calls Python subprocess for vector similarity search.
- *
- * Use this in API routes only, NOT in client components.
+ * Keeps a long-lived Python worker process alive so transcript indexes and the
+ * embedding model are loaded once and reused across requests.
  */
 
-import { spawn } from 'child_process';
+import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 
 export interface FAISSResult {
@@ -18,230 +17,337 @@ export interface FAISSResult {
   score: number;
 }
 
-// Paths relative to the ui directory (process.cwd() in Next.js)
+type WorkerResponse<T> = {
+  id: number | null;
+  ok: boolean;
+  result?: T;
+  error?: string;
+};
+
 const PROJECT_ROOT = join(process.cwd(), '..');
-const FAISS_SEARCH_SCRIPT = join(PROJECT_ROOT, 'scripts', 'lib', 'faiss_search.py');
+const FAISS_WORKER_SCRIPT = join(PROJECT_ROOT, 'scripts', 'lib', 'faiss_search_worker.py');
 const VIDEOS_PATH = join(PROJECT_ROOT, 'data', 'local-videos');
 
-// Cache for checking if FAISS is available
+let worker: ChildProcessWithoutNullStreams | null = null;
+let workerReadyPromise: Promise<void> | null = null;
 let faissAvailable: boolean | null = null;
+let workerCorpusSignature: string | null = null;
+let nextRequestId = 1;
+const pendingRequests = new Map<number, {
+  resolve: (value: any) => void;
+  reject: (reason?: unknown) => void;
+}>();
 
-/**
- * Check if FAISS search is available (indexes exist and Python deps installed)
- */
-export async function isFAISSAvailable(): Promise<boolean> {
-  if (faissAvailable !== null) {
-    return faissAvailable;
+function normalizeQueryForSearch(query: string): string {
+  const normalized = query
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return normalized || query.trim();
+}
+
+function hasEmbeddingsOnDisk(): boolean {
+  if (!existsSync(VIDEOS_PATH)) {
+    return false;
   }
 
-  return new Promise((resolve) => {
-    const proc = spawn('python', [
-      '-c',
-      `
-import sys
-from pathlib import Path
-try:
-    import faiss
-    import numpy
-    from sentence_transformers import SentenceTransformer
-except ImportError as e:
-    print(f"Missing: {e}", file=sys.stderr)
-    sys.exit(1)
+  return readdirSync(VIDEOS_PATH, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .some((entry) => {
+      const basePath = join(VIDEOS_PATH, entry.name);
+      return existsSync(join(basePath, 'embeddings.faiss')) && existsSync(join(basePath, 'segments.json'));
+    });
+}
 
-# Check for embeddings
-videos_path = Path(r'${VIDEOS_PATH.replace(/\\/g, '\\\\')}')
-has_embeddings = any((d / 'embeddings.faiss').exists() for d in videos_path.iterdir() if d.is_dir())
-if not has_embeddings:
-    print("No embeddings found", file=sys.stderr)
-    sys.exit(1)
-print("OK")
-`
-    ]);
+function normalizeCorpusMetadata(metadata: Record<string, unknown>): string {
+  const model = typeof metadata.model === 'string' ? metadata.model : 'all-MiniLM-L6-v2';
+  const provider = typeof metadata.provider === 'string'
+    ? metadata.provider
+    : model.startsWith('gemini-embedding')
+      ? 'google-gemini-api'
+      : 'legacy-minilm';
+  const modality = typeof metadata.modality === 'string' ? metadata.modality : 'text';
+  const indexVersion = typeof metadata.index_version === 'string'
+    ? metadata.index_version
+    : provider === 'google-gemini-api'
+      ? 'tcm-gemini-v3'
+      : 'legacy-minilm-v1';
+  const dimension = typeof metadata.dimension === 'number' ? metadata.dimension : 'na';
+  const profile = typeof metadata.profile === 'string' ? metadata.profile : 'coarse';
 
-    let stdout = '';
-    proc.stdout.on('data', (data) => { stdout += data; });
-    proc.stderr.on('data', (data) => { console.log('[FAISS Check]', data.toString().trim()); });
+  return `${provider}:${model}:${modality}:${indexVersion}:${dimension}:${profile}`;
+}
 
-    proc.on('close', (code) => {
-      faissAvailable = code === 0;
-      console.log(`[FAISS] Available: ${faissAvailable}`);
-      resolve(faissAvailable);
+function readProfileSignature(basePath: string, entryName: string, embeddingsFile: string, metadataFile: string): string | null {
+  const segmentsPath = join(basePath, metadataFile);
+  const embeddingsPath = join(basePath, embeddingsFile);
+
+  if (!existsSync(segmentsPath) || !existsSync(embeddingsPath)) {
+    return null;
+  }
+
+  try {
+    const metadata = JSON.parse(readFileSync(segmentsPath, 'utf-8')) as Record<string, unknown>;
+    return `${entryName}|${metadataFile}|${normalizeCorpusMetadata(metadata)}`;
+  } catch (error) {
+    console.warn('[FAISS] Failed to read segments metadata for signature:', entryName, error);
+    return null;
+  }
+}
+
+function getEmbeddingCorpusSignature(): string | null {
+  if (!existsSync(VIDEOS_PATH)) {
+    return null;
+  }
+
+  const signatures = readdirSync(VIDEOS_PATH, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      const basePath = join(VIDEOS_PATH, entry.name);
+      const profileSignatures = [
+        readProfileSignature(basePath, entry.name, 'embeddings.faiss', 'segments.json'),
+        readProfileSignature(basePath, entry.name, 'embeddings.fine.faiss', 'segments.fine.json'),
+      ].filter((value): value is string => Boolean(value));
+
+      if (profileSignatures.length === 0) {
+        return null;
+      }
+
+      return profileSignatures.join('&&');
+    })
+    .filter((value): value is string => Boolean(value))
+    .sort();
+
+  if (signatures.length === 0) {
+    return null;
+  }
+
+  return signatures.join('||');
+}
+
+function cleanupWorker(reason?: string) {
+  if (reason) {
+    console.warn('[FAISS] Worker reset:', reason);
+  }
+
+  if (worker) {
+    try {
+      worker.kill();
+    } catch {
+      // Ignore worker teardown errors.
+    }
+  }
+
+  worker = null;
+  workerReadyPromise = null;
+  workerCorpusSignature = null;
+
+  for (const pending of pendingRequests.values()) {
+    pending.reject(new Error('FAISS worker stopped before the request completed'));
+  }
+  pendingRequests.clear();
+}
+
+function attachWorkerListeners(proc: ChildProcessWithoutNullStreams, markReady: () => void, markFailed: (error: Error) => void) {
+  let stdoutBuffer = '';
+
+  proc.stdout.on('data', (data) => {
+    stdoutBuffer += data.toString();
+    const lines = stdoutBuffer.split('\n');
+    stdoutBuffer = lines.pop() || '';
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      try {
+        const payload = JSON.parse(line) as WorkerResponse<unknown> & { type?: string };
+
+        if (payload.type === 'ready') {
+          markReady();
+          continue;
+        }
+
+        if (payload.id === null || payload.id === undefined) {
+          continue;
+        }
+
+        const pending = pendingRequests.get(payload.id);
+        if (!pending) {
+          continue;
+        }
+
+        pendingRequests.delete(payload.id);
+        if (payload.ok) {
+          pending.resolve(payload.result);
+        } else {
+          pending.reject(new Error(payload.error || 'FAISS worker request failed'));
+        }
+      } catch (error) {
+        console.error('[FAISS] Failed to parse worker output:', error, line);
+      }
+    }
+  });
+
+  proc.stderr.on('data', (data) => {
+    const message = data.toString().trim();
+    if (message) {
+      console.log('[FAISS Worker]', message);
+    }
+  });
+
+  proc.on('error', (error) => {
+    markFailed(error instanceof Error ? error : new Error(String(error)));
+    cleanupWorker(error instanceof Error ? error.message : 'Unknown FAISS worker error');
+  });
+
+  proc.on('close', (code) => {
+    cleanupWorker(`FAISS worker exited with code ${code}`);
+  });
+}
+
+async function ensureWorker(): Promise<void> {
+  const currentCorpusSignature = getEmbeddingCorpusSignature();
+
+  if (workerReadyPromise) {
+    if (workerCorpusSignature && currentCorpusSignature && workerCorpusSignature !== currentCorpusSignature) {
+      cleanupWorker('Detected embedding corpus metadata change');
+    } else {
+      return workerReadyPromise;
+    }
+  }
+
+  if (!currentCorpusSignature) {
+    faissAvailable = false;
+    return Promise.reject(new Error('No FAISS embeddings are available on disk'));
+  }
+
+  if (workerReadyPromise) {
+    return workerReadyPromise;
+  }
+
+  workerReadyPromise = new Promise<void>((resolve, reject) => {
+    const proc = spawn('python', [FAISS_WORKER_SCRIPT], {
+      cwd: PROJECT_ROOT,
+      env: { ...process.env },
+      stdio: ['pipe', 'pipe', 'pipe']
     });
 
-    proc.on('error', () => {
-      faissAvailable = false;
-      resolve(false);
+    worker = proc;
+    workerCorpusSignature = currentCorpusSignature;
+
+    attachWorkerListeners(
+      proc,
+      () => {
+        faissAvailable = true;
+        resolve();
+      },
+      (error) => {
+        faissAvailable = false;
+        reject(error);
+      }
+    );
+  });
+
+  return workerReadyPromise;
+}
+
+async function sendWorkerRequest<T>(payload: Record<string, unknown>): Promise<T> {
+  await ensureWorker();
+
+  if (!worker) {
+    throw new Error('FAISS worker is unavailable');
+  }
+
+  const id = nextRequestId++;
+  const requestPayload = JSON.stringify({ id, ...payload });
+
+  return new Promise<T>((resolve, reject) => {
+    pendingRequests.set(id, { resolve, reject });
+    worker!.stdin.write(`${requestPayload}\n`, (error) => {
+      if (error) {
+        pendingRequests.delete(id);
+        reject(error);
+      }
     });
   });
 }
 
-/**
- * Search video transcripts using FAISS semantic similarity
- *
- * @param query - Natural language search query
- * @param topK - Maximum number of results to return
- * @returns Array of search results sorted by similarity score
- */
+export async function isFAISSAvailable(): Promise<boolean> {
+  if (faissAvailable === true) {
+    return true;
+  }
+
+  if (!hasEmbeddingsOnDisk()) {
+    faissAvailable = false;
+    return false;
+  }
+
+  try {
+    await ensureWorker();
+    faissAvailable = true;
+    return true;
+  } catch {
+    faissAvailable = false;
+    return false;
+  }
+}
+
 export async function searchFAISS(query: string, topK: number = 5): Promise<FAISSResult[]> {
-  // Check availability first
   const available = await isFAISSAvailable();
   if (!available) {
-    console.log('[FAISS] Not available, returning empty results');
     return [];
   }
 
-  return new Promise((resolve) => {
-    // Escape single quotes in query for Python string
-    const escapedQuery = query.replace(/'/g, "\\'").replace(/"/g, '\\"');
-
-    const pythonCode = `
-import sys
-import json
-from pathlib import Path
-
-# Add scripts/lib to path
-sys.path.insert(0, r'${join(PROJECT_ROOT, 'scripts', 'lib').replace(/\\/g, '\\\\')}')
-
-from faiss_search import VideoSearcher
-
-videos_path = Path(r'${VIDEOS_PATH.replace(/\\/g, '\\\\')}')
-searcher = VideoSearcher(videos_path)
-results = searcher.search_json('${escapedQuery}', ${topK})
-print(results)
-`;
-
-    const proc = spawn('python', ['-c', pythonCode]);
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', (data) => { stdout += data; });
-    proc.stderr.on('data', (data) => { stderr += data; });
-
-    proc.on('close', (code) => {
-      if (code !== 0) {
-        console.error('[FAISS] Search error:', stderr);
-        resolve([]);
-        return;
-      }
-
-      try {
-        // Get the last line that looks like JSON
-        const lines = stdout.trim().split('\n');
-        const jsonLine = lines.find(line => line.startsWith('[')) || '[]';
-        const results: FAISSResult[] = JSON.parse(jsonLine);
-        resolve(results);
-      } catch (e) {
-        console.error('[FAISS] Failed to parse results:', e, '\nStdout:', stdout);
-        resolve([]);
-      }
+  try {
+    const normalizedQuery = normalizeQueryForSearch(query);
+    const result = await sendWorkerRequest<FAISSResult[]>({
+      command: 'search',
+      query: normalizedQuery,
+      topK
     });
-
-    proc.on('error', (err) => {
-      console.error('[FAISS] Process error:', err);
-      resolve([]);
-    });
-  });
+    return Array.isArray(result) ? result : [];
+  } catch (error) {
+    console.error('[FAISS] Search error:', error);
+    cleanupWorker(error instanceof Error ? error.message : 'Unknown search error');
+    faissAvailable = false;
+    return [];
+  }
 }
 
-/**
- * Reset the FAISS availability cache (useful after generating new embeddings)
- */
-export function resetFAISSCache(): void {
-  faissAvailable = null;
-  console.log('[FAISS] Availability cache reset');
-}
-
-/**
- * Search video transcripts using FAISS with semantic boundary detection
- *
- * Unlike regular searchFAISS which returns fixed-window clips, this method
- * extends the clip end time by scanning forward through subsequent segments
- * until the semantic similarity drops below a threshold.
- *
- * Features:
- * - Backward extension: includes high-similarity segments before the peak match
- * - Minimum duration: enforces a floor to capture explanations that shift terminology
- *
- * @param query - Natural language search query
- * @param similarityThreshold - Stop when similarity drops below peak * threshold (default 0.4 = 40%)
- * @param maxExtensionSeconds - Safety cap for max clip length (default 300s = 5 minutes)
- * @param minDurationSeconds - Minimum clip duration to enforce (default 60s = 1 minute)
- * @returns Single best match with extended end time, or null if no match
- */
 export async function searchFAISSWithBoundary(
   query: string,
   similarityThreshold: number = 0.4,
   maxExtensionSeconds: number = 300,
   minDurationSeconds: number = 60
 ): Promise<FAISSResult | null> {
-  // Check availability first
   const available = await isFAISSAvailable();
   if (!available) {
-    console.log('[FAISS] Not available, returning null');
     return null;
   }
 
-  return new Promise((resolve) => {
-    // Escape single quotes in query for Python string
-    const escapedQuery = query.replace(/'/g, "\\'").replace(/"/g, '\\"');
-
-    const pythonCode = `
-import sys
-import json
-from pathlib import Path
-
-# Add scripts/lib to path
-sys.path.insert(0, r'${join(PROJECT_ROOT, 'scripts', 'lib').replace(/\\/g, '\\\\')}')
-
-from faiss_search import VideoSearcher
-
-videos_path = Path(r'${VIDEOS_PATH.replace(/\\/g, '\\\\')}')
-searcher = VideoSearcher(videos_path)
-result = searcher.search_with_boundary_json('${escapedQuery}', ${similarityThreshold}, ${maxExtensionSeconds}, ${minDurationSeconds})
-print(result)
-`;
-
-    const proc = spawn('python', ['-c', pythonCode]);
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', (data) => { stdout += data; });
-    proc.stderr.on('data', (data) => {
-      stderr += data;
-      // Log boundary search progress (useful for debugging)
-      console.log('[FAISS Boundary]', data.toString().trim());
+  try {
+    const normalizedQuery = normalizeQueryForSearch(query);
+    const result = await sendWorkerRequest<FAISSResult | null>({
+      command: 'search_with_boundary',
+      query: normalizedQuery,
+      similarityThreshold,
+      maxExtensionSeconds,
+      minDurationSeconds
     });
+    return result ?? null;
+  } catch (error) {
+    console.error('[FAISS] Boundary search error:', error);
+    cleanupWorker(error instanceof Error ? error.message : 'Unknown boundary search error');
+    faissAvailable = false;
+    return null;
+  }
+}
 
-    proc.on('close', (code) => {
-      if (code !== 0) {
-        console.error('[FAISS Boundary] Search error:', stderr);
-        resolve(null);
-        return;
-      }
-
-      try {
-        // Get the last line that looks like JSON
-        const lines = stdout.trim().split('\n');
-        const jsonLine = lines.find(line => line.startsWith('{') || line === 'null') || 'null';
-
-        if (jsonLine === 'null') {
-          resolve(null);
-          return;
-        }
-
-        const result: FAISSResult = JSON.parse(jsonLine);
-        resolve(result);
-      } catch (e) {
-        console.error('[FAISS Boundary] Failed to parse result:', e, '\nStdout:', stdout);
-        resolve(null);
-      }
-    });
-
-    proc.on('error', (err) => {
-      console.error('[FAISS Boundary] Process error:', err);
-      resolve(null);
-    });
-  });
+export function resetFAISSCache(): void {
+  faissAvailable = null;
+  cleanupWorker('Manual cache reset');
 }

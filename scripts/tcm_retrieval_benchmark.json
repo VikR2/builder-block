@@ -1,0 +1,119 @@
+{
+  "cases": [
+    {
+      "id": "matched-orders-on-book",
+      "query": "show me where he says all the matched orders are placed on the book",
+      "expectedVideoId": "Order-Fufilment-Tips_a89df5aa",
+      "expectedStart": 736.17,
+      "expectedEnd": 740.85,
+      "notes": "Order fulfillment lesson: matched orders are placed on the book."
+    },
+    {
+      "id": "book-overlap",
+      "query": "show me the exact clip where he explains the book is the overlap between the submission range and matching window",
+      "expectedVideoId": "Order-Fufilment-Tips_a89df5aa",
+      "expectedStart": 2532.29,
+      "expectedEnd": 2536.29,
+      "notes": "Order fulfillment lesson: overlap defines the book."
+    },
+    {
+      "id": "unmatched-no-liquidity",
+      "query": "show me where he says if it is not matched there is no liquidity there",
+      "expectedVideoId": "Order-Fufilment-Tips_a89df5aa",
+      "expectedStart": 975.74,
+      "expectedEnd": 985.38,
+      "notes": "Order fulfillment lesson: unmatched orders do not create liquidity."
+    },
+    {
+      "id": "matching-does-not-overlap",
+      "query": "where does he leave the note that matching does not overlap any day",
+      "expectedVideoId": "Order-Fufilment-Tips_a89df5aa",
+      "expectedStart": 4622.34,
+      "expectedEnd": 4630.98,
+      "notes": "Order fulfillment lesson closing note on matching overlap."
+    },
+    {
+      "id": "amazon-analogy",
+      "query": "explain the Amazon warehouse analogy for order fulfillment",
+      "expectedVideoId": "TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527",
+      "expectedStart": 471.65,
+      "expectedEnd": 508.02,
+      "notes": "Akatsuki bootcamp lesson reuses the Amazon analogy."
+    },
+    {
+      "id": "liquidity-after-fill",
+      "query": "show me where he says liquidity does not pop up until the order is filled",
+      "expectedVideoId": "TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527",
+      "expectedStart": 660.5,
+      "expectedEnd": 671.86,
+      "notes": "Akatsuki bootcamp on liquidity only appearing after fill."
+    },
+    {
+      "id": "submission-range-unfilled",
+      "query": "where does he explain that if we have the submission range and have not traded to it then the submitted orders can be regarded as unfilled",
+      "expectedVideoId": "TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527",
+      "expectedStart": 1438.82,
+      "expectedEnd": 1444.5,
+      "notes": "Akatsuki bootcamp on unfilled submitted orders."
+    },
+    {
+      "id": "submission-range-pending-orders",
+      "query": "show me where he says submission range is just pending orders",
+      "expectedVideoId": "TCM_Akatsuki_Bootcamp_indicator_2026_b07e4527",
+      "expectedStart": 1767.01,
+      "expectedEnd": 1775.49,
+      "notes": "Akatsuki bootcamp on pending orders definition."
+    },
+    {
+      "id": "fractal-delivery-overlap",
+      "query": "show me the clip where the big M5 range overlaps the big M1 range showing fractal delivery",
+      "expectedVideoId": "Revisting_Expansions_d53d8ad4",
+      "expectedStart": 1333.744,
+      "expectedEnd": 1351.754,
+      "notes": "Revisiting expansions: fractal delivery overlap explanation."
+    },
+    {
+      "id": "failure-swing-olr",
+      "query": "show me where he explains that a failure swing is often followed by OLR opposing liquidity run",
+      "expectedVideoId": "Revisting_Expansions_d53d8ad4",
+      "expectedStart": 1678.394,
+      "expectedEnd": 1698.614,
+      "acceptableVideoIds": [
+        "Rant2_afed3f3c"
+      ],
+      "notes": "Failure swing to OLR explanation appears in revisiting expansions and rant2."
+    },
+    {
+      "id": "first-expansion-outside-range",
+      "query": "where does he say you pull a box until it overlaps with the high and that becomes your first expansion outside of a range",
+      "expectedVideoId": "Revisting_Expansions_d53d8ad4",
+      "expectedStart": 5391.48,
+      "expectedEnd": 5407.17,
+      "notes": "Revisiting expansions range expansion explanation."
+    },
+    {
+      "id": "fixed-range-volume-entries",
+      "query": "show me where he says with fixed ranges and volume you can find pinpoint accurate entries and exits",
+      "expectedVideoId": "read_and_interpret_volume_afa0985f",
+      "expectedStart": 2429.34,
+      "expectedEnd": 2439.42,
+      "notes": "Volume lesson on fixed range volume for precise entries and exits."
+    },
+    {
+      "id": "volume-studies-culmination",
+      "query": "where does he say this is the culmination of the volume studies versus the time ranges studies",
+      "expectedVideoId": "volume_insighst_p2_04321b27",
+      "expectedStart": 15.34,
+      "expectedEnd": 25.98,
+      "notes": "Volume insights part two introduction."
+    },
+    {
+      "id": "fixed-range-volume-tool",
+      "query": "show me where he says we have a fixed range volume tool which is what we have been using here",
+      "expectedVideoId": "volume_insighst_p2_04321b27",
+      "expectedStart": 647.18,
+      "expectedEnd": 655.51,
+      "notes": "Volume insights part two fixed range volume tool reference."
+    }
+  ]
+}

@@ -1,6 +1,9 @@
 import Database from 'better-sqlite3';
 import { join } from 'path';
 import { readFileSync, existsSync, readdirSync } from 'fs';
+import { ensureAdminTables, getPublishedReadyVideos } from './tcm-admin/db';
+import { containsTeachTrades } from './teachtrades-filter';
+import { buildVisibleTCMSkillSql } from './tcm-skill-source-filter';
 
 // Database path (relative to project root)
 const DB_PATH = join(process.cwd(), '..', 'data', 'builder.db');
@@ -42,12 +45,7 @@ export function getTCMSkills(): TCMSkill[] {
   const skills = db.prepare(`
     SELECT id, name, slug, category, subcategory, description, code_snippet, nlp_keywords
     FROM skills
-    WHERE category LIKE '%TCM%'
-       OR name LIKE '%TCM%'
-       OR description LIKE '%TCM%'
-       OR description LIKE '%book building%'
-       OR description LIKE '%submission%'
-       OR description LIKE '%order fulfillment%'
+    WHERE ${buildVisibleTCMSkillSql()}
     ORDER BY name
   `).all() as TCMSkill[];
   db.close();
@@ -64,6 +62,7 @@ export function searchTCMSkills(query: string, limit: number = 10): TCMSkill[] {
       FROM skills s
       JOIN skills_fts fts ON s.id = fts.rowid
       WHERE skills_fts MATCH ?
+        AND ${buildVisibleTCMSkillSql('s')}
       ORDER BY rank
       LIMIT ?
     `).all(query, limit) as TCMSkill[];
@@ -74,9 +73,12 @@ export function searchTCMSkills(query: string, limit: number = 10): TCMSkill[] {
     const skills = db.prepare(`
       SELECT id, name, slug, category, subcategory, description, code_snippet, nlp_keywords
       FROM skills
-      WHERE name LIKE ?
-         OR description LIKE ?
-         OR nlp_keywords LIKE ?
+      WHERE (
+        name LIKE ?
+        OR description LIKE ?
+        OR nlp_keywords LIKE ?
+      )
+        AND ${buildVisibleTCMSkillSql()}
       LIMIT ?
     `).all(`%${query}%`, `%${query}%`, `%${query}%`, limit) as TCMSkill[];
     db.close();
@@ -90,6 +92,28 @@ export interface ArchDocument {
   title: string;
   content: string;
 }
+
+export type ArchDocumentSectionType = 'explanation' | 'quote' | 'table' | 'metadata';
+
+export interface ArchDocumentSection {
+  doc: string;
+  sectionTitle: string;
+  sectionType: ArchDocumentSectionType;
+  content: string;
+}
+
+export interface DocumentParagraphMatch {
+  doc: string;
+  paragraph: string;
+  score: number;
+  sectionTitle: string;
+  sectionType: ArchDocumentSectionType;
+}
+
+const SUPPRESSED_SECTION_HEADINGS = new Set([
+  'skills to extract',
+  'relationship to existing tcm skills',
+]);
 
 // Get all architecture documents
 export function getArchitectureDocuments(): ArchDocument[] {
@@ -112,6 +136,10 @@ export function getArchitectureDocuments(): ArchDocument[] {
         ? firstLine.replace(/^#+\s*/, '')
         : filename.replace(/\.(md|txt)$/, '').replace(/-/g, ' ');
 
+      if (containsTeachTrades(filename, title, content)) {
+        continue;
+      }
+
       docs.push({ filename, title, content });
     } catch {
       // Skip files that can't be read
@@ -119,6 +147,105 @@ export function getArchitectureDocuments(): ArchDocument[] {
   }
 
   return docs;
+}
+
+function cleanSectionContent(content: string): string {
+  return content
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/^\|.*\|$/gm, ' ')
+    .replace(/^-{3,}$/gm, ' ')
+    .replace(/^\*\*Source:\*\*.*$/gm, ' ')
+    .replace(/^\*\*Duration:\*\*.*$/gm, ' ')
+    .replace(/^\*\*Extracted:\*\*.*$/gm, ' ')
+    .replace(/^\*\*Type:\*\*.*$/gm, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function classifySection(sectionTitle: string, content: string): ArchDocumentSectionType {
+  const loweredTitle = sectionTitle.trim().toLowerCase();
+  const loweredContent = content.trim().toLowerCase();
+
+  if (!loweredContent) {
+    return 'metadata';
+  }
+
+  if (SUPPRESSED_SECTION_HEADINGS.has(loweredTitle)) {
+    return 'metadata';
+  }
+
+  if (loweredTitle.includes('key quotes') || /^>\s/m.test(content)) {
+    return 'quote';
+  }
+
+  if (/^\|.*\|$/m.test(content) || /^\|[-\s|:]+\|$/m.test(content)) {
+    return 'table';
+  }
+
+  if (
+    /^\*\*source:\*\*/m.test(loweredContent)
+    || /^\*\*duration:\*\*/m.test(loweredContent)
+    || /^\*\*extracted:\*\*/m.test(loweredContent)
+    || /^\*\*type:\*\*/m.test(loweredContent)
+  ) {
+    return 'metadata';
+  }
+
+  return 'explanation';
+}
+
+function flushSection(
+  sections: ArchDocumentSection[],
+  docTitle: string,
+  sectionTitle: string,
+  lines: string[],
+) {
+  const rawContent = lines.join('\n').trim();
+  if (!rawContent) {
+    return;
+  }
+
+  const cleanedContent = cleanSectionContent(rawContent);
+  if (!cleanedContent) {
+    return;
+  }
+
+  sections.push({
+    doc: docTitle,
+    sectionTitle,
+    sectionType: classifySection(sectionTitle, rawContent),
+    content: cleanedContent
+  });
+}
+
+export function getArchitectureDocumentSections(): ArchDocumentSection[] {
+  const sections: ArchDocumentSection[] = [];
+
+  for (const doc of getArchitectureDocuments()) {
+    const lines = doc.content.split(/\r?\n/);
+    let currentTitle = 'Overview';
+    let currentLines: string[] = [];
+
+    for (const line of lines) {
+      if (/^#\s+/.test(line)) {
+        continue;
+      }
+
+      const headingMatch = line.match(/^#{2,3}\s+(.*)$/);
+      if (headingMatch) {
+        flushSection(sections, doc.title, currentTitle, currentLines);
+        currentTitle = headingMatch[1].trim();
+        currentLines = [];
+        continue;
+      }
+
+      currentLines.push(line);
+    }
+
+    flushSection(sections, doc.title, currentTitle, currentLines);
+  }
+
+  return sections;
 }
 
 // Search architecture documents
@@ -139,45 +266,104 @@ const STOP_WORDS = new Set([
   'please', 'i', 'my', 'do', 'does', 'and', 'or', 'this', 'that', 'it', 'be'
 ]);
 
-// Extract meaningful keywords from a query
-function extractKeywords(query: string): string[] {
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(word => word.length > 2 && !STOP_WORDS.has(word));
+const TCM_QUERY_ALIASES: Record<string, string[]> = {
+  css: ['csd', 'cisd', 'change in state', 'change in state of delivery'],
+};
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Search within a document and return matching paragraphs
-export function searchDocumentParagraphs(query: string, limit: number = 5): { doc: string; paragraph: string; score: number }[] {
-  const docs = getArchitectureDocuments();
+function buildKeywordRegex(keyword: string): RegExp {
+  const escaped = escapeRegex(keyword);
+
+  if (/^[a-z0-9]{2,4}$/i.test(keyword)) {
+    return new RegExp(`\\b${escaped}\\b`, 'gi');
+  }
+
+  return new RegExp(escaped, 'gi');
+}
+
+function containsKeyword(text: string, keyword: string): boolean {
+  return buildKeywordRegex(keyword).test(text);
+}
+
+function countKeywordMatches(text: string, keyword: string): number {
+  return (text.match(buildKeywordRegex(keyword)) || []).length;
+}
+
+function expandSearchTerms(keywords: string[]): string[] {
+  const expanded = new Set<string>();
+
+  for (const keyword of keywords) {
+    const normalized = keyword.trim().toLowerCase();
+    if (!normalized) {
+      continue;
+    }
+
+    expanded.add(normalized);
+
+    for (const alias of TCM_QUERY_ALIASES[normalized] || []) {
+      expanded.add(alias);
+    }
+  }
+
+  return Array.from(expanded);
+}
+
+// Extract meaningful keywords from a query
+function extractKeywords(query: string): string[] {
+  return expandSearchTerms(query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !STOP_WORDS.has(word)));
+}
+
+// Search within the cleaned document sections and return matching paragraphs.
+export function searchDocumentParagraphs(
+  query: string,
+  limit: number = 5,
+  includeTypes: ArchDocumentSectionType[] = ['explanation']
+): DocumentParagraphMatch[] {
+  const sections = getArchitectureDocumentSections().filter(section =>
+    includeTypes.includes(section.sectionType)
+  );
   const keywords = extractKeywords(query);
-  const results: { doc: string; paragraph: string; score: number }[] = [];
+  const results: DocumentParagraphMatch[] = [];
 
   // If no meaningful keywords, try the full query as fallback
   if (keywords.length === 0) {
-    keywords.push(query.toLowerCase());
+    keywords.push(...expandSearchTerms([query.toLowerCase()]));
   }
 
-  for (const doc of docs) {
-    // Split into paragraphs (double newline or section breaks)
-    const paragraphs = doc.content.split(/\n\s*\n/).filter(p => p.trim().length > 20);
+  for (const section of sections) {
+    const paragraphs = section.content
+      .split(/\n\s*\n/)
+      .map(paragraph => paragraph.replace(/^\s*[-*]\s+/gm, '').trim())
+      .filter(paragraph => paragraph.length > 30 && !paragraph.includes('|'));
 
     for (const paragraph of paragraphs) {
       const lowerPara = paragraph.toLowerCase();
+      const sectionTitleLower = section.sectionTitle.toLowerCase();
 
       // Score based on keyword matches
       let score = 0;
       for (const keyword of keywords) {
-        const regex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        const matches = (lowerPara.match(regex) || []).length;
+        const matches = countKeywordMatches(lowerPara, keyword);
         score += matches;
+
+        if (containsKeyword(sectionTitleLower, keyword)) {
+          score += 2;
+        }
       }
 
       if (score > 0) {
         results.push({
-          doc: doc.title,
+          doc: section.doc,
           paragraph: paragraph.trim().substring(0, 500),
-          score
+          score,
+          sectionTitle: section.sectionTitle,
+          sectionType: section.sectionType
         });
       }
     }
@@ -204,44 +390,37 @@ export interface VideoInfo {
 
 // Get all local video folders
 export function getLocalVideos(): VideoInfo[] {
-  const videos: VideoInfo[] = [];
+  ensureAdminTables();
 
-  if (!existsSync(LOCAL_VIDEOS_PATH)) {
-    return videos;
-  }
+  return getPublishedReadyVideos()
+    .filter((video) => Boolean(video.folder_id))
+    .map((video) => {
+      const folderId = video.folder_id!;
+      const videoPath = join(LOCAL_VIDEOS_PATH, folderId);
+      const manifestPath = join(videoPath, 'manifest.json');
 
-  const folders = readdirSync(LOCAL_VIDEOS_PATH, { withFileTypes: true })
-    .filter(d => d.isDirectory());
-
-  for (const folder of folders) {
-    const videoPath = join(LOCAL_VIDEOS_PATH, folder.name);
-    const hasFrames = existsSync(join(videoPath, 'frames'));
-    const manifestPath = join(videoPath, 'manifest.json');
-
-    // Prefer title from manifest.json (source_title field)
-    let title: string;
-    if (existsSync(manifestPath)) {
-      try {
-        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-        title = manifest.source_title || folder.name.replace(/_[a-f0-9]+$/, '').replace(/_/g, ' ');
-      } catch {
-        // Fallback if manifest can't be parsed
-        title = folder.name.replace(/_[a-f0-9]+$/, '').replace(/_/g, ' ');
+      let title = video.title || folderId.replace(/_[a-f0-9]+$/, '').replace(/_/g, ' ');
+      if (existsSync(manifestPath)) {
+        try {
+          const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+          title = manifest.source_title || title;
+        } catch {
+          // Keep DB title fallback
+        }
       }
-    } else {
-      // Fallback: extract title from folder name (remove hash suffix)
-      title = folder.name.replace(/_[a-f0-9]+$/, '').replace(/_/g, ' ');
-    }
 
-    videos.push({
-      id: folder.name,
-      title,
-      path: videoPath,
-      hasFrames
-    });
-  }
+      if (containsTeachTrades(folderId, title, video.title ?? null, video.description ?? null)) {
+        return null;
+      }
 
-  return videos;
+      return {
+        id: folderId,
+        title,
+        path: videoPath,
+        hasFrames: existsSync(join(videoPath, 'frames'))
+      };
+    })
+    .filter((video): video is VideoInfo => video !== null);
 }
 
 // Load transcript for a video
@@ -268,7 +447,7 @@ export function searchTranscripts(query: string, limit: number = 10): { videoId:
 
   // If no meaningful keywords, try the full query as fallback
   if (keywords.length === 0) {
-    keywords.push(query.toLowerCase());
+    keywords.push(...expandSearchTerms([query.toLowerCase()]));
   }
 
   for (const video of videos) {
@@ -281,9 +460,7 @@ export function searchTranscripts(query: string, limit: number = 10): { videoId:
       // Score based on keyword matches
       let score = 0;
       for (const keyword of keywords) {
-        if (lowerText.includes(keyword)) {
-          score += 1;
-        }
+        score += countKeywordMatches(lowerText, keyword);
       }
 
       if (score > 0) {

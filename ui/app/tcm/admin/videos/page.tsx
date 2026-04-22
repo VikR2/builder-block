@@ -8,6 +8,7 @@ import { VideoTable } from '@/components/admin/video-table';
 interface ProcessedVideo {
   id: number;
   filename: string;
+  folder_id?: string | null;
   title: string | null;
   processing_status: string;
   skills_extracted: number;
@@ -16,6 +17,8 @@ interface ProcessedVideo {
   created_at: string;
   processed_at: string | null;
   category_id?: number | null;
+  is_published?: number | null;
+  error_message?: string | null;
 }
 
 interface Category {
@@ -33,6 +36,8 @@ interface VideoTag {
   color: string;
   video_count?: number;
 }
+
+const STATUS_FILTERS = ['all', 'uploaded', 'extracting', 'embedding', 'lesson_building', 'ready', 'failed'] as const;
 
 export default function VideosPage() {
   const [videos, setVideos] = useState<ProcessedVideo[]>([]);
@@ -177,9 +182,11 @@ export default function VideosPage() {
   // Count by status
   const statusCounts = {
     all: videos.length,
-    pending: videos.filter(v => v.processing_status === 'pending').length,
-    processing: videos.filter(v => v.processing_status === 'processing').length,
-    completed: videos.filter(v => v.processing_status === 'completed').length,
+    uploaded: videos.filter(v => v.processing_status === 'uploaded').length,
+    extracting: videos.filter(v => v.processing_status === 'extracting').length,
+    embedding: videos.filter(v => v.processing_status === 'embedding').length,
+    lesson_building: videos.filter(v => v.processing_status === 'lesson_building').length,
+    ready: videos.filter(v => v.processing_status === 'ready').length,
     failed: videos.filter(v => v.processing_status === 'failed').length
   };
 
@@ -198,7 +205,7 @@ export default function VideosPage() {
         <div>
           <h1 className="text-2xl font-bold">Videos</h1>
           <p className="text-muted-foreground">
-            {videos.length} video{videos.length !== 1 ? 's' : ''} in library
+            {videos.length} tracked video{videos.length !== 1 ? 's' : ''} across upload and lesson-ready stages
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -256,7 +263,7 @@ export default function VideosPage() {
 
           {/* Status Filter */}
           <div className="flex gap-1 p-1 bg-card border border-border/50 rounded-lg">
-            {(['all', 'pending', 'processing', 'completed', 'failed'] as const).map((status) => (
+            {STATUS_FILTERS.map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -266,7 +273,9 @@ export default function VideosPage() {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {status.charAt(0).toUpperCase() + status.slice(1)}
+                {status === 'lesson_building'
+                  ? 'Lesson'
+                  : status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
                 {statusCounts[status] > 0 && (
                   <span className="ml-1 text-xs opacity-70">({statusCounts[status]})</span>
                 )}

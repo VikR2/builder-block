@@ -39,6 +39,22 @@ export function ensureAdminTables() {
     }
   }
 
+  // Run lesson readiness migration
+  const migration041Path = join(MIGRATIONS_PATH, '041_add_video_lesson_readiness.sql');
+  if (existsSync(migration041Path)) {
+    try {
+      const columns = db.prepare("PRAGMA table_info(processed_local_videos)").all() as { name: string }[];
+      const hasIsPublished = columns.some(col => col.name === 'is_published');
+
+      if (!hasIsPublished) {
+        const sql = readFileSync(migration041Path, 'utf-8');
+        db.exec(sql);
+      }
+    } catch {
+      // Table might not exist yet, skip this migration
+    }
+  }
+
   db.close();
 }
 
@@ -85,6 +101,7 @@ export interface ProcessedVideo {
   title: string | null;
   description: string | null;
   source_type: string | null;
+  is_published: number | null;
   created_at: string;
   updated_at: string | null;
   processed_at: string | null;
@@ -98,7 +115,7 @@ export interface UploadSession {
   total_chunks: number;
   received_chunks: number;
   chunk_size: number;
-  status: 'uploading' | 'complete' | 'failed' | 'expired';
+  status: 'uploading' | 'complete' | 'failed' | 'expired' | 'duplicate';
   temp_path: string | null;
   created_at: string;
   expires_at: string | null;
@@ -140,6 +157,21 @@ export function getVideoById(id: number): ProcessedVideo | null {
   }
 }
 
+export function getPublishedReadyVideoById(id: number): ProcessedVideo | null {
+  const db = getDb();
+  try {
+    const video = db.prepare(`
+      SELECT * FROM processed_local_videos
+      WHERE id = ?
+        AND processing_status = 'ready'
+        AND COALESCE(is_published, 0) = 1
+    `).get(id) as ProcessedVideo | undefined;
+    return video && existsSync(video.file_path) ? video : null;
+  } finally {
+    db.close();
+  }
+}
+
 export function getVideoByHash(hash: string): ProcessedVideo | null {
   const db = getDb();
   try {
@@ -164,6 +196,21 @@ export function getVideoByFolderId(folderId: string): ProcessedVideo | null {
   }
 }
 
+export function getPublishedReadyVideoByFolderId(folderId: string): ProcessedVideo | null {
+  const db = getDb();
+  try {
+    const video = db.prepare(`
+      SELECT * FROM processed_local_videos
+      WHERE folder_id = ?
+        AND processing_status = 'ready'
+        AND COALESCE(is_published, 0) = 1
+    `).get(folderId) as ProcessedVideo | undefined;
+    return video && existsSync(video.file_path) ? video : null;
+  } finally {
+    db.close();
+  }
+}
+
 export function getFolderIdByDbId(id: number): string | null {
   const db = getDb();
   try {
@@ -171,6 +218,21 @@ export function getFolderIdByDbId(id: number): string | null {
       SELECT folder_id FROM processed_local_videos WHERE id = ?
     `).get(id) as { folder_id: string | null } | undefined;
     return row?.folder_id || null;
+  } finally {
+    db.close();
+  }
+}
+
+export function getPublishedReadyVideos(): ProcessedVideo[] {
+  const db = getDb();
+  try {
+    return (db.prepare(`
+      SELECT * FROM processed_local_videos
+      WHERE processing_status = 'ready'
+        AND COALESCE(is_published, 0) = 1
+        AND folder_id IS NOT NULL
+      ORDER BY COALESCE(title, filename) ASC
+    `).all() as ProcessedVideo[]).filter((video) => existsSync(video.file_path));
   } finally {
     db.close();
   }
@@ -184,12 +246,24 @@ export function createVideo(data: {
   title?: string;
   source_type?: string;
   folder_id?: string;
+  processing_status?: string;
+  is_published?: boolean;
 }): number {
   const db = getDb();
   try {
     const result = db.prepare(`
-      INSERT INTO processed_local_videos (filename, file_path, file_hash, file_size_bytes, title, source_type, folder_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO processed_local_videos (
+        filename,
+        file_path,
+        file_hash,
+        file_size_bytes,
+        title,
+        source_type,
+        folder_id,
+        processing_status,
+        is_published
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.filename,
       data.file_path,
@@ -197,7 +271,9 @@ export function createVideo(data: {
       data.file_size_bytes || null,
       data.title || data.filename.replace(/\.[^/.]+$/, ''),
       data.source_type || 'other',
-      data.folder_id || null
+      data.folder_id || null,
+      data.processing_status || 'pending',
+      data.is_published ? 1 : 0
     );
     return result.lastInsertRowid as number;
   } finally {

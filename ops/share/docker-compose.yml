@@ -1,0 +1,36 @@
+services:
+  nginx:
+    image: nginx:1.29-alpine
+    ports:
+      - "${SHARE_PORT:-8080}:8080"
+    restart: unless-stopped
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/ >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    profiles: ["quick"]
+    depends_on:
+      nginx:
+        condition: service_healthy
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://nginx:8080
+
+  cloudflared-named:
+    image: cloudflare/cloudflared:latest
+    profiles: ["named"]
+    depends_on:
+      nginx:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'if [ -z "$$TUNNEL_TOKEN" ]; then echo "TUNNEL_TOKEN is required for the named tunnel profile." >&2; exit 1; fi; exec cloudflared tunnel --no-autoupdate run --token "$$TUNNEL_TOKEN"'

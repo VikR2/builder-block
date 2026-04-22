@@ -8,10 +8,11 @@ import { Upload, File, X, Loader2, CheckCircle, AlertCircle, ArrowRight } from '
 interface UploadProgress {
   filename: string;
   progress: number;
-  status: 'uploading' | 'processing' | 'complete' | 'error';
+  status: 'uploading' | 'processing' | 'ready' | 'error';
   error?: string;
   videoId?: number;
   jobId?: number;
+  reusedExisting?: boolean;
 }
 
 interface UploadDropzoneProps {
@@ -102,30 +103,37 @@ export function UploadDropzone({ onUploadComplete, maxFiles = 5 }: UploadDropzon
         throw new Error(err.error || 'Failed to finalize upload');
       }
 
-      const { videoId, jobId, isDuplicate, message } = await finalRes.json();
+      const { videoId, jobId, isDuplicate, reusedExisting, message } = await finalRes.json();
 
       setUploads(prev => {
         const newMap = new Map(prev);
         const current = newMap.get(uploadKey);
         if (current) {
           if (isDuplicate) {
-            // Handle duplicate - show as warning, not success
             newMap.set(uploadKey, {
               ...current,
               progress: 100,
-              status: 'error',
+              status: 'ready',
               videoId,
+              reusedExisting: true,
               error: message || 'Video already exists in library'
             });
           } else {
-            newMap.set(uploadKey, { ...current, progress: 100, status: 'complete', videoId, jobId });
+            newMap.set(uploadKey, {
+              ...current,
+              progress: 100,
+              status: jobId ? 'processing' : 'ready',
+              videoId,
+              jobId,
+              reusedExisting: Boolean(reusedExisting),
+              error: reusedExisting ? message || 'Reused the existing lesson pipeline' : undefined
+            });
           }
         }
         return newMap;
       });
 
-      // Only trigger onUploadComplete for new uploads, not duplicates
-      if (onUploadComplete && videoId && !isDuplicate) {
+      if (onUploadComplete && videoId) {
         onUploadComplete(videoId);
       }
     } catch (error) {
@@ -178,10 +186,10 @@ export function UploadDropzone({ onUploadComplete, maxFiles = 5 }: UploadDropzon
   };
 
   const activeUploads = Array.from(uploads.entries()).filter(
-    ([_, u]) => u.status === 'uploading' || u.status === 'processing'
+    ([_, u]) => u.status === 'uploading'
   );
   const completedUploads = Array.from(uploads.entries()).filter(
-    ([_, u]) => u.status === 'complete' || u.status === 'error'
+    ([_, u]) => u.status === 'processing' || u.status === 'ready' || u.status === 'error'
   );
 
   return (
@@ -263,27 +271,41 @@ export function UploadDropzone({ onUploadComplete, maxFiles = 5 }: UploadDropzon
           {completedUploads.map(([key, upload]) => (
             <div key={key} className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border/50">
               <div className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                upload.status === 'complete' ? 'bg-emerald-500/20' : 'bg-rose-500/20'
+                upload.status === 'error'
+                  ? 'bg-rose-500/20'
+                  : upload.status === 'ready'
+                    ? 'bg-emerald-500/20'
+                    : 'bg-sky-500/20'
               }`}>
-                {upload.status === 'complete' ? (
+                {upload.status === 'error' ? (
+                  <AlertCircle className="h-5 w-5 text-rose-500" />
+                ) : upload.status === 'ready' ? (
                   <CheckCircle className="h-5 w-5 text-emerald-500" />
                 ) : (
-                  <AlertCircle className="h-5 w-5 text-rose-500" />
+                  <Loader2 className="h-5 w-5 text-sky-500 animate-spin" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{upload.filename}</div>
                 <div className={`text-xs mt-0.5 ${
-                  upload.status === 'complete' ? 'text-emerald-500' : 'text-rose-500'
+                  upload.status === 'error'
+                    ? 'text-rose-500'
+                    : upload.status === 'ready'
+                      ? 'text-emerald-500'
+                      : 'text-sky-500'
                 }`}>
-                  {upload.status === 'complete'
-                    ? upload.jobId
-                      ? 'Processing started!'
-                      : 'Upload complete'
-                    : upload.error}
+                  {upload.status === 'error'
+                    ? upload.error
+                    : upload.status === 'ready'
+                      ? upload.reusedExisting
+                        ? upload.error || 'Reused the existing lesson-ready video'
+                        : 'Lesson-ready upload complete'
+                      : upload.reusedExisting
+                        ? upload.error || 'Reused the existing video and resumed lesson processing.'
+                        : 'Lesson pipeline started. This video stays hidden until ready.'}
                 </div>
               </div>
-              {upload.status === 'complete' && upload.jobId && (
+              {upload.jobId && upload.status === 'processing' && (
                 <Link
                   href="/tcm/admin/queue"
                   className="flex items-center gap-1 text-xs text-sky-500 hover:text-sky-400"

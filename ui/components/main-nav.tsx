@@ -22,7 +22,6 @@ export function MainNav() {
         </div>
         <span className="font-semibold text-lg tracking-tight">
           <span className="text-amber-500">The Currency Merchant</span>
-          <span className="text-muted-foreground text-sm ml-2">Opus</span>
         </span>
       </Link>
 
@@ -61,14 +60,6 @@ export function MainNav() {
         >
           <span className="text-emerald-500 mr-1.5">&#9670;</span>
           Skills Library
-        </Link>
-
-        <Link
-          href="/tcm/guides"
-          className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-amber-500/10 rounded-lg transition-all"
-        >
-          <span className="text-sky-500 mr-1.5">&#9678;</span>
-          Study Guides
         </Link>
 
         {/* Admin - only for admin users */}

@@ -8,14 +8,23 @@ import { VideoDetails, formatDuration } from '@/lib/tcm-library.client';
 interface PlaylistSidebarProps {
   videos: VideoDetails[];
   currentVideoId: string;
+  playlistId?: number | null;
+  playlistSlug?: string | null;
+  playlistName?: string | null;
 }
 
-export function PlaylistSidebar({ videos, currentVideoId }: PlaylistSidebarProps) {
+export function PlaylistSidebar({
+  videos,
+  currentVideoId,
+  playlistId,
+  playlistSlug,
+  playlistName
+}: PlaylistSidebarProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-3 py-2 border-b border-border/50">
-        <h3 className="text-sm font-medium text-foreground">Playlist</h3>
+        <h3 className="text-sm font-medium text-foreground">{playlistName || 'Playlist'}</h3>
         <p className="text-xs text-muted-foreground">{videos.length} videos</p>
       </div>
 
@@ -27,6 +36,8 @@ export function PlaylistSidebar({ videos, currentVideoId }: PlaylistSidebarProps
             video={video}
             index={index + 1}
             isCurrent={video.id === currentVideoId}
+            playlistId={playlistId}
+            playlistSlug={playlistSlug}
           />
         ))}
       </div>
@@ -38,14 +49,19 @@ interface PlaylistItemProps {
   video: VideoDetails;
   index: number;
   isCurrent: boolean;
+  playlistId?: number | null;
+  playlistSlug?: string | null;
 }
 
-function PlaylistItem({ video, index, isCurrent }: PlaylistItemProps) {
+function PlaylistItem({ video, index, isCurrent, playlistId, playlistSlug }: PlaylistItemProps) {
   const [imageError, setImageError] = useState(false);
+  const href = playlistId && playlistSlug
+    ? `/tcm/library/${encodeURIComponent(video.id)}?playlist=${playlistId}&playlistSlug=${encodeURIComponent(playlistSlug)}`
+    : `/tcm/library/${encodeURIComponent(video.id)}`;
 
   return (
     <Link
-      href={`/tcm/library/${encodeURIComponent(video.id)}`}
+      href={href}
       className={`flex gap-2 p-2 transition-colors ${
         isCurrent
           ? 'bg-primary/10 border-l-2 border-primary'

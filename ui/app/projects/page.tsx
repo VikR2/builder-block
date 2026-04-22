@@ -6,6 +6,8 @@ import {
 } from "@/lib/db";
 import { ProjectsPageClient } from "@/components/projects-page-client";
 
+export const dynamic = 'force-dynamic';
+
 // Server Component - fetches data from database
 export default function ProjectsPage() {
   // Get all projects with counts

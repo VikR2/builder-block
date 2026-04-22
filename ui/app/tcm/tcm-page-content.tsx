@@ -18,7 +18,6 @@ const QUICK_TOPICS = [
 interface TCMPageContentProps {
   stats: {
     skillCount: number;
-    docCount: number;
     videoCount: number;
   };
 }
@@ -74,7 +73,17 @@ export function TCMPageContent({ stats }: TCMPageContentProps) {
       <div className="relative z-10 grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-10rem)]">
         {/* Main Chat Area */}
         <div className="lg:col-span-3 rounded-xl border bg-card overflow-hidden flex flex-col">
-          <ChatInterface ref={chatRef} />
+          <ChatInterface
+            ref={chatRef}
+            storageNamespace="knowledge-bot"
+            chatMode="knowledge"
+            title="TCM Mentor Chat"
+            subtitle="Lesson-grounded answers with the right clip when you ask about a concept or a specific video"
+            welcomeMessage={"Ask about a concept, a setup, or a video name like `Rant2`, and I’ll answer the way a mentor would: plain English first, then the key teaching points, then the best clip to watch next."}
+            placeholder="Ask about a concept or video, e.g. 'What does Rant2 teach about reversals?'"
+            helperText="Grounded in lesson guides, transcripts, and timestamped clips"
+            newChatLabel="Reset chat"
+          />
         </div>
 
         {/* Sidebar */}
@@ -97,16 +106,6 @@ export function TCMPageContent({ stats }: TCMPageContentProps) {
                 label="TCM Skills"
                 value={stats.skillCount}
                 color="text-amber-500"
-              />
-              <StatItem
-                icon={
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                }
-                label="Study Guides"
-                value={stats.docCount}
-                color="text-sky-500"
               />
               <StatItem
                 icon={

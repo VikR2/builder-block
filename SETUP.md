@@ -348,3 +348,9 @@ Built with:
 **You're all set! 🚀**
 
 Open http://localhost:3000 to start browsing your skills library.
+
+## 🚢 Deployment
+
+For the current production hosting plan, release workflow, and Render branch strategy, see:
+
+- [docs/render-deployment.md](docs/render-deployment.md)

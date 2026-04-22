@@ -7,6 +7,7 @@ import {
   createJob,
   ensureAdminTables
 } from '@/lib/tcm-admin';
+import { getVideoArtifactStatus } from '@/lib/tcm-video-artifacts';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -30,8 +31,9 @@ export async function GET(request: Request, context: RouteContext) {
 
     // Get latest job for this video
     const job = getJobByVideoId(videoId);
+    const artifactStatus = getVideoArtifactStatus(video);
 
-    return NextResponse.json({ video, job });
+    return NextResponse.json({ video, job, artifactStatus });
   } catch (error) {
     console.error('Error fetching video:', error);
     return NextResponse.json(

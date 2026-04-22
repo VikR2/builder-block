@@ -1,12 +1,34 @@
 "use client";
 
-import { useState, useRef, useEffect, FormEvent, forwardRef, useImperativeHandle, useCallback, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, FormEvent, forwardRef, useImperativeHandle, useCallback, KeyboardEvent, useMemo } from "react";
 import { MessageBubble, Message, FrameReference, VideoClip } from "./message-bubble";
 import { ChartConfig } from "@/lib/tcm-chart-data";
 import { TCMSearchResult } from "@/lib/tcm-db";
+import { useAuth } from "@/lib/auth/context";
+import { StructuredCoachBrief } from "@/lib/tcm-coach-brief";
+import {
+  buildTCMChatSessionKey,
+  buildLegacyTCMChatSessionKey,
+  migrateLegacyTCMChatSession,
+  migrateStoredTCMChatSession,
+  readTCMChatSession,
+  writeTCMChatSession,
+} from "@/lib/tcm-chat-session";
 
 interface ChatInterfaceProps {
   onSourceSelect?: (source: TCMSearchResult) => void;
+  preferredVideoId?: string;
+  preferredPlaylistId?: number | null;
+  preferredTimestamp?: number | null;
+  storageNamespace?: string;
+  legacyStorageNamespaces?: string[];
+  chatMode?: "knowledge" | "lesson";
+  title?: string;
+  subtitle?: string;
+  welcomeMessage?: string;
+  placeholder?: string;
+  helperText?: string;
+  newChatLabel?: string;
 }
 
 export interface ChatInterfaceRef {
@@ -20,20 +42,55 @@ interface SkillSuggestion {
   description: string;
 }
 
-export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(function ChatInterface({ onSourceSelect }, ref) {
+const DEFAULT_WELCOME_MESSAGE =
+  "Welcome to the TCM Knowledge Bot! Ask me anything about TCM trading concepts like:\n\n- What is the Submission Range?\n- How does book building work?\n- Explain order fulfillment\n- What is the matching window?";
+const LEGACY_NAMESPACE_SEPARATOR = "\u0001";
+
+export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(function ChatInterface({
+  onSourceSelect,
+  preferredVideoId,
+  preferredPlaylistId,
+  preferredTimestamp,
+  storageNamespace = "default",
+  legacyStorageNamespaces = [],
+  chatMode = "knowledge",
+  title = "TCM Knowledge Bot",
+  subtitle = "Ask about TCM trading concepts",
+  welcomeMessage = DEFAULT_WELCOME_MESSAGE,
+  placeholder = "Ask about TCM concepts... (type @ for skill suggestions)",
+  helperText = "Searching skills, documents, and video transcripts",
+  newChatLabel = "New Chat"
+}, ref) {
+  const { user, loading: authLoading } = useAuth();
+  const createWelcomeMessage = useCallback((): Message => ({
+    id: "welcome",
+    role: "assistant",
+    content: welcomeMessage,
+    timestamp: new Date(),
+  }), [welcomeMessage]);
+  const storageScope = storageNamespace;
+  const storageKey = user ? buildTCMChatSessionKey(user.id, storageScope) : null;
+  const legacyStorageNamespacesKey = legacyStorageNamespaces.join(LEGACY_NAMESPACE_SEPARATOR);
+  const normalizedLegacyStorageNamespaces = useMemo(
+    () => legacyStorageNamespacesKey
+      ? legacyStorageNamespacesKey.split(LEGACY_NAMESPACE_SEPARATOR).filter(Boolean)
+      : [],
+    [legacyStorageNamespacesKey]
+  );
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
-      content:
-        "Welcome to the TCM Knowledge Bot! Ask me anything about TCM trading concepts like:\n\n- What is the Submission Range?\n- How does book building work?\n- Explain order fulfillment\n- What is the matching window?",
+      content: welcomeMessage,
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [hasHydratedStorage, setHasHydratedStorage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const hydratedStorageKeyRef = useRef<string | null>(null);
 
   // Autocomplete state
   const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -52,6 +109,73 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
     inputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!storageKey || !user) {
+      setMessages([createWelcomeMessage()]);
+      setInput("");
+      setHasHydratedStorage(false);
+      hydratedStorageKeyRef.current = null;
+      return;
+    }
+
+    const persistedSession = readTCMChatSession(storageKey)
+      || normalizedLegacyStorageNamespaces
+        .map((namespace) => migrateStoredTCMChatSession({
+          fromKey: buildTCMChatSessionKey(user.id, namespace),
+          nextKey: storageKey,
+          scope: storageScope,
+        }))
+        .find((session): session is NonNullable<typeof session> => Boolean(session))
+      || migrateLegacyTCMChatSession({
+        legacyKey: buildLegacyTCMChatSessionKey(storageScope),
+        nextKey: storageKey,
+        userId: user.id,
+        scope: storageScope
+      });
+
+    if (!persistedSession || persistedSession.messages.length === 0) {
+      setMessages([createWelcomeMessage()]);
+      setInput("");
+      hydratedStorageKeyRef.current = storageKey;
+      setHasHydratedStorage(true);
+      return;
+    }
+
+    setMessages(
+      persistedSession.messages.map((message) => ({
+        ...message,
+        timestamp: new Date(message.timestamp),
+      }))
+    );
+    setInput(persistedSession.input);
+    hydratedStorageKeyRef.current = storageKey;
+    setHasHydratedStorage(true);
+  }, [authLoading, createWelcomeMessage, normalizedLegacyStorageNamespaces, storageKey, storageScope, user]);
+
+  useEffect(() => {
+    if (!storageKey || !user || !hasHydratedStorage || hydratedStorageKeyRef.current !== storageKey) {
+      return;
+    }
+
+    const messagesToPersist = messages
+      .filter((message) => !message.isLoading)
+      .map((message) => ({
+        ...message,
+        timestamp: message.timestamp.toISOString(),
+      }));
+
+    writeTCMChatSession(storageKey, {
+      userId: String(user.id),
+      scope: storageScope,
+      messages: messagesToPersist,
+      input,
+    });
+  }, [hasHydratedStorage, input, messages, storageKey, storageScope, user]);
+
   // Debounced fetch for autocomplete suggestions
   const fetchSuggestions = useCallback(async (query: string) => {
     if (query.length < 2) {
@@ -62,7 +186,15 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
 
     setIsLoadingSuggestions(true);
     try {
-      const res = await fetch(`/api/tcm/search?q=${encodeURIComponent(query)}&source=skills&limit=5`);
+      const params = new URLSearchParams({
+        q: query,
+        source: "skills",
+        limit: "5",
+      });
+      if (preferredVideoId) {
+        params.set("preferredVideoId", preferredVideoId);
+      }
+      const res = await fetch(`/api/tcm/search?${params.toString()}`);
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
       const skillResults = (data.results || [])
@@ -82,7 +214,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
     } finally {
       setIsLoadingSuggestions(false);
     }
-  }, []);
+  }, [preferredVideoId]);
 
   // Handle input changes with autocomplete trigger
   const handleInputChange = useCallback((value: string) => {
@@ -165,7 +297,6 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
     setIsSearching(true);
 
     try {
-      // Build message history for context (exclude loading messages)
       const history = messages
         .filter((m) => !m.isLoading && m.id !== "welcome")
         .map((m) => ({
@@ -173,69 +304,168 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
           content: m.content,
         }));
 
-      // Call the chat endpoint
-      const response = await fetch("/api/tcm/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: query,
-          history,
-        }),
-      });
+      const requestBody = {
+        message: query,
+        history,
+        preferredVideoId,
+        preferredPlaylistId,
+        preferredTimestamp,
+        chatMode,
+      };
 
-      const data = await response.json();
+      const setAssistantState = (updater: (current: Message) => Message) => {
+        setMessages((prev) => prev.map((message) => (
+          message.id === loadingMessage.id ? updater(message) : message
+        )));
+      };
 
-      if (!response.ok) {
-        throw new Error(data.error || "Chat request failed");
-      }
-
-      const responseContent = data.response;
-      const sources: TCMSearchResult[] = data.sources || [];
-      const frames: FrameReference[] = data.frames || [];
-      const chartData: ChartConfig | undefined = data.chartData || undefined;
-      const videoClip: VideoClip | undefined = data.videoClip || undefined;
-
-      // Replace loading message with actual response
-      setMessages((prev) => {
-        const newMessages = prev.filter((m) => !m.isLoading);
-        return [
-          ...newMessages,
-          {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            content: responseContent,
-            timestamp: new Date(),
-            sources: sources.slice(0, 5), // Limit sources shown
-            frames: frames.slice(0, 3), // Limit frames shown
-            chartData,
-            videoClip,
+      const loadJsonFallback = async () => {
+        const response = await fetch("/api/tcm/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        ];
-      });
+          body: JSON.stringify(requestBody),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Chat request failed");
+        }
+
+        setAssistantState((current) => ({
+          ...current,
+          isLoading: false,
+          content: data.response,
+          structuredAnswer: data.structuredAnswer as StructuredCoachBrief | undefined,
+          sources: (data.sources || []).slice(0, 5),
+          frames: (data.frames || []).slice(0, 3),
+          chartData: data.chartData || undefined,
+          videoClip: data.videoClip || undefined,
+          primaryClip: data.primaryClip || undefined,
+          recommendedClips: data.recommendedClips || [],
+          watchLink: data.watchLink || undefined,
+          lessonLink: data.lessonLink || undefined,
+        }));
+      };
+
+      try {
+        const response = await fetch("/api/tcm/chat/stream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error("Streaming chat request failed");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let accumulatedContent = "";
+        let didFinish = false;
+        let streamedMeta: Partial<Message> = {};
+
+        const applyStreamUpdate = () => {
+          setAssistantState((current) => ({
+            ...current,
+            ...streamedMeta,
+            content: accumulatedContent,
+          }));
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          while (buffer.includes("\n\n")) {
+            const separatorIndex = buffer.indexOf("\n\n");
+            const rawEvent = buffer.slice(0, separatorIndex);
+            buffer = buffer.slice(separatorIndex + 2);
+
+            if (!rawEvent.trim()) continue;
+
+            let eventName = "message";
+            let eventData = "";
+
+            for (const line of rawEvent.split("\n")) {
+              if (line.startsWith("event:")) {
+                eventName = line.slice(6).trim();
+              } else if (line.startsWith("data:")) {
+                eventData += line.slice(5).trim();
+              }
+            }
+
+            if (!eventData) continue;
+            const parsed = JSON.parse(eventData) as Record<string, unknown>;
+
+            if (eventName === "meta") {
+              streamedMeta = {
+                structuredAnswer: parsed.structuredAnswer as StructuredCoachBrief | undefined,
+                sources: Array.isArray(parsed.sources) ? (parsed.sources as TCMSearchResult[]).slice(0, 5) : [],
+                frames: Array.isArray(parsed.frames) ? (parsed.frames as FrameReference[]).slice(0, 3) : [],
+                chartData: parsed.chartData as ChartConfig | undefined,
+                videoClip: parsed.videoClip as VideoClip | undefined,
+                primaryClip: parsed.primaryClip as VideoClip | undefined,
+                recommendedClips: Array.isArray(parsed.recommendedClips) ? parsed.recommendedClips as VideoClip[] : [],
+                watchLink: typeof parsed.watchLink === "string" ? parsed.watchLink : undefined,
+                lessonLink: typeof parsed.lessonLink === "string" ? parsed.lessonLink : undefined,
+              };
+              applyStreamUpdate();
+            } else if (eventName === "token") {
+              const delta = typeof parsed.delta === "string" ? parsed.delta : "";
+              accumulatedContent += delta;
+              applyStreamUpdate();
+            } else if (eventName === "done") {
+              didFinish = true;
+              accumulatedContent = typeof parsed.response === "string" ? parsed.response : accumulatedContent;
+              setAssistantState((current) => ({
+                ...current,
+                ...streamedMeta,
+                isLoading: false,
+                content: accumulatedContent,
+                structuredAnswer: parsed.structuredAnswer as StructuredCoachBrief | undefined || current.structuredAnswer,
+              }));
+            } else if (eventName === "error") {
+              throw new Error(typeof parsed.error === "string" ? parsed.error : "Streaming response failed");
+            }
+          }
+        }
+
+        if (!didFinish) {
+          setAssistantState((current) => ({
+            ...current,
+            ...streamedMeta,
+            isLoading: false,
+            content: accumulatedContent || current.content,
+          }));
+        }
+      } catch (streamError) {
+        console.warn("Streaming chat failed, falling back to JSON:", streamError);
+        await loadJsonFallback();
+      }
     } catch (error) {
       console.error("Search error:", error);
 
-      // Replace loading with error message
-      setMessages((prev) => {
-        const newMessages = prev.filter((m) => !m.isLoading);
-        return [
-          ...newMessages,
-          {
-            id: `error-${Date.now()}`,
-            role: "assistant",
-            content:
-              "Sorry, I encountered an error searching the knowledge base. Please try again.",
-            timestamp: new Date(),
-          },
-        ];
-      });
+      setMessages((prev) => prev.map((message) => (
+        message.id === loadingMessage.id
+          ? {
+              ...message,
+              isLoading: false,
+              content: "Sorry, I encountered an error searching the knowledge base. Please try again.",
+            }
+          : message
+      )));
     } finally {
       setIsSearching(false);
       inputRef.current?.focus();
     }
-  }, [isSearching, messages]);
+  }, [chatMode, isSearching, messages, preferredPlaylistId, preferredTimestamp, preferredVideoId]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -255,15 +485,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
   }), [submitMessageInternal]);
 
   const handleNewChat = () => {
-    setMessages([
-      {
-        id: "welcome",
-        role: "assistant",
-        content:
-          "Welcome to the TCM Knowledge Bot! Ask me anything about TCM trading concepts like:\n\n- What is the Submission Range?\n- How does book building work?\n- Explain order fulfillment\n- What is the matching window?",
-        timestamp: new Date(),
-      },
-    ]);
+    setMessages([createWelcomeMessage()]);
     setInput("");
     setShowAutocomplete(false);
     inputRef.current?.focus();
@@ -276,28 +498,28 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-border/70 bg-background/60">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded bg-gradient-to-br from-accent to-accent/60 flex items-center justify-center">
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-accent to-accent/60 flex items-center justify-center shadow-sm">
             <span className="text-accent-foreground font-bold text-sm">TCM</span>
           </div>
           <div>
-            <h2 className="font-semibold">TCM Knowledge Bot</h2>
-            <p className="text-xs text-muted-foreground">
-              Ask about TCM trading concepts
+            <h2 className="font-semibold tracking-tight">{title}</h2>
+            <p className="max-w-xl text-xs text-muted-foreground">
+              {subtitle}
             </p>
           </div>
         </div>
         <button
           onClick={handleNewChat}
-          className="px-3 py-1.5 text-sm rounded-md bg-secondary hover:bg-secondary/80 transition-colors"
+          className="px-3 py-1.5 text-sm rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
         >
-          New Chat
+          {newChatLabel}
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto bg-gradient-to-b from-background to-background/95 p-4 md:p-5">
         {messages.map((message) => (
           <MessageBubble
             key={message.id}
@@ -309,7 +531,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
       </div>
 
       {/* Input */}
-      <div className="border-t border-border p-4">
+      <div className="border-t border-border/70 bg-background/80 p-4">
         <form onSubmit={handleSubmit} className="flex gap-2 relative">
           {/* Autocomplete Dropdown */}
           {showAutocomplete && suggestions.length > 0 && (
@@ -346,14 +568,14 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
             value={input}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about TCM concepts... (type @ for skill suggestions)"
+            placeholder={placeholder}
             disabled={isSearching}
-            className="flex-1 px-4 py-3 rounded-lg border bg-secondary/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all disabled:opacity-50"
+            className="flex-1 px-4 py-3 rounded-xl border bg-secondary/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={isSearching || !input.trim()}
-            className="px-4 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg
               className="w-5 h-5"
@@ -370,8 +592,8 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
             </svg>
           </button>
         </form>
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          Searching skills, documents, and video transcripts
+        <p className="mt-2 text-xs text-muted-foreground">
+          {helperText}
         </p>
       </div>
     </div>

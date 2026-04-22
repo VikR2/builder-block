@@ -1,12 +1,44 @@
 import Database from 'better-sqlite3';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 // Database path (relative to ui folder)
 const DB_PATH = join(process.cwd(), '..', 'data', 'builder.db');
+const MIGRATIONS_PATH = join(process.cwd(), '..', 'data', 'migrations');
+let authTablesEnsured = false;
+
+function getRawAuthDb() {
+  return new Database(DB_PATH);
+}
 
 // Get writable database connection
 export function getAuthDb() {
-  return new Database(DB_PATH);
+  ensureAuthTables();
+  return getRawAuthDb();
+}
+
+export function ensureAuthTables() {
+  if (authTablesEnsured) {
+    return;
+  }
+
+  const db = getRawAuthDb();
+
+  try {
+    const authMigrationPath = join(MIGRATIONS_PATH, '020_add_auth_tables.sql');
+    if (existsSync(authMigrationPath)) {
+      db.exec(readFileSync(authMigrationPath, 'utf-8'));
+    }
+
+    const creditMigrationPath = join(MIGRATIONS_PATH, '021_add_user_credits.sql');
+    if (existsSync(creditMigrationPath)) {
+      db.exec(readFileSync(creditMigrationPath, 'utf-8'));
+    }
+
+    authTablesEnsured = true;
+  } finally {
+    db.close();
+  }
 }
 
 // User types
@@ -40,6 +72,32 @@ export interface Subscription {
   cancel_at_period_end: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserCreditAccount {
+  user_id: number;
+  balance_credits: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCreditTransaction {
+  id: number;
+  user_id: number;
+  delta_credits: number;
+  reason: string;
+  metadata_json: string | null;
+  balance_after: number;
+  created_at: string;
+}
+
+export interface CreditSeedOptions {
+  amount: number;
+  onlyVerified?: boolean;
+  excludePremium?: boolean;
+  onlyZeroBalance?: boolean;
+  reason?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AuthToken {
@@ -312,6 +370,14 @@ export interface UserWithSubscription extends User {
   current_period_end: string | null;
 }
 
+function ensureUserCreditAccount(db: ReturnType<typeof getRawAuthDb>, userId: number): void {
+  db.prepare(`
+    INSERT INTO user_credit_accounts (user_id, balance_credits)
+    VALUES (?, 0)
+    ON CONFLICT(user_id) DO NOTHING
+  `).run(userId);
+}
+
 export function getAllUsers(limit: number = 50, offset: number = 0): UserWithSubscription[] {
   const db = getAuthDb();
   try {
@@ -322,6 +388,242 @@ export function getAllUsers(limit: number = 50, offset: number = 0): UserWithSub
       ORDER BY u.created_at DESC
       LIMIT ? OFFSET ?
     `).all(limit, offset) as UserWithSubscription[];
+  } finally {
+    db.close();
+  }
+}
+
+export function getUserCreditAccount(userId: number): UserCreditAccount {
+  const db = getAuthDb();
+  try {
+    ensureUserCreditAccount(db, userId);
+    return db.prepare(`
+      SELECT * FROM user_credit_accounts WHERE user_id = ?
+    `).get(userId) as UserCreditAccount;
+  } finally {
+    db.close();
+  }
+}
+
+export function getUserCreditBalance(userId: number): number {
+  return getUserCreditAccount(userId).balance_credits;
+}
+
+export function grantUserCredits(
+  userId: number,
+  amount: number,
+  reason: string,
+  metadata?: Record<string, unknown>
+): UserCreditAccount {
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new Error('Credit grant amount must be a positive integer');
+  }
+
+  const db = getAuthDb();
+  try {
+    const runGrant = db.transaction(() => {
+      ensureUserCreditAccount(db, userId);
+      db.prepare(`
+        UPDATE user_credit_accounts
+        SET balance_credits = balance_credits + ?, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+      `).run(amount, userId);
+
+      const account = db.prepare(`
+        SELECT * FROM user_credit_accounts WHERE user_id = ?
+      `).get(userId) as UserCreditAccount;
+
+      db.prepare(`
+        INSERT INTO user_credit_transactions (
+          user_id,
+          delta_credits,
+          reason,
+          metadata_json,
+          balance_after
+        ) VALUES (?, ?, ?, ?, ?)
+      `).run(
+        userId,
+        amount,
+        reason,
+        metadata ? JSON.stringify(metadata) : null,
+        account.balance_credits
+      );
+
+      return account;
+    });
+
+    return runGrant();
+  } finally {
+    db.close();
+  }
+}
+
+export function consumeUserCredits(
+  userId: number,
+  amount: number,
+  reason: string,
+  metadata?: Record<string, unknown>
+): { success: boolean; balance: number } {
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new Error('Credit consumption amount must be a positive integer');
+  }
+
+  const db = getAuthDb();
+  try {
+    const runConsumption = db.transaction(() => {
+      ensureUserCreditAccount(db, userId);
+
+      const accountBefore = db.prepare(`
+        SELECT * FROM user_credit_accounts WHERE user_id = ?
+      `).get(userId) as UserCreditAccount;
+
+      if (accountBefore.balance_credits < amount) {
+        return {
+          success: false,
+          balance: accountBefore.balance_credits
+        };
+      }
+
+      db.prepare(`
+        UPDATE user_credit_accounts
+        SET balance_credits = balance_credits - ?, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+      `).run(amount, userId);
+
+      const accountAfter = db.prepare(`
+        SELECT * FROM user_credit_accounts WHERE user_id = ?
+      `).get(userId) as UserCreditAccount;
+
+      db.prepare(`
+        INSERT INTO user_credit_transactions (
+          user_id,
+          delta_credits,
+          reason,
+          metadata_json,
+          balance_after
+        ) VALUES (?, ?, ?, ?, ?)
+      `).run(
+        userId,
+        -amount,
+        reason,
+        metadata ? JSON.stringify(metadata) : null,
+        accountAfter.balance_credits
+      );
+
+      return {
+        success: true,
+        balance: accountAfter.balance_credits
+      };
+    });
+
+    return runConsumption();
+  } finally {
+    db.close();
+  }
+}
+
+export function getUserCreditTransactions(userId: number, limit: number = 50): UserCreditTransaction[] {
+  const db = getAuthDb();
+  try {
+    ensureUserCreditAccount(db, userId);
+    return db.prepare(`
+      SELECT *
+      FROM user_credit_transactions
+      WHERE user_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?
+    `).all(userId, limit) as UserCreditTransaction[];
+  } finally {
+    db.close();
+  }
+}
+
+export function seedCreditsForEligibleUsers(options: CreditSeedOptions): {
+  seededUserIds: number[];
+  count: number;
+} {
+  const {
+    amount,
+    onlyVerified = true,
+    excludePremium = true,
+    onlyZeroBalance = true,
+    reason = 'initial_chat_credit_seed',
+    metadata,
+  } = options;
+
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new Error('Seed credit amount must be a positive integer');
+  }
+
+  const db = getAuthDb();
+  try {
+    const runSeed = db.transaction(() => {
+      const whereClauses: string[] = [];
+
+      if (onlyVerified) {
+        whereClauses.push('u.email_verified = 1');
+      }
+
+      if (excludePremium) {
+        whereClauses.push("(u.manual_premium = 0 AND s.id IS NULL)");
+      }
+
+      if (onlyZeroBalance) {
+        whereClauses.push('COALESCE(c.balance_credits, 0) = 0');
+      }
+
+      const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+      const rows = db.prepare(`
+        SELECT DISTINCT u.id
+        FROM users u
+        LEFT JOIN subscriptions s
+          ON u.id = s.user_id AND s.status IN ('active', 'trialing')
+        LEFT JOIN user_credit_accounts c
+          ON u.id = c.user_id
+        ${whereSql}
+        ORDER BY u.id ASC
+      `).all() as Array<{ id: number }>;
+
+      const seededUserIds: number[] = [];
+
+      for (const row of rows) {
+        ensureUserCreditAccount(db, row.id);
+        db.prepare(`
+          UPDATE user_credit_accounts
+          SET balance_credits = balance_credits + ?, updated_at = CURRENT_TIMESTAMP
+          WHERE user_id = ?
+        `).run(amount, row.id);
+
+        const account = db.prepare(`
+          SELECT * FROM user_credit_accounts WHERE user_id = ?
+        `).get(row.id) as UserCreditAccount;
+
+        db.prepare(`
+          INSERT INTO user_credit_transactions (
+            user_id,
+            delta_credits,
+            reason,
+            metadata_json,
+            balance_after
+          ) VALUES (?, ?, ?, ?, ?)
+        `).run(
+          row.id,
+          amount,
+          reason,
+          metadata ? JSON.stringify(metadata) : null,
+          account.balance_credits
+        );
+
+        seededUserIds.push(row.id);
+      }
+
+      return {
+        seededUserIds,
+        count: seededUserIds.length
+      };
+    });
+
+    return runSeed();
   } finally {
     db.close();
   }

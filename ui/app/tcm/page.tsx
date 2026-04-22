@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getTCMSkills, getArchitectureDocuments, getLocalVideos } from "@/lib/tcm-db";
+import { getLocalVideos, getTCMSkills } from "@/lib/tcm-db";
 import { getCurrentUser } from "@/lib/auth";
 import { PaywallOverlay } from "@/components/paywall";
 import { TCMPageContent } from "./tcm-page-content";
@@ -12,22 +12,20 @@ export default async function TCMPage() {
     redirect('/login?redirect=/tcm');
   }
 
-  if (!user.isPremium) {
+  if (!user.hasChatAccess) {
     return <PaywallOverlay
       returnUrl="/tcm"
       title="Knowledge Bot"
-      description="Subscribe to Premium to access the AI-powered Knowledge Bot and ask questions about trading concepts."
+      description="Subscribe to Premium or add chat credits to access the AI-powered Knowledge Bot and ask questions about trading concepts."
     />;
   }
 
   // Get stats for the sidebar
   const skills = getTCMSkills();
-  const docs = getArchitectureDocuments();
   const videos = getLocalVideos();
 
   const stats = {
     skillCount: skills.length,
-    docCount: docs.length,
     videoCount: videos.length,
   };
 

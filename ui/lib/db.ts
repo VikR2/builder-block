@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { join } from 'path';
+import { buildVisibleTCMSkillSql } from './tcm-skill-source-filter';
 
 // Database path (relative to project root)
 const DB_PATH = join(process.cwd(), '..', 'data', 'builder.db');
@@ -91,24 +92,70 @@ export interface Attachment {
   created_at: string;
 }
 
+const SKILL_SELECT_COLUMN_NAMES = [
+  'id',
+  'name',
+  'slug',
+  'category',
+  'subcategory',
+  'description',
+  'code_snippet',
+  'variables_required',
+  'dependencies',
+  'complexity',
+  'trading_style',
+  'timeframe',
+  'nlp_keywords',
+  'usage_examples',
+  'common_combinations',
+  'usage_count',
+  'created_at',
+  'updated_at',
+];
+
+function buildSkillSelectColumns(alias?: string): string {
+  const prefix = alias ? `${alias}.` : '';
+  return SKILL_SELECT_COLUMN_NAMES.map((column) => `${prefix}${column}`).join(', ');
+}
+
+const SKILL_SELECT_COLUMNS = buildSkillSelectColumns();
+
+const VISIBLE_SKILL_SQL = buildVisibleTCMSkillSql();
+
 // Skill queries
 export function getAllSkills(): Skill[] {
   const db = getDb();
-  const skills = db.prepare('SELECT * FROM skills ORDER BY category, name').all() as Skill[];
+  const skills = db.prepare(`
+    SELECT ${SKILL_SELECT_COLUMNS}
+    FROM skills
+    WHERE ${VISIBLE_SKILL_SQL}
+    ORDER BY category, name
+  `).all() as Skill[];
   db.close();
   return skills;
 }
 
 export function getSkillBySlug(slug: string): Skill | undefined {
   const db = getDb();
-  const skill = db.prepare('SELECT * FROM skills WHERE slug = ?').get(slug) as Skill | undefined;
+  const skill = db.prepare(`
+    SELECT ${SKILL_SELECT_COLUMNS}
+    FROM skills
+    WHERE slug = ?
+      AND ${VISIBLE_SKILL_SQL}
+  `).get(slug) as Skill | undefined;
   db.close();
   return skill;
 }
 
 export function getSkillsByCategory(category: string): Skill[] {
   const db = getDb();
-  const skills = db.prepare('SELECT * FROM skills WHERE category = ? ORDER BY name').all(category) as Skill[];
+  const skills = db.prepare(`
+    SELECT ${SKILL_SELECT_COLUMNS}
+    FROM skills
+    WHERE category = ?
+      AND ${VISIBLE_SKILL_SQL}
+    ORDER BY name
+  `).all(category) as Skill[];
   db.close();
   return skills;
 }
@@ -116,10 +163,11 @@ export function getSkillsByCategory(category: string): Skill[] {
 export function searchSkills(query: string, limit: number = 20): Skill[] {
   const db = getDb();
   const skills = db.prepare(`
-    SELECT s.*
+    SELECT ${buildSkillSelectColumns('s')}
     FROM skills s
     JOIN skills_fts fts ON s.id = fts.rowid
     WHERE skills_fts MATCH ?
+      AND ${buildVisibleTCMSkillSql('s')}
     ORDER BY rank
     LIMIT ?
   `).all(query, limit) as Skill[];
@@ -132,6 +180,7 @@ export function getSkillCategories(): { category: string; count: number }[] {
   const categories = db.prepare(`
     SELECT category, COUNT(*) as count
     FROM skills
+    WHERE ${VISIBLE_SKILL_SQL}
     GROUP BY category
     ORDER BY category
   `).all() as { category: string; count: number }[];
@@ -248,10 +297,11 @@ export function getScriptById(id: number): Script | undefined {
 export function getSkillsByScript(scriptId: number): Skill[] {
   const db = getDb();
   const skills = db.prepare(`
-    SELECT s.*
+    SELECT ${SKILL_SELECT_COLUMNS}
     FROM skills s
     JOIN script_skills ss ON s.id = ss.skill_id
     WHERE ss.script_id = ?
+      AND ${buildVisibleTCMSkillSql('s')}
     ORDER BY s.category, s.name
   `).all(scriptId) as Skill[];
   db.close();
@@ -311,7 +361,11 @@ export function getAttachmentsByEntry(entryId: number): Attachment[] {
 export function getStats() {
   const db = getDb();
 
-  const skillCount = db.prepare('SELECT COUNT(*) as count FROM skills').get() as { count: number };
+  const skillCount = db.prepare(`
+    SELECT COUNT(*) as count
+    FROM skills
+    WHERE ${VISIBLE_SKILL_SQL}
+  `).get() as { count: number };
   const projectCount = db.prepare('SELECT COUNT(*) as count FROM projects').get() as { count: number };
   const scriptCount = db.prepare('SELECT COUNT(*) as count FROM scripts').get() as { count: number };
   const journalCount = db.prepare('SELECT COUNT(*) as count FROM journal_entries').get() as { count: number };
