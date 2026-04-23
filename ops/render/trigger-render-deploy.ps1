@@ -12,7 +12,7 @@ $body = @{
 }
 
 $deploy = Invoke-RenderApi -Method POST -Path "/v1/services/$($config.serviceId)/deploys" -Body $body
-$result = if ($deploy.deploy) { $deploy.deploy } else { $deploy }
+$result = if ($deploy.deploy) { $deploy.deploy } elseif ($deploy.serviceDeploy.deploy) { $deploy.serviceDeploy.deploy } elseif ($deploy.serviceDeploy) { $deploy.serviceDeploy } else { $deploy }
 
 [pscustomobject]@{
     deployId = $result.id

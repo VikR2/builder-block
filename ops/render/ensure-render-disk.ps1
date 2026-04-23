@@ -32,7 +32,7 @@ $created = Invoke-RenderApi -Method POST -Path '/v1/disks' -Body @{
     serviceId = $config.serviceId
 }
 
-$disk = if ($created.disk) { $created.disk } else { $created }
+$disk = if ($created.disk) { $created.disk } elseif ($created.serviceDisk.disk) { $created.serviceDisk.disk } elseif ($created.serviceDisk) { $created.serviceDisk } else { $created }
 [pscustomobject]@{
     id = $disk.id
     name = $disk.name
