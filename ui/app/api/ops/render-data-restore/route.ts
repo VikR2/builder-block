@@ -3,6 +3,7 @@ import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { join } from 'path';
 import { spawn } from 'child_process';
+import { timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,20 @@ const MANIFEST_FILE = 'render-data-bundle.parts.json';
 
 function unauthorized() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}
+
+function tokensMatch(expected: string | undefined, provided: string | null | undefined) {
+  if (!expected || !provided) {
+    return false;
+  }
+
+  const expectedBuffer = Buffer.from(expected);
+  const providedBuffer = Buffer.from(provided);
+  if (expectedBuffer.length !== providedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
 function fileUrl(name: string) {
@@ -82,9 +97,13 @@ async function runRestoreScript(bundlePath: string) {
 }
 
 export async function POST(request: Request) {
-  const providedToken = request.headers.get('x-render-migration-token');
+  const requestUrl = new URL(request.url);
+  const body = await request.json().catch(() => ({})) as { token?: string };
+  const providedToken = request.headers.get('x-render-migration-token')
+    ?? requestUrl.searchParams.get('token')
+    ?? body.token;
 
-  if (!MIGRATION_TOKEN || providedToken !== MIGRATION_TOKEN) {
+  if (!tokensMatch(MIGRATION_TOKEN, providedToken)) {
     return unauthorized();
   }
 
