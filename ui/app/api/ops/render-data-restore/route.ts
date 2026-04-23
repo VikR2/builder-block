@@ -1,6 +1,4 @@
-import { createReadStream, createWriteStream, existsSync, mkdirSync, rmSync } from 'fs';
-import { Readable } from 'stream';
-import { pipeline } from 'stream/promises';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { spawn } from 'child_process';
 import { timingSafeEqual } from 'crypto';
@@ -11,9 +9,7 @@ export const dynamic = 'force-dynamic';
 const MIGRATION_TOKEN = process.env.RENDER_MIGRATION_TOKEN;
 const RELEASE_TAG = process.env.RENDER_DATA_RELEASE_TAG || 'render-data-bundle-20260423';
 const RELEASE_REPO = process.env.RENDER_DATA_RELEASE_REPO || 'VikR2/builder-block';
-const TEMP_DIR = '/tmp/builder-block-render-restore';
-const ZIP_PATH = join(TEMP_DIR, 'render-data-bundle.zip');
-const MANIFEST_FILE = 'render-data-bundle.parts.json';
+const STATUS_FILE = '/app/data/.render-restore-status.json';
 
 function unauthorized() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -33,67 +29,36 @@ function tokensMatch(expected: string | undefined, provided: string | null | und
   return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
-function fileUrl(name: string) {
-  return `https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_TAG}/${name}`;
-}
-
-async function downloadToFile(url: string, destination: string) {
-  const response = await fetch(url);
-  if (!response.ok || !response.body) {
-    throw new Error(`Failed to download ${url}: ${response.status}`);
+function readStatusPayload() {
+  if (!existsSync(STATUS_FILE)) {
+    return null;
   }
-
-  const writable = createWriteStream(destination);
-  const readable = Readable.fromWeb(response.body as any);
-  await pipeline(readable, writable);
-}
-
-async function concatenateParts(parts: string[], outputPath: string) {
-  const out = createWriteStream(outputPath);
 
   try {
-    for (const partPath of parts) {
-      await new Promise<void>((resolve, reject) => {
-        const stream = createReadStream(partPath);
-        stream.on('error', reject);
-        stream.on('end', resolve);
-        stream.pipe(out, { end: false });
-      });
-    }
-  } finally {
-    out.end();
+    return JSON.parse(readFileSync(STATUS_FILE, 'utf-8'));
+  } catch {
+    return {
+      status: 'error',
+      error: 'Status file exists but could not be parsed',
+    };
   }
 }
 
-async function runRestoreScript(bundlePath: string) {
-  return new Promise<void>((resolve, reject) => {
-    const proc = spawn('python', [
-      '/app/scripts/render_restore_data_bundle.py',
-      '--bundle',
-      bundlePath,
-      '--dest',
-      '/app/data',
-      '--replace',
-    ], {
-      cwd: '/app/ui',
-      env: { ...process.env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
+  const providedToken = request.headers.get('x-render-migration-token')
+    ?? requestUrl.searchParams.get('token');
 
-    let stderr = '';
-    proc.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
+  if (!tokensMatch(MIGRATION_TOKEN, providedToken)) {
+    return unauthorized();
+  }
 
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      reject(new Error(stderr || `Restore script exited with code ${code}`));
-    });
-  });
+  const payload = readStatusPayload();
+  return NextResponse.json(
+    payload ?? {
+      status: existsSync('/app/data/builder.db') ? 'already_restored' : 'idle',
+    }
+  );
 }
 
 export async function POST(request: Request) {
@@ -115,40 +80,39 @@ export async function POST(request: Request) {
     });
   }
 
-  rmSync(TEMP_DIR, { recursive: true, force: true });
-  mkdirSync(TEMP_DIR, { recursive: true });
-
-  try {
-    const manifestPath = join(TEMP_DIR, MANIFEST_FILE);
-    await downloadToFile(fileUrl(MANIFEST_FILE), manifestPath);
-
-    const manifest = JSON.parse(await (await import('fs/promises')).readFile(manifestPath, 'utf-8')) as {
-      parts: Array<{ name: string }>;
-    };
-
-    const partPaths: string[] = [];
-    for (const part of manifest.parts) {
-      const partPath = join(TEMP_DIR, part.name);
-      await downloadToFile(fileUrl(part.name), partPath);
-      partPaths.push(partPath);
-    }
-
-    await concatenateParts(partPaths, ZIP_PATH);
-    await runRestoreScript(ZIP_PATH);
-
+  const currentStatus = readStatusPayload();
+  if (currentStatus?.status && !['error', 'success', 'already_restored'].includes(currentStatus.status)) {
     return NextResponse.json({
-      status: 'success',
-      restoredTo: '/app/data',
-      releaseTag: RELEASE_TAG,
-      partCount: manifest.parts.length,
+      status: 'already_running',
+      currentStatus,
     });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown restore failure',
-      },
-      { status: 500 }
-    );
   }
+
+  mkdirSync('/app/data', { recursive: true });
+  const proc = spawn('python', [
+    '/app/scripts/render_restore_from_release.py',
+    '--repo',
+    RELEASE_REPO,
+    '--tag',
+    RELEASE_TAG,
+    '--dest',
+    '/app/data',
+    '--status-file',
+    STATUS_FILE,
+  ], {
+    cwd: '/app/ui',
+    env: { ...process.env },
+    detached: true,
+    stdio: 'ignore',
+  });
+
+  proc.unref();
+
+  return NextResponse.json({
+    status: 'started',
+    pid: proc.pid,
+    releaseTag: RELEASE_TAG,
+    releaseRepo: RELEASE_REPO,
+    statusEndpoint: '/api/ops/render-data-restore',
+  });
 }
