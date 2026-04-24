@@ -9,15 +9,38 @@ import { PostComposer } from '@/components/home/post-composer';
 
 export const dynamic = 'force-dynamic';
 
+const EMPTY_STATS = {
+  skills: 0,
+  projects: 0,
+  scripts: 0,
+  journalEntries: 0,
+};
+
 export default async function HomePage() {
   // Get current user (already authenticated via layout)
   const user = await getCurrentUser();
 
-  // Fetch data in parallel
+  let dataLoadFailed = false;
   const [posts, stats, videos] = await Promise.all([
-    Promise.resolve(getAdminPosts(20)),
-    Promise.resolve(getStats()),
-    getLibraryVideos(),
+    Promise.resolve()
+      .then(() => getAdminPosts(20))
+      .catch((error) => {
+        dataLoadFailed = true;
+        console.error('Home dashboard posts load failed:', error);
+        return [];
+      }),
+    Promise.resolve()
+      .then(() => getStats())
+      .catch((error) => {
+        dataLoadFailed = true;
+        console.error('Home dashboard stats load failed:', error);
+        return EMPTY_STATS;
+      }),
+    getLibraryVideos().catch((error) => {
+      dataLoadFailed = true;
+      console.error('Home dashboard videos load failed:', error);
+      return [];
+    }),
   ]);
 
   const statsData = {
@@ -40,6 +63,13 @@ export default async function HomePage() {
           <div className="lg:col-span-3 space-y-8">
             {/* Welcome banner */}
             <WelcomeBanner userName={user?.email} />
+
+            {dataLoadFailed ? (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
+                Some dashboard data could not be loaded from the production volume. The app is available, and the missing
+                dashboard widgets will repopulate after the remaining data artifacts are synced.
+              </div>
+            ) : null}
 
             {/* Post composer stays available for admins without cluttering learner home */}
             {user?.isAdmin ? <PostComposer /> : null}
