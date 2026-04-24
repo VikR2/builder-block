@@ -166,7 +166,7 @@ export function getPublishedReadyVideoById(id: number): ProcessedVideo | null {
         AND processing_status = 'ready'
         AND COALESCE(is_published, 0) = 1
     `).get(id) as ProcessedVideo | undefined;
-    return video && existsSync(video.file_path) ? video : null;
+    return video && hasPublishedVideoArtifacts(video) ? video : null;
   } finally {
     db.close();
   }
@@ -205,7 +205,7 @@ export function getPublishedReadyVideoByFolderId(folderId: string): ProcessedVid
         AND processing_status = 'ready'
         AND COALESCE(is_published, 0) = 1
     `).get(folderId) as ProcessedVideo | undefined;
-    return video && existsSync(video.file_path) ? video : null;
+    return video && hasPublishedVideoArtifacts(video) ? video : null;
   } finally {
     db.close();
   }
@@ -232,10 +232,25 @@ export function getPublishedReadyVideos(): ProcessedVideo[] {
         AND COALESCE(is_published, 0) = 1
         AND folder_id IS NOT NULL
       ORDER BY COALESCE(title, filename) ASC
-    `).all() as ProcessedVideo[]).filter((video) => existsSync(video.file_path));
+    `).all() as ProcessedVideo[]).filter(hasPublishedVideoArtifacts);
   } finally {
     db.close();
   }
+}
+
+function hasPublishedVideoArtifacts(video: ProcessedVideo): boolean {
+  if (video.file_path && existsSync(video.file_path)) {
+    return true;
+  }
+
+  if (!video.folder_id) {
+    return false;
+  }
+
+  const videoDir = join(LOCAL_VIDEOS_PATH, video.folder_id);
+  return existsSync(join(videoDir, 'manifest.json'))
+    || existsSync(join(videoDir, 'segments.json'))
+    || existsSync(join(videoDir, 'transcript_timed.json'));
 }
 
 export function createVideo(data: {
