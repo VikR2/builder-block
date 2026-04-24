@@ -51,7 +51,7 @@ export async function GET(
     if (range) {
       const parts = range.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + 1024 * 1024, fileSize - 1); // 1MB chunks
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
 
       if (!Number.isFinite(start) || start < 0 || start >= fileSize || end < start) {
         return new NextResponse(null, {
