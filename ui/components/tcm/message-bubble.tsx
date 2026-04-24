@@ -411,6 +411,7 @@ export function MessageBubble({ message, onSourceClick }: MessageBubbleProps) {
 
         {/* Timestamp */}
         <div
+          suppressHydrationWarning
           className={`text-xs mt-2 ${
             isUser ? "text-primary-foreground/60" : "text-muted-foreground"
           }`}
