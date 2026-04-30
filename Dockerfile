@@ -1,3 +1,5 @@
+ARG RENDER_BASE_IMAGE=ghcr.io/vikr2/builder-block-render-base:latest
+
 FROM node:22-bookworm-slim AS build
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -17,7 +19,6 @@ COPY scripts /app/scripts
 RUN npm run build \
   && npm prune --omit=dev
 
-ARG RENDER_BASE_IMAGE=ghcr.io/vikr2/builder-block-render-base:latest
 FROM ${RENDER_BASE_IMAGE} AS runtime
 
 ENV NODE_ENV=production \
