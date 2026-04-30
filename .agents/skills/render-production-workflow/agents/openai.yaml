@@ -1,0 +1,4 @@
+interface:
+  display_name: "Render Production Workflow"
+  short_description: "Deploy and configure TCM on Render."
+  default_prompt: "Use this skill to push Render environment variables, deploy the app, and verify production."

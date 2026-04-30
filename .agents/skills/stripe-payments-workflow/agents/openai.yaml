@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stripe Payments Workflow"
+  short_description: "Run TCM Stripe payment workflows."
+  default_prompt: "Use this skill to set up, test, verify, or go live with TCM Stripe subscription payments."
