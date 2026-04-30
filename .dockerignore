@@ -12,8 +12,12 @@
 .runtime
 .serena
 .tldr
+%SystemDrive%
+~
+app
 data
 docs
+Errors
 node_modules
 ops/share
 results
@@ -41,6 +45,7 @@ ui/tsconfig.tsbuildinfo
 *.zip
 *.tar
 *.tar.gz
+test_*.py
 !ui/app/icon.png
 !ui/app/favicon.ico
 !ui/public/**/*.png
