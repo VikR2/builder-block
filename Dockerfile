@@ -17,7 +17,8 @@ COPY scripts /app/scripts
 RUN npm run build \
   && npm prune --omit=dev
 
-FROM node:22-bookworm-slim AS runtime
+ARG RENDER_BASE_IMAGE=ghcr.io/vikr2/builder-block-render-base:latest
+FROM ${RENDER_BASE_IMAGE} AS runtime
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
@@ -25,16 +26,6 @@ ENV NODE_ENV=production \
     PYTHONUNBUFFERED=1 \
     VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:${PATH}"
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 python3-venv ffmpeg ca-certificates \
-  && python3 -m venv /opt/venv \
-  && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
-  && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.render.txt /tmp/requirements.render.txt
-RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.render.txt \
-  && rm /tmp/requirements.render.txt
 
 WORKDIR /app
 
@@ -52,4 +43,3 @@ RUN mkdir -p /app/data/post-uploads /app/data/scripts-output
 EXPOSE 3000
 
 CMD ["npm", "start"]
-
