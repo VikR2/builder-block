@@ -163,7 +163,7 @@ function PricingContent() {
           <div className="p-8 md:p-10">
             {/* Price */}
             <div className="flex items-baseline gap-2 mb-6">
-              <span className="text-5xl font-bold text-white">$XX</span>
+              <span className="text-5xl font-bold text-white">$25</span>
               <span className="text-xl text-neutral-400">/month</span>
             </div>
 
