@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, UserPlus, Mail, Crown, Loader2, Check, AlertCircle } from 'lucide-react';
+import { X, UserPlus, Mail, Crown, Loader2, Check, AlertCircle, Shield } from 'lucide-react';
 
 interface AddUserDialogProps {
   isOpen: boolean;
@@ -26,6 +26,7 @@ interface User {
 
 export function AddUserDialog({ isOpen, onClose, onUserCreated }: AddUserDialogProps) {
   const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'user' | 'admin'>('user');
   const [grantPremium, setGrantPremium] = useState(false);
   const [sendWelcome, setSendWelcome] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,6 +40,7 @@ export function AddUserDialog({ isOpen, onClose, onUserCreated }: AddUserDialogP
   useEffect(() => {
     if (isOpen) {
       setEmail('');
+      setRole('user');
       setGrantPremium(false);
       setSendWelcome(true);
       setError(null);
@@ -75,7 +77,7 @@ export function AddUserDialog({ isOpen, onClose, onUserCreated }: AddUserDialogP
       const response = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, grantPremium, sendWelcome })
+        body: JSON.stringify({ email, role, grantPremium, sendWelcome })
       });
 
       const data = await response.json();
@@ -178,6 +180,36 @@ export function AddUserDialog({ isOpen, onClose, onUserCreated }: AddUserDialogP
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-amber-500/50 disabled:opacity-50"
                 />
               </div>
+            </div>
+
+            {/* Role Selector */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setRole('user')}
+                disabled={isSubmitting}
+                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  role === 'user'
+                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-500'
+                    : 'bg-muted/30 hover:bg-muted'
+                } disabled:opacity-50`}
+              >
+                <UserPlus className="h-4 w-4" />
+                User
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('admin')}
+                disabled={isSubmitting}
+                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  role === 'admin'
+                    ? 'border-rose-500 bg-rose-500/10 text-rose-500'
+                    : 'bg-muted/30 hover:bg-muted'
+                } disabled:opacity-50`}
+              >
+                <Shield className="h-4 w-4" />
+                Admin
+              </button>
             </div>
 
             {/* Premium Toggle */}

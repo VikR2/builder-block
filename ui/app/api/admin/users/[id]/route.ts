@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { getUserById, deleteUser } from '@/lib/auth/db';
+import { stripe, isStripeConfigured } from '@/lib/stripe';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -43,7 +44,30 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Cannot delete admin accounts' }, { status: 400 });
     }
 
-    // Delete the user
+    if (user.stripe_customer_id) {
+      if (!isStripeConfigured()) {
+        return NextResponse.json(
+          { error: 'Stripe is not configured; cannot safely delete a Stripe subscriber' },
+          { status: 500 }
+        );
+      }
+
+      const subscriptions = await stripe.subscriptions.list({
+        customer: user.stripe_customer_id,
+        status: 'all',
+        limit: 10,
+      });
+
+      const activeSubscriptions = subscriptions.data.filter(subscription =>
+        ['active', 'trialing', 'past_due', 'unpaid'].includes(subscription.status)
+      );
+
+      for (const subscription of activeSubscriptions) {
+        await stripe.subscriptions.cancel(subscription.id);
+      }
+    }
+
+    // Delete the local user after any billable Stripe subscriptions are canceled
     const deleted = deleteUser(userId);
 
     if (!deleted) {

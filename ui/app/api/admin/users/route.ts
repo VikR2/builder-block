@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, grantPremium, sendWelcome } = body;
+    const { email, grantPremium, sendWelcome, role = 'user' } = body;
 
     // Validate email
     if (!email || typeof email !== 'string') {
@@ -138,6 +138,10 @@ export async function POST(request: NextRequest) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+    }
+
+    if (role !== 'user' && role !== 'admin') {
+      return NextResponse.json({ error: 'Role must be user or admin' }, { status: 400 });
     }
 
     // Check if user already exists
@@ -151,6 +155,16 @@ export async function POST(request: NextRequest) {
 
     // Mark email as verified since admin is creating the account
     updateUserEmailVerified(newUser.id);
+
+    const db = getAuthDb();
+
+    if (role === 'admin') {
+      db.prepare(`
+        UPDATE users
+        SET role = 'admin', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(newUser.id);
+    }
 
     // Grant premium if requested
     if (grantPremium) {
@@ -171,7 +185,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch the complete user with updated fields
-    const db = getAuthDb();
     const user = db.prepare(`
       SELECT
         u.id,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Crown, Mail, MailCheck, Check, X, ChevronLeft, ChevronRight, UserPlus, Gift, CreditCard, Trash2 } from 'lucide-react';
+import { Search, Crown, Mail, MailCheck, Check, X, ChevronLeft, ChevronRight, UserPlus, Gift, CreditCard, Trash2, RotateCcw } from 'lucide-react';
 import { AddUserDialog } from './add-user-dialog';
 import { DeleteUserDialog } from './delete-user-dialog';
 
@@ -38,8 +38,10 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
+  const [refundingUserId, setRefundingUserId] = useState<number | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteDialogUser, setDeleteDialogUser] = useState<User | null>(null);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const handleUserCreated = (newUser: User) => {
     // Add new user to the top of the list
@@ -109,6 +111,39 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
     }
   };
 
+  const refundLatestPayment = async (user: User) => {
+    const confirmed = window.confirm(
+      `Refund the latest paid Stripe invoice for ${user.email}? This does not cancel the subscription.`
+    );
+
+    if (!confirmed) return;
+
+    setNotice(null);
+    setRefundingUserId(user.id);
+
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}/refund`, {
+        method: 'POST'
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setNotice({ type: 'error', message: data.error || 'Failed to refund payment' });
+        return;
+      }
+
+      const amount = (data.refund.amount / 100).toLocaleString('en-US', {
+        style: 'currency',
+        currency: data.refund.currency.toUpperCase()
+      });
+      setNotice({ type: 'success', message: `Refund created for ${amount}.` });
+    } catch (error) {
+      setNotice({ type: 'error', message: 'Network error. Please try again.' });
+    } finally {
+      setRefundingUserId(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -147,6 +182,18 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
           Add User
         </button>
       </div>
+
+      {notice && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            notice.type === 'success'
+              ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'
+              : 'border-rose-500/20 bg-rose-500/10 text-rose-500'
+          }`}
+        >
+          {notice.message}
+        </div>
+      )}
 
       {/* Add User Dialog */}
       <AddUserDialog
@@ -304,6 +351,23 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
                             title="Delete user"
                           >
                             <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                        {user.hasStripeSubscription && (
+                          <button
+                            onClick={() => refundLatestPayment(user)}
+                            disabled={refundingUserId === user.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-sky-500/20 text-sky-500 hover:bg-sky-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Refund latest Stripe payment"
+                          >
+                            {refundingUserId === user.id ? (
+                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <>
+                                <RotateCcw className="h-4 w-4" />
+                                Refund
+                              </>
+                            )}
                           </button>
                         )}
                       </div>
