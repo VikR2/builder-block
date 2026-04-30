@@ -48,6 +48,154 @@ function clearStripeSubscriptionForUser(userId: number): void {
 }
 
 test.describe('Auth and billing smoke flows', () => {
+  test('keeps a new signup authenticated before starting checkout', async ({ page }) => {
+    let signedUp = false;
+    let checkoutRequested = false;
+
+    const newUser = {
+      id: 901,
+      email: 'new-subscriber@example.com',
+      role: 'user',
+      isPremium: false,
+      creditBalance: 0,
+      hasChatAccess: false,
+      hasStripeSubscription: false,
+      isAdmin: false,
+      emailVerified: false,
+    };
+
+    await page.route('**/api/auth/me', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ user: signedUp ? newUser : null }),
+      });
+    });
+
+    await page.route('**/api/auth/signup', async route => {
+      signedUp = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, user: newUser }),
+      });
+    });
+
+    await page.route('**/api/stripe/checkout', async route => {
+      checkoutRequested = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ url: 'http://localhost:3000/pricing?checkout-created=1' }),
+      });
+    });
+
+    await page.goto('/signup');
+    await page.getByLabel('Email').fill(newUser.email);
+    await page.getByLabel('Password', { exact: true }).fill('Password123');
+    await page.getByLabel('Confirm Password').fill('Password123');
+    await page.getByRole('button', { name: 'Create Account' }).click();
+
+    await expect(page).toHaveURL(/\/pricing$/);
+    await page.getByRole('button', { name: 'Subscribe Now' }).click();
+
+    await expect.poll(() => checkoutRequested).toBe(true);
+    await expect(page).toHaveURL(/\/pricing\?checkout-created=1$/);
+  });
+
+  test('keeps a login redirect authenticated before starting checkout', async ({ page }) => {
+    let loggedIn = false;
+    let checkoutRequested = false;
+
+    const user = {
+      id: 902,
+      email: 'returning-subscriber@example.com',
+      role: 'user',
+      isPremium: false,
+      creditBalance: 0,
+      hasChatAccess: false,
+      hasStripeSubscription: false,
+      isAdmin: false,
+      emailVerified: true,
+    };
+
+    await page.route('**/api/auth/me', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ user: loggedIn ? user : null }),
+      });
+    });
+
+    await page.route('**/api/auth/login', async route => {
+      loggedIn = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, user }),
+      });
+    });
+
+    await page.route('**/api/stripe/checkout', async route => {
+      checkoutRequested = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ url: 'http://localhost:3000/pricing?checkout-created=1' }),
+      });
+    });
+
+    await page.goto('/login?redirect=/pricing');
+    await page.getByLabel('Email').fill(user.email);
+    await page.getByLabel('Password').fill('Password123');
+    await page.getByRole('button', { name: 'Sign In' }).click();
+
+    await expect(page).toHaveURL(/\/pricing$/);
+    await page.getByRole('button', { name: 'Subscribe Now' }).click();
+
+    await expect.poll(() => checkoutRequested).toBe(true);
+    await expect(page).toHaveURL(/\/pricing\?checkout-created=1$/);
+  });
+
+  test('waits for premium activation on Stripe success before entering the library', async ({ page }) => {
+    let authChecks = 0;
+
+    const pendingUser = {
+      id: 903,
+      email: 'activating-subscriber@example.com',
+      role: 'user',
+      isPremium: false,
+      creditBalance: 0,
+      hasChatAccess: false,
+      hasStripeSubscription: false,
+      isAdmin: false,
+      emailVerified: true,
+    };
+
+    const premiumUser = {
+      ...pendingUser,
+      isPremium: true,
+      hasChatAccess: true,
+      hasStripeSubscription: true,
+    };
+
+    await page.route('**/api/auth/me', async route => {
+      authChecks += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ user: authChecks >= 2 ? premiumUser : pendingUser }),
+      });
+    });
+
+    await page.goto('/pricing?success=true&session_id=cs_test');
+
+    await expect(page.getByText('Payment complete. Activating your premium access...')).toBeVisible();
+    await expect(page.getByText('Your subscription is active. You have full access to all content.')).toBeVisible({
+      timeout: 5000,
+    });
+  });
+
   test('renders the login page without a prerender bailout', async ({ page }) => {
     await page.goto('/login');
 

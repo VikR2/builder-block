@@ -8,7 +8,8 @@ import { useAuth } from '@/lib/auth/context';
 function PricingContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user, loading: authLoading } = useAuth();
+  const [activationStatus, setActivationStatus] = useState<'checking' | 'active' | 'delayed'>('checking');
+  const { user, loading: authLoading, refresh } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -49,15 +50,66 @@ function PricingContent() {
     }
   };
 
-  // If success, redirect to the library after a moment
+  // After Stripe returns, wait for the webhook-backed premium state before entering paid content.
   useEffect(() => {
-    if (isSuccess) {
-      const timer = setTimeout(() => {
-        router.push('/tcm/library');
-      }, 3000);
-      return () => clearTimeout(timer);
+    if (!isSuccess) {
+      return;
     }
-  }, [isSuccess, router]);
+
+    let canceled = false;
+    let redirectTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const verifyPremiumAccess = async () => {
+      setActivationStatus('checking');
+
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        if (attempt > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+
+        if (canceled) {
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/auth/me', { cache: 'no-store' });
+
+          if (response.ok) {
+            const data = await response.json();
+
+            if (data.user?.isPremium) {
+              await refresh();
+
+              if (canceled) {
+                return;
+              }
+
+              setActivationStatus('active');
+              redirectTimer = setTimeout(() => {
+                router.push('/tcm/library');
+              }, 1200);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('Failed to verify premium activation:', err);
+        }
+      }
+
+      if (!canceled) {
+        setActivationStatus('delayed');
+      }
+    };
+
+    verifyPremiumAccess();
+
+    return () => {
+      canceled = true;
+      if (redirectTimer) {
+        clearTimeout(redirectTimer);
+      }
+    };
+  }, [isSuccess, refresh, router]);
 
   const features = [
     'Full access to video courses with synchronized transcripts',
@@ -73,17 +125,59 @@ function PricingContent() {
       <div className="container py-20 max-w-lg mx-auto text-center">
         <div className="bg-[#12121a] border border-green-500/20 rounded-2xl p-10">
           <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+            {activationStatus === 'checking' ? (
+              <div className="w-9 h-9 border-2 border-green-500/30 border-t-green-500 rounded-full animate-spin" />
+            ) : (
+              <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
           </div>
-          <h1 className="text-2xl font-bold text-white mb-3">Welcome to Premium!</h1>
-          <p className="text-neutral-400 mb-6">
-            Your subscription is now active. You have full access to all content.
-          </p>
-          <p className="text-sm text-neutral-500">
-            Redirecting you to the video library...
-          </p>
+          <h1 className="text-2xl font-bold text-white mb-3">
+            {activationStatus === 'delayed' ? 'Payment Received' : 'Welcome to Premium!'}
+          </h1>
+          {activationStatus === 'checking' && (
+            <>
+              <p className="text-neutral-400 mb-6">
+                Payment complete. Activating your premium access...
+              </p>
+              <p className="text-sm text-neutral-500">
+                This usually takes a few seconds.
+              </p>
+            </>
+          )}
+          {activationStatus === 'active' && (
+            <>
+              <p className="text-neutral-400 mb-6">
+                Your subscription is active. You have full access to all content.
+              </p>
+              <p className="text-sm text-neutral-500">
+                Redirecting you to the video library...
+              </p>
+            </>
+          )}
+          {activationStatus === 'delayed' && (
+            <>
+              <p className="text-neutral-400 mb-6">
+                Stripe confirmed the payment, and premium access is still finishing activation.
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  Refresh Status
+                </button>
+                <Link
+                  href="/account/subscription"
+                  className="px-6 py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  View Account
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );

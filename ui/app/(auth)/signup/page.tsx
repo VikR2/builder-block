@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth/context';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -12,6 +13,7 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
+  const { refresh } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +39,9 @@ export default function SignupPage() {
       if (!response.ok) {
         throw new Error(data.error || 'Signup failed');
       }
+
+      // Refresh auth context so pricing can immediately create checkout.
+      await refresh();
 
       // Redirect to pricing page after signup
       router.push('/pricing');

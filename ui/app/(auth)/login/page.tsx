@@ -53,6 +53,7 @@ function LoginContent() {
         throw new Error(data.error || 'Login failed');
       }
 
+      await refresh();
       router.push(redirect);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
