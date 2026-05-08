@@ -27,6 +27,9 @@ type WorkerResponse<T> = {
 const PROJECT_ROOT = join(process.cwd(), '..');
 const FAISS_WORKER_SCRIPT = join(PROJECT_ROOT, 'scripts', 'lib', 'faiss_search_worker.py');
 const VIDEOS_PATH = join(PROJECT_ROOT, 'data', 'local-videos');
+const PYTHON_EXECUTABLE = process.env.TCM_FAISS_PYTHON
+  || process.env.PYTHON_BIN
+  || (process.platform === 'win32' ? 'python' : 'python3');
 
 let worker: ChildProcessWithoutNullStreams | null = null;
 let workerReadyPromise: Promise<void> | null = null;
@@ -230,7 +233,7 @@ async function ensureWorker(): Promise<void> {
   }
 
   workerReadyPromise = new Promise<void>((resolve, reject) => {
-    const proc = spawn('python', [FAISS_WORKER_SCRIPT], {
+    const proc = spawn(PYTHON_EXECUTABLE, [FAISS_WORKER_SCRIPT], {
       cwd: PROJECT_ROOT,
       env: { ...process.env },
       stdio: ['pipe', 'pipe', 'pipe']
