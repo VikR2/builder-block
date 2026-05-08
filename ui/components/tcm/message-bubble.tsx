@@ -276,12 +276,19 @@ function renderAssistantContent(content: string): ReactNode[] {
 export function MessageBubble({ message, onSourceClick }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const primaryClip = message.primaryClip || message.videoClip;
-  const extraClips = (message.recommendedClips || []).filter((clip, index) => {
-    if (!primaryClip) return true;
-    if (index === 0 && clip.videoId === primaryClip.videoId && clip.startTime === primaryClip.startTime) {
+  const seenExtraClipVideos = new Set<string>();
+  const extraClips = (message.recommendedClips || []).filter((clip) => {
+    if (primaryClip && clip.videoId === primaryClip.videoId && clip.startTime === primaryClip.startTime) {
       return false;
     }
-    return clip.videoId !== primaryClip.videoId || clip.startTime !== primaryClip.startTime;
+
+    const videoKey = clip.videoId || clip.videoTitle.trim().toLowerCase();
+    if (seenExtraClipVideos.has(videoKey)) {
+      return false;
+    }
+
+    seenExtraClipVideos.add(videoKey);
+    return true;
   });
 
   return (
