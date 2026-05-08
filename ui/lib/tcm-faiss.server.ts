@@ -30,6 +30,8 @@ const VIDEOS_PATH = join(PROJECT_ROOT, 'data', 'local-videos');
 const PYTHON_EXECUTABLE = process.env.TCM_FAISS_PYTHON
   || process.env.PYTHON_BIN
   || (process.platform === 'win32' ? 'python' : 'python3');
+const WORKER_READY_TIMEOUT_MS = Number.parseInt(process.env.TCM_FAISS_READY_TIMEOUT_MS || '10000', 10);
+const WORKER_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.TCM_FAISS_REQUEST_TIMEOUT_MS || '15000', 10);
 
 let worker: ChildProcessWithoutNullStreams | null = null;
 let workerReadyPromise: Promise<void> | null = null;
@@ -156,6 +158,7 @@ function cleanupWorker(reason?: string) {
 
 function attachWorkerListeners(proc: ChildProcessWithoutNullStreams, markReady: () => void, markFailed: (error: Error) => void) {
   let stdoutBuffer = '';
+  let isReady = false;
 
   proc.stdout.on('data', (data) => {
     stdoutBuffer += data.toString();
@@ -170,6 +173,7 @@ function attachWorkerListeners(proc: ChildProcessWithoutNullStreams, markReady: 
         const payload = JSON.parse(line) as WorkerResponse<unknown> & { type?: string };
 
         if (payload.type === 'ready') {
+          isReady = true;
           markReady();
           continue;
         }
@@ -208,6 +212,9 @@ function attachWorkerListeners(proc: ChildProcessWithoutNullStreams, markReady: 
   });
 
   proc.on('close', (code) => {
+    if (!isReady) {
+      markFailed(new Error(`FAISS worker exited before ready with code ${code}`));
+    }
     cleanupWorker(`FAISS worker exited with code ${code}`);
   });
 }
@@ -233,6 +240,35 @@ async function ensureWorker(): Promise<void> {
   }
 
   workerReadyPromise = new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const readyTimer = setTimeout(() => {
+      const error = new Error(`FAISS worker did not become ready within ${WORKER_READY_TIMEOUT_MS}ms`);
+      markFailed(error);
+      cleanupWorker(error.message);
+    }, WORKER_READY_TIMEOUT_MS);
+
+    const markReadyOnce = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(readyTimer);
+      faissAvailable = true;
+      resolve();
+    };
+
+    const markFailed = (error: Error) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(readyTimer);
+      faissAvailable = false;
+      reject(error);
+    };
+
     const proc = spawn(PYTHON_EXECUTABLE, [FAISS_WORKER_SCRIPT], {
       cwd: PROJECT_ROOT,
       env: { ...process.env },
@@ -244,14 +280,8 @@ async function ensureWorker(): Promise<void> {
 
     attachWorkerListeners(
       proc,
-      () => {
-        faissAvailable = true;
-        resolve();
-      },
-      (error) => {
-        faissAvailable = false;
-        reject(error);
-      }
+      markReadyOnce,
+      markFailed
     );
   });
 
@@ -269,10 +299,27 @@ async function sendWorkerRequest<T>(payload: Record<string, unknown>): Promise<T
   const requestPayload = JSON.stringify({ id, ...payload });
 
   return new Promise<T>((resolve, reject) => {
-    pendingRequests.set(id, { resolve, reject });
+    const requestTimer = setTimeout(() => {
+      pendingRequests.delete(id);
+      const error = new Error(`FAISS worker request timed out after ${WORKER_REQUEST_TIMEOUT_MS}ms`);
+      reject(error);
+      cleanupWorker(error.message);
+    }, WORKER_REQUEST_TIMEOUT_MS);
+
+    pendingRequests.set(id, {
+      resolve: (value) => {
+        clearTimeout(requestTimer);
+        resolve(value);
+      },
+      reject: (reason) => {
+        clearTimeout(requestTimer);
+        reject(reason);
+      },
+    });
     worker!.stdin.write(`${requestPayload}\n`, (error) => {
       if (error) {
         pendingRequests.delete(id);
+        clearTimeout(requestTimer);
         reject(error);
       }
     });
