@@ -73,8 +73,12 @@ function getAppBaseUrl(request: NextRequest): string {
   return process.env.NEXT_PUBLIC_APP_URL?.trim() || request.nextUrl.origin;
 }
 
+export function buildAppUrl(request: NextRequest, path: string): URL {
+  return new URL(path, getAppBaseUrl(request));
+}
+
 function getGoogleRedirectUri(request: NextRequest): string {
-  return new URL('/api/auth/google/callback', getAppBaseUrl(request)).toString();
+  return buildAppUrl(request, '/api/auth/google/callback').toString();
 }
 
 function randomOAuthValue(): string {
@@ -137,7 +141,7 @@ export function buildLoginErrorRedirect(
   request: NextRequest,
   errorCode: string
 ): NextResponse {
-  const url = new URL('/login', request.url);
+  const url = buildAppUrl(request, '/login');
   url.searchParams.set('error', errorCode);
   const response = NextResponse.redirect(url);
   clearGoogleOAuthCookies(response);

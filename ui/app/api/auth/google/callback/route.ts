@@ -3,6 +3,7 @@ import { createSession } from '@/lib/auth';
 import { getSafeRedirectPath } from '@/lib/auth/redirects';
 import {
   buildLoginErrorRedirect,
+  buildAppUrl,
   clearGoogleOAuthCookies,
   getOrCreateGoogleUser,
   GOOGLE_OAUTH_NONCE_COOKIE,
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
     const user = getOrCreateGoogleUser(profile);
     await createSession(user.id);
 
-    const response = NextResponse.redirect(new URL(redirectPath, request.url));
+    const response = NextResponse.redirect(buildAppUrl(request, redirectPath));
     clearGoogleOAuthCookies(response);
     return response;
   } catch (error) {
