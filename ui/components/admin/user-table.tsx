@@ -11,10 +11,9 @@ interface User {
   emailVerified: boolean;
   role: string;
   manualPremium: boolean;
-  hasStripeSubscription: boolean;
+  hasPaidSubscription: boolean;
   subscriptionStatus: string | null;
   subscriptionEnd: string | null;
-  stripeCustomerId: string | null;
   isPremium: boolean;
   createdAt: string;
   updatedAt: string;
@@ -100,7 +99,7 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
         // Update local state
         setUsers(users.map(u =>
           u.id === userId
-            ? { ...u, manualPremium: !currentStatus, isPremium: !currentStatus || u.hasStripeSubscription }
+            ? { ...u, manualPremium: !currentStatus, isPremium: !currentStatus || u.hasPaidSubscription }
             : u
         ));
       }
@@ -113,7 +112,7 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
 
   const refundLatestPayment = async (user: User) => {
     const confirmed = window.confirm(
-      `Refund the latest paid Stripe invoice for ${user.email}? This does not cancel the subscription.`
+      `Refund the latest paid Whop payment for ${user.email}? This does not cancel the subscription.`
     );
 
     if (!confirmed) return;
@@ -132,7 +131,7 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
         return;
       }
 
-      const amount = (data.refund.amount / 100).toLocaleString('en-US', {
+      const amount = data.refund.amount.toLocaleString('en-US', {
         style: 'currency',
         currency: data.refund.currency.toUpperCase()
       });
@@ -287,7 +286,7 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
 
                     {/* Subscription */}
                     <td className="px-4 py-3">
-                      {user.hasStripeSubscription ? (
+                      {user.hasPaidSubscription ? (
                         <div className="text-sm">
                           <div className="flex items-center gap-1.5">
                             <CreditCard className="h-3.5 w-3.5 text-emerald-500" />
@@ -353,12 +352,12 @@ export function UserTable({ initialUsers, initialPagination }: UserTableProps) {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
-                        {user.hasStripeSubscription && (
+                        {user.hasPaidSubscription && (
                           <button
                             onClick={() => refundLatestPayment(user)}
                             disabled={refundingUserId === user.id}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-sky-500/20 text-sky-500 hover:bg-sky-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Refund latest Stripe payment"
+                            title="Refund latest Whop payment"
                           >
                             {refundingUserId === user.id ? (
                               <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />

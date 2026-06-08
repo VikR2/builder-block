@@ -5,15 +5,32 @@ import { attachSessionCookie, createSession, deleteSession } from '../helpers/se
 
 const DB_PATH = path.join(process.cwd(), '..', 'data', 'builder.db');
 
-function enableStripeSubscriptionForUser(userId: number, customerId: string): void {
+function ensureWhopSubscriptionColumns(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(subscriptions)').all() as Array<{ name: string }>;
+  const hasColumn = (name: string) => columns.some(column => column.name === name);
+
+  if (!hasColumn('provider')) {
+    db.exec("ALTER TABLE subscriptions ADD COLUMN provider TEXT DEFAULT 'legacy'");
+  }
+  if (!hasColumn('provider_latest_payment_id')) {
+    db.exec('ALTER TABLE subscriptions ADD COLUMN provider_latest_payment_id TEXT');
+  }
+  if (!hasColumn('provider_manage_url')) {
+    db.exec('ALTER TABLE subscriptions ADD COLUMN provider_manage_url TEXT');
+  }
+}
+
+function enableWhopSubscriptionForUser(userId: number): void {
   const db = new Database(DB_PATH);
 
   try {
+    ensureWhopSubscriptionColumns(db);
+
     db.prepare(`
       UPDATE users
-      SET stripe_customer_id = ?, manual_premium = 0, updated_at = CURRENT_TIMESTAMP
+      SET manual_premium = 0, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(customerId, userId);
+    `).run(userId);
 
     db.prepare(`
       INSERT INTO subscriptions (
@@ -23,25 +40,29 @@ function enableStripeSubscriptionForUser(userId: number, customerId: string): vo
         status,
         current_period_start,
         current_period_end,
-        cancel_at_period_end
+        cancel_at_period_end,
+        provider,
+        provider_latest_payment_id,
+        provider_manage_url
       )
-      VALUES (?, ?, ?, 'active', datetime('now'), datetime('now', '+30 day'), 0)
-    `).run(userId, `sub_test_${userId}`, 'price_test');
+      VALUES (?, ?, ?, 'active', datetime('now'), datetime('now', '+30 day'), 0, 'whop', ?, ?)
+    `).run(
+      userId,
+      `mem_test_${userId}`,
+      'plan_test',
+      `pay_test_${userId}`,
+      'http://localhost:3000/account?portal=1'
+    );
   } finally {
     db.close();
   }
 }
 
-function clearStripeSubscriptionForUser(userId: number): void {
+function clearWhopSubscriptionForUser(userId: number): void {
   const db = new Database(DB_PATH);
 
   try {
     db.prepare('DELETE FROM subscriptions WHERE user_id = ?').run(userId);
-    db.prepare(`
-      UPDATE users
-      SET stripe_customer_id = NULL, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(userId);
   } finally {
     db.close();
   }
@@ -59,7 +80,7 @@ test.describe('Auth and billing smoke flows', () => {
       isPremium: false,
       creditBalance: 0,
       hasChatAccess: false,
-      hasStripeSubscription: false,
+      hasPaidSubscription: false,
       isAdmin: false,
       emailVerified: false,
     };
@@ -81,7 +102,7 @@ test.describe('Auth and billing smoke flows', () => {
       });
     });
 
-    await page.route('**/api/stripe/checkout', async route => {
+    await page.route('**/api/whop/checkout', async route => {
       checkoutRequested = true;
       await route.fulfill({
         status: 200,
@@ -114,7 +135,7 @@ test.describe('Auth and billing smoke flows', () => {
       isPremium: false,
       creditBalance: 0,
       hasChatAccess: false,
-      hasStripeSubscription: false,
+      hasPaidSubscription: false,
       isAdmin: false,
       emailVerified: true,
     };
@@ -136,7 +157,7 @@ test.describe('Auth and billing smoke flows', () => {
       });
     });
 
-    await page.route('**/api/stripe/checkout', async route => {
+    await page.route('**/api/whop/checkout', async route => {
       checkoutRequested = true;
       await route.fulfill({
         status: 200,
@@ -157,7 +178,7 @@ test.describe('Auth and billing smoke flows', () => {
     await expect(page).toHaveURL(/\/pricing\?checkout-created=1$/);
   });
 
-  test('waits for premium activation on Stripe success before entering the library', async ({ page }) => {
+  test('waits for premium activation on Whop success before entering the library', async ({ page }) => {
     let authChecks = 0;
 
     const pendingUser = {
@@ -167,7 +188,7 @@ test.describe('Auth and billing smoke flows', () => {
       isPremium: false,
       creditBalance: 0,
       hasChatAccess: false,
-      hasStripeSubscription: false,
+      hasPaidSubscription: false,
       isAdmin: false,
       emailVerified: true,
     };
@@ -176,7 +197,7 @@ test.describe('Auth and billing smoke flows', () => {
       ...pendingUser,
       isPremium: true,
       hasChatAccess: true,
-      hasStripeSubscription: true,
+      hasPaidSubscription: true,
     };
 
     await page.route('**/api/auth/me', async route => {
@@ -213,7 +234,7 @@ test.describe('Auth and billing smoke flows', () => {
     await expect(page).toHaveURL(/\/login\?redirect=(?:%2F|\/)pricing$/);
   });
 
-  test('does not offer Stripe portal actions to manual premium users', async ({ page }) => {
+  test('does not offer Whop portal actions to manual premium users', async ({ page }) => {
     const sessionId = createSession(1);
 
     try {
@@ -224,25 +245,25 @@ test.describe('Auth and billing smoke flows', () => {
       await expect(page.getByRole('link', { name: 'Manage Subscription' })).toHaveCount(0);
 
       await page.goto('/account');
-      await expect(page.getByText(/not managed through the Stripe billing portal/i)).toBeVisible();
+      await expect(page.getByText(/not managed through the Whop billing portal/i)).toBeVisible();
       await expect(page.getByRole('link', { name: 'Manage Subscription' })).toHaveCount(0);
 
       await page.goto('/account/subscription');
       await expect(page.getByText(/there is no billing portal to open/i)).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Open Stripe Portal' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Open Whop Portal' })).toHaveCount(0);
     } finally {
       deleteSession(sessionId);
     }
   });
 
-  test('shows the Stripe portal action for Stripe-managed subscribers', async ({ page }) => {
+  test('shows the Whop portal action for Whop-managed subscribers', async ({ page }) => {
     const sessionId = createSession(2);
-    enableStripeSubscriptionForUser(2, 'cus_test_user_2');
+    enableWhopSubscriptionForUser(2);
 
     try {
       await attachSessionCookie(page, sessionId);
 
-      await page.route('/api/stripe/portal', async route => {
+      await page.route('/api/whop/portal', async route => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -251,12 +272,12 @@ test.describe('Auth and billing smoke flows', () => {
       });
 
       await page.goto('/account/subscription');
-      await expect(page.getByRole('button', { name: 'Open Stripe Portal' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Open Whop Portal' })).toBeVisible();
 
-      await page.getByRole('button', { name: 'Open Stripe Portal' }).click();
+      await page.getByRole('button', { name: 'Open Whop Portal' }).click();
       await expect(page).toHaveURL(/\/account\?portal=1$/);
     } finally {
-      clearStripeSubscriptionForUser(2);
+      clearWhopSubscriptionForUser(2);
       deleteSession(sessionId);
     }
   });

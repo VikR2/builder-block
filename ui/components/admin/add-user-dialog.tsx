@@ -15,10 +15,9 @@ interface User {
   emailVerified: boolean;
   role: string;
   manualPremium: boolean;
-  hasStripeSubscription: boolean;
+  hasPaidSubscription: boolean;
   subscriptionStatus: string | null;
   subscriptionEnd: string | null;
-  stripeCustomerId: string | null;
   isPremium: boolean;
   createdAt: string;
   updatedAt: string;

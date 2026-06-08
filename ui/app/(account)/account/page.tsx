@@ -76,8 +76,8 @@ export default function AccountPage() {
         </div>
       </div>
 
-      {/* Subscription Section (for Stripe-managed subscriptions) */}
-      {user.hasStripeSubscription && (
+      {/* Subscription Section (for paid subscriptions) */}
+      {user.hasPaidSubscription && (
         <div className="bg-[#12121a] border border-neutral-800 rounded-xl p-6 mb-6">
           <h2 className="text-lg font-semibold text-white mb-4">Subscription</h2>
 
@@ -97,13 +97,13 @@ export default function AccountPage() {
         </div>
       )}
 
-      {/* Premium access that is not managed through Stripe */}
-      {user.isPremium && !user.hasStripeSubscription && (
+      {/* Premium access that is not managed through Whop */}
+      {user.isPremium && !user.hasPaidSubscription && (
         <div className="bg-[#12121a] border border-amber-500/20 rounded-xl p-6 mb-6">
           <h2 className="text-lg font-semibold text-white mb-4">Premium Access</h2>
 
           <p className="text-neutral-400">
-            Your premium access is active, but it is not managed through the Stripe billing portal.
+            Your premium access is active, but it is not managed through the Whop billing portal.
             If you need billing help or access changes, please contact support.
           </p>
         </div>

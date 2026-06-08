@@ -31,7 +31,7 @@ function PricingContent() {
     setError(null);
 
     try {
-      const response = await fetch('/api/stripe/checkout', {
+      const response = await fetch('/api/whop/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -42,7 +42,7 @@ function PricingContent() {
         throw new Error(data.error || 'Failed to create checkout session');
       }
 
-      // Redirect to Stripe Checkout
+      // Redirect to Whop Checkout
       window.location.href = data.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -50,7 +50,7 @@ function PricingContent() {
     }
   };
 
-  // After Stripe returns, wait for the webhook-backed premium state before entering paid content.
+  // After Whop returns, wait for the webhook-backed premium state before entering paid content.
   useEffect(() => {
     if (!isSuccess) {
       return;
@@ -116,7 +116,7 @@ function PricingContent() {
     'Complete trading skills library with code snippets',
     'AI-powered Knowledge Bot for instant answers',
     'Comprehensive trading documentation and platform resources',
-    'Pine Script and NinjaTrader C# code examples',
+    'Pine Script examples and implementation notes',
     'New content added regularly',
   ];
 
@@ -159,7 +159,7 @@ function PricingContent() {
           {activationStatus === 'delayed' && (
             <>
               <p className="text-neutral-400 mb-6">
-                Stripe confirmed the payment, and premium access is still finishing activation.
+                Whop confirmed the payment, and premium access is still finishing activation.
               </p>
               <div className="flex flex-col gap-3">
                 <button
@@ -203,7 +203,7 @@ function PricingContent() {
             >
               Browse Video Courses
             </Link>
-            {user.hasStripeSubscription ? (
+            {user.hasPaidSubscription ? (
               <Link
                 href="/account/subscription"
                 className="px-6 py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-lg transition-colors"

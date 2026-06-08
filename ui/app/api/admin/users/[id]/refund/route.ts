@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser, getAuthDb } from '@/lib/auth';
-import { stripe, isStripeConfigured } from '@/lib/stripe';
+import { requireAdminApi } from '@/lib/security/api';
+import { getWhopClient, isWhopConfigured, WHOP_PROVIDER } from '@/lib/whop';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,9 +9,42 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+async function findLatestRefundablePaymentId(
+  userEmail: string,
+  membershipId: string
+): Promise<string | null> {
+  const companyId = process.env.WHOP_COMPANY_ID;
+  if (!companyId) {
+    return null;
+  }
+
+  const queries = [membershipId, userEmail];
+  for (const query of queries) {
+    for await (const payment of getWhopClient().payments.list({
+      company_id: companyId,
+      query,
+      statuses: ['paid'],
+      order: 'paid_at',
+      direction: 'desc',
+      first: 10,
+    })) {
+      if (payment.refundable) {
+        return payment.id;
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function POST(request: NextRequest, context: RouteContext) {
+  const guard = await requireAdminApi(request);
+  if (!guard.ok) {
+    return guard.response;
+  }
+
   try {
-    if (!isStripeConfigured()) {
+    if (!isWhopConfigured()) {
       return NextResponse.json(
         { error: 'Payment system is not configured' },
         { status: 500 }
@@ -38,110 +72,78 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     try {
       const user = db.prepare(`
-        SELECT id, email, stripe_customer_id
+        SELECT id, email
         FROM users
         WHERE id = ?
       `).get(userId) as {
         id: number;
         email: string;
-        stripe_customer_id: string | null;
       } | undefined;
 
       if (!user) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
 
-      if (!user.stripe_customer_id) {
-        return NextResponse.json(
-          { error: 'User does not have a Stripe customer record' },
-          { status: 400 }
-        );
-      }
-
       const subscription = db.prepare(`
-        SELECT stripe_subscription_id
+        SELECT stripe_subscription_id, provider, provider_latest_payment_id
         FROM subscriptions
         WHERE user_id = ? AND status IN ('active', 'trialing', 'past_due')
         ORDER BY created_at DESC
         LIMIT 1
-      `).get(userId) as { stripe_subscription_id: string } | undefined;
+      `).get(userId) as {
+        stripe_subscription_id: string;
+        provider: string | null;
+        provider_latest_payment_id: string | null;
+      } | undefined;
 
       if (!subscription) {
         return NextResponse.json(
-          { error: 'User does not have an active Stripe subscription' },
+          { error: 'User does not have an active paid subscription' },
           { status: 400 }
         );
       }
 
-      const invoices = await stripe.invoices.list({
-        customer: user.stripe_customer_id,
-        subscription: subscription.stripe_subscription_id,
-        limit: 10,
-      });
-
-      const paidInvoice = invoices.data.find(invoice => invoice.status === 'paid' && invoice.amount_paid > 0);
-
-      if (!paidInvoice) {
+      if (subscription.provider !== WHOP_PROVIDER) {
         return NextResponse.json(
-          { error: 'No paid invoice found to refund' },
+          { error: 'Subscription is not managed through Whop' },
           { status: 400 }
         );
       }
 
-      const paymentIntentId =
-        typeof paidInvoice.payment_intent === 'string'
-          ? paidInvoice.payment_intent
-          : paidInvoice.payment_intent?.id;
+      const paymentId =
+        subscription.provider_latest_payment_id ||
+        await findLatestRefundablePaymentId(user.email, subscription.stripe_subscription_id);
 
-      if (!paymentIntentId) {
+      if (!paymentId) {
         return NextResponse.json(
-          { error: 'Paid invoice does not have a refundable payment intent' },
+          { error: 'No Whop payment found to refund' },
           { status: 400 }
         );
       }
 
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      const chargeId =
-        typeof paymentIntent.latest_charge === 'string'
-          ? paymentIntent.latest_charge
-          : paymentIntent.latest_charge?.id;
+      const payment = await getWhopClient().payments.retrieve(paymentId);
+      const refundableAmount = Math.max(
+        (payment.total ?? payment.settlement_amount ?? 0) - (payment.refunded_amount ?? 0),
+        0
+      );
 
-      if (!chargeId) {
+      if (!payment.refundable || refundableAmount <= 0) {
         return NextResponse.json(
-          { error: 'Payment intent does not have a refundable charge' },
+          { error: 'Latest paid Whop payment has already been fully refunded' },
           { status: 400 }
         );
       }
 
-      const charge = await stripe.charges.retrieve(chargeId);
-      const refundableAmount = charge.amount - charge.amount_refunded;
-
-      if (!charge.paid || refundableAmount <= 0) {
-        return NextResponse.json(
-          { error: 'Latest paid charge has already been fully refunded' },
-          { status: 400 }
-        );
-      }
-
-      const refund = await stripe.refunds.create({
-        charge: charge.id,
-        amount: refundableAmount,
-        metadata: {
-          userId: user.id.toString(),
-          adminUserId: currentUser.id.toString(),
-          invoiceId: paidInvoice.id,
-        },
-      });
+      const refund = await getWhopClient().payments.refund(paymentId);
 
       return NextResponse.json({
         success: true,
         refund: {
           id: refund.id,
           status: refund.status,
-          amount: refund.amount,
+          amount: refundableAmount,
           currency: refund.currency,
-          chargeId: charge.id,
-          invoiceId: paidInvoice.id,
+          paymentId,
         },
       });
     } finally {

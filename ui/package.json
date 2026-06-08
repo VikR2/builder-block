@@ -13,6 +13,7 @@
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@whop/sdk": "^0.0.40",
     "bcrypt": "^5.1.1",
     "better-sqlite3": "^11.0.0",
     "class-variance-authority": "^0.7.1",
@@ -26,7 +27,6 @@
     "react-dropzone": "^14.3.8",
     "resend": "^3.5.0",
     "shiki": "^1.24.2",
-    "stripe": "^14.25.0",
     "tailwind-merge": "^2.6.0",
     "uuid": "^9.0.1"
   },

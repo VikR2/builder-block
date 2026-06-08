@@ -24,13 +24,13 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
-      - key: STRIPE_SECRET_KEY
+      - key: WHOP_API_KEY
         sync: false
-      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+      - key: WHOP_PLAN_ID
         sync: false
-      - key: STRIPE_PRICE_ID
+      - key: WHOP_COMPANY_ID
         sync: false
-      - key: STRIPE_WEBHOOK_SECRET
+      - key: WHOP_WEBHOOK_SECRET
         sync: false
       - key: OPENAI_API_KEY
         sync: false

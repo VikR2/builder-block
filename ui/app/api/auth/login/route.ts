@@ -6,8 +6,18 @@ import {
   getActiveSubscriptionByUserId,
   getUserCreditBalance,
 } from '@/lib/auth';
+import { enforceRateLimit } from '@/lib/security/api';
 
 export async function POST(request: NextRequest) {
+  const rateLimitError = enforceRateLimit(request, {
+    scope: 'auth-login',
+    limit: 10,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (rateLimitError) {
+    return rateLimitError;
+  }
+
   try {
     const body = await request.json();
     const { email, password } = body;
@@ -63,7 +73,7 @@ export async function POST(request: NextRequest) {
         isPremium,
         creditBalance,
         hasChatAccess: isAdmin || isPremium || creditBalance > 0,
-        hasStripeSubscription: !!subscription,
+        hasPaidSubscription: !!subscription,
         isAdmin,
         emailVerified: user.email_verified === 1,
       },

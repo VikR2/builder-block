@@ -113,12 +113,12 @@ https://builder-block-ui.onrender.com
 - `EMAIL_FROM`
 - `RESEND_API_KEY`
 
-### Stripe
+### Whop
 
-- `STRIPE_SECRET_KEY`
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-- `STRIPE_PRICE_ID`
-- `STRIPE_WEBHOOK_SECRET`
+- `WHOP_API_KEY`
+- `WHOP_PLAN_ID`
+- `WHOP_COMPANY_ID`
+- `WHOP_WEBHOOK_SECRET`
 
 ### LLM / chat
 
@@ -216,21 +216,21 @@ If uploads matter for today’s release:
 3. Confirm video detail page loads
 4. Confirm transcript/lesson artifacts complete
 
-## 9. Stripe Webhook Setup
+## 9. Whop Webhook Setup
 
-After the app is live, add the real Render production URL to Stripe.
+After the app is live, add the real Render production URL to Whop.
 
-Create a webhook endpoint in Stripe:
+Create a webhook endpoint in Whop:
 
 ```text
-https://YOUR-RENDER-HOST/api/stripe/webhooks
+https://YOUR-RENDER-HOST/api/whop/webhooks
 ```
 
-Subscribe it to the relevant subscription events already handled by the app.
+Subscribe it to `payment.succeeded`, `membership.activated`, `membership.deactivated`, and `membership.cancel_at_period_end_changed`.
 
 Then copy the webhook signing secret into:
 
-- `STRIPE_WEBHOOK_SECRET`
+- `WHOP_WEBHOOK_SECRET`
 
 ## 10. Custom Domain
 

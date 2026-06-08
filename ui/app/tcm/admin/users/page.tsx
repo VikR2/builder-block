@@ -10,7 +10,6 @@ interface UserRow {
   email_verified: number;
   role: string;
   manual_premium: number;
-  stripe_customer_id: string | null;
   created_at: string;
   updated_at: string;
   subscription_status: string | null;
@@ -38,7 +37,6 @@ export default function AdminUsersPage() {
       u.email_verified,
       u.role,
       u.manual_premium,
-      u.stripe_customer_id,
       u.created_at,
       u.updated_at,
       s.status as subscription_status,
@@ -55,10 +53,9 @@ export default function AdminUsersPage() {
     emailVerified: u.email_verified === 1,
     role: u.role,
     manualPremium: u.manual_premium === 1,
-    hasStripeSubscription: u.subscription_status === 'active' || u.subscription_status === 'trialing',
+    hasPaidSubscription: u.subscription_status === 'active' || u.subscription_status === 'trialing',
     subscriptionStatus: u.subscription_status,
     subscriptionEnd: u.subscription_end,
-    stripeCustomerId: u.stripe_customer_id,
     isPremium: u.manual_premium === 1 || u.subscription_status === 'active' || u.subscription_status === 'trialing',
     createdAt: u.created_at,
     updatedAt: u.updated_at

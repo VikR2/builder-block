@@ -1,19 +1,32 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { createCheckoutSession, isStripeConfigured } from '@/lib/stripe';
 import { getUserById } from '@/lib/auth/db';
+import { enforceRateLimit, requireSameOrigin } from '@/lib/security/api';
+import { createCheckoutSession, isWhopConfigured } from '@/lib/whop';
 
-export async function POST() {
+export async function POST(request: Request) {
+  const originError = requireSameOrigin(request);
+  if (originError) {
+    return originError;
+  }
+
+  const rateLimitError = enforceRateLimit(request, {
+    scope: 'whop-checkout',
+    limit: 10,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (rateLimitError) {
+    return rateLimitError;
+  }
+
   try {
-    // Check if Stripe is configured
-    if (!isStripeConfigured()) {
+    if (!isWhopConfigured()) {
       return NextResponse.json(
         { error: 'Payment system is not configured' },
         { status: 500 }
       );
     }
 
-    // Get current user
     const authUser = await getCurrentUser();
 
     if (!authUser) {
@@ -23,7 +36,6 @@ export async function POST() {
       );
     }
 
-    // Get full user data including stripe_customer_id
     const user = getUserById(authUser.id);
 
     if (!user) {
@@ -33,7 +45,6 @@ export async function POST() {
       );
     }
 
-    // Check if already premium
     if (authUser.isPremium) {
       return NextResponse.json(
         { error: 'You already have an active subscription' },
@@ -41,16 +52,14 @@ export async function POST() {
       );
     }
 
-    // Create checkout session
     const checkoutUrl = await createCheckoutSession({
       userId: user.id,
       email: user.email,
-      stripeCustomerId: user.stripe_customer_id,
     });
 
     return NextResponse.json({ url: checkoutUrl });
   } catch (error) {
-    console.error('Checkout error:', error);
+    console.error('Whop checkout error:', error);
     return NextResponse.json(
       { error: 'Failed to create checkout session' },
       { status: 500 }

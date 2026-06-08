@@ -118,7 +118,7 @@ export function UserMenu() {
               Account
             </Link>
 
-            {user.hasStripeSubscription && (
+            {user.hasPaidSubscription && (
               <Link
                 href="/account/subscription"
                 onClick={() => setIsOpen(false)}

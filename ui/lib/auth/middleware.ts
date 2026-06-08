@@ -9,7 +9,7 @@ export interface AuthUser {
   isPremium: boolean;
   creditBalance: number;
   hasChatAccess: boolean;
-  hasStripeSubscription: boolean;
+  hasPaidSubscription: boolean;
   isAdmin: boolean;
   emailVerified: boolean;
 }
@@ -27,7 +27,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   const { user } = session;
 
   // Check if user has premium access
-  // Premium = manual_premium OR active Stripe subscription
+  // Premium = manual_premium OR active paid subscription
   const hasManualPremium = user.manual_premium === 1;
   const subscription = getActiveSubscriptionByUserId(user.id);
   const hasActiveSubscription = subscription !== undefined;
@@ -42,7 +42,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     isPremium,
     creditBalance,
     hasChatAccess: isAdmin || isPremium || creditBalance > 0,
-    hasStripeSubscription: hasActiveSubscription,
+    hasPaidSubscription: hasActiveSubscription,
     isAdmin,
     emailVerified: user.email_verified === 1,
   };

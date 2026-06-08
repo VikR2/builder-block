@@ -10,7 +10,7 @@ export interface ClientUser {
   isPremium: boolean;
   creditBalance: number;
   hasChatAccess: boolean;
-  hasStripeSubscription: boolean;
+  hasPaidSubscription: boolean;
   isAdmin: boolean;
   emailVerified: boolean;
 }

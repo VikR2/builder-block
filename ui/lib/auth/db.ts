@@ -11,6 +11,25 @@ function getRawAuthDb() {
   return new Database(DB_PATH);
 }
 
+function runMigrationIfExists(db: ReturnType<typeof getRawAuthDb>, filename: string) {
+  const migrationPath = join(MIGRATIONS_PATH, filename);
+  if (existsSync(migrationPath)) {
+    db.exec(readFileSync(migrationPath, 'utf-8'));
+  }
+}
+
+function ensureColumn(
+  db: ReturnType<typeof getRawAuthDb>,
+  tableName: string,
+  columnName: string,
+  definition: string
+) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all() as { name: string }[];
+  if (!columns.some((column) => column.name === columnName)) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
+}
+
 // Get writable database connection
 export function getAuthDb() {
   ensureAuthTables();
@@ -25,15 +44,17 @@ export function ensureAuthTables() {
   const db = getRawAuthDb();
 
   try {
-    const authMigrationPath = join(MIGRATIONS_PATH, '020_add_auth_tables.sql');
-    if (existsSync(authMigrationPath)) {
-      db.exec(readFileSync(authMigrationPath, 'utf-8'));
-    }
+    runMigrationIfExists(db, '020_add_auth_tables.sql');
+    runMigrationIfExists(db, '021_add_user_credits.sql');
+    runMigrationIfExists(db, '022_add_stripe_webhook_events.sql');
+    runMigrationIfExists(db, '043_add_whop_payment_metadata.sql');
 
-    const creditMigrationPath = join(MIGRATIONS_PATH, '021_add_user_credits.sql');
-    if (existsSync(creditMigrationPath)) {
-      db.exec(readFileSync(creditMigrationPath, 'utf-8'));
-    }
+    ensureColumn(db, 'subscriptions', 'last_stripe_event_created', 'INTEGER DEFAULT 0');
+    ensureColumn(db, 'subscriptions', 'last_stripe_event_id', 'TEXT');
+    ensureColumn(db, 'subscriptions', 'last_stripe_event_type', 'TEXT');
+    ensureColumn(db, 'subscriptions', 'provider', "TEXT DEFAULT 'legacy'");
+    ensureColumn(db, 'subscriptions', 'provider_latest_payment_id', 'TEXT');
+    ensureColumn(db, 'subscriptions', 'provider_manage_url', 'TEXT');
 
     authTablesEnsured = true;
   } finally {
@@ -66,10 +87,16 @@ export interface Subscription {
   user_id: number;
   stripe_subscription_id: string;
   stripe_price_id: string;
-  status: 'active' | 'past_due' | 'canceled' | 'trialing';
+  status: string;
   current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: number;
+  last_stripe_event_created: number | null;
+  last_stripe_event_id: string | null;
+  last_stripe_event_type: string | null;
+  provider: string | null;
+  provider_latest_payment_id: string | null;
+  provider_manage_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -98,6 +125,19 @@ export interface CreditSeedOptions {
   onlyZeroBalance?: boolean;
   reason?: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface PaymentSyncEventMeta {
+  id: string;
+  type: string;
+  created: number;
+}
+
+export interface PaymentWebhookEventMeta {
+  provider: string;
+  id: string;
+  type: string;
+  created: string;
 }
 
 export interface AuthToken {
@@ -170,19 +210,6 @@ export function updateUserEmailVerified(userId: number): void {
   }
 }
 
-export function updateUserStripeCustomerId(userId: number, stripeCustomerId: string): void {
-  const db = getAuthDb();
-  try {
-    db.prepare(`
-      UPDATE users
-      SET stripe_customer_id = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(stripeCustomerId, userId);
-  } finally {
-    db.close();
-  }
-}
-
 export function updateUserManualPremium(userId: number, manualPremium: boolean): void {
   const db = getAuthDb();
   try {
@@ -191,15 +218,6 @@ export function updateUserManualPremium(userId: number, manualPremium: boolean):
       SET manual_premium = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(manualPremium ? 1 : 0, userId);
-  } finally {
-    db.close();
-  }
-}
-
-export function getUserByStripeCustomerId(stripeCustomerId: string): User | undefined {
-  const db = getAuthDb();
-  try {
-    return db.prepare('SELECT * FROM users WHERE stripe_customer_id = ?').get(stripeCustomerId) as User | undefined;
   } finally {
     db.close();
   }
@@ -262,24 +280,54 @@ export function createSubscription(
   stripePriceId: string,
   status: string,
   currentPeriodStart: string | null,
-  currentPeriodEnd: string | null
+  currentPeriodEnd: string | null,
+  eventMeta?: PaymentSyncEventMeta,
+  provider: string = 'legacy',
+  providerLatestPaymentId: string | null = null,
+  providerManageUrl: string | null = null
 ): Subscription {
   const db = getAuthDb();
   try {
     db.prepare(`
-      INSERT INTO subscriptions (user_id, stripe_subscription_id, stripe_price_id, status, current_period_start, current_period_end)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(userId, stripeSubscriptionId, stripePriceId, status, currentPeriodStart, currentPeriodEnd);
+      INSERT INTO subscriptions (
+        user_id,
+        stripe_subscription_id,
+        stripe_price_id,
+        status,
+        current_period_start,
+        current_period_end,
+        last_stripe_event_created,
+        last_stripe_event_id,
+        last_stripe_event_type,
+        provider,
+        provider_latest_payment_id,
+        provider_manage_url
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      userId,
+      stripeSubscriptionId,
+      stripePriceId,
+      status,
+      currentPeriodStart,
+      currentPeriodEnd,
+      eventMeta?.created ?? 0,
+      eventMeta?.id ?? null,
+      eventMeta?.type ?? null,
+      provider,
+      providerLatestPaymentId,
+      providerManageUrl
+    );
     return db.prepare('SELECT * FROM subscriptions WHERE stripe_subscription_id = ?').get(stripeSubscriptionId) as Subscription;
   } finally {
     db.close();
   }
 }
 
-export function getSubscriptionByStripeId(stripeSubscriptionId: string): Subscription | undefined {
+export function getSubscriptionByProviderId(providerSubscriptionId: string): Subscription | undefined {
   const db = getAuthDb();
   try {
-    return db.prepare('SELECT * FROM subscriptions WHERE stripe_subscription_id = ?').get(stripeSubscriptionId) as Subscription | undefined;
+    return db.prepare('SELECT * FROM subscriptions WHERE stripe_subscription_id = ?').get(providerSubscriptionId) as Subscription | undefined;
   } finally {
     db.close();
   }
@@ -304,16 +352,65 @@ export function updateSubscription(
   status: string,
   currentPeriodStart: string | null,
   currentPeriodEnd: string | null,
-  cancelAtPeriodEnd: boolean
+  cancelAtPeriodEnd: boolean,
+  eventMeta?: PaymentSyncEventMeta,
+  provider: string = 'legacy',
+  providerLatestPaymentId?: string | null,
+  providerManageUrl?: string | null
 ): void {
   const db = getAuthDb();
   try {
     db.prepare(`
       UPDATE subscriptions
       SET status = ?, current_period_start = ?, current_period_end = ?,
-          cancel_at_period_end = ?, updated_at = CURRENT_TIMESTAMP
+          cancel_at_period_end = ?,
+          last_stripe_event_created = ?,
+          last_stripe_event_id = ?,
+          last_stripe_event_type = ?,
+          provider = ?,
+          provider_latest_payment_id = COALESCE(?, provider_latest_payment_id),
+          provider_manage_url = COALESCE(?, provider_manage_url),
+          updated_at = CURRENT_TIMESTAMP
       WHERE stripe_subscription_id = ?
-    `).run(status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd ? 1 : 0, stripeSubscriptionId);
+    `).run(
+      status,
+      currentPeriodStart,
+      currentPeriodEnd,
+      cancelAtPeriodEnd ? 1 : 0,
+      eventMeta?.created ?? 0,
+      eventMeta?.id ?? null,
+      eventMeta?.type ?? null,
+      provider,
+      providerLatestPaymentId ?? null,
+      providerManageUrl ?? null,
+      stripeSubscriptionId
+    );
+  } finally {
+    db.close();
+  }
+}
+
+export function claimPaymentWebhookEvent(eventMeta: PaymentWebhookEventMeta): boolean {
+  const db = getAuthDb();
+  try {
+    const result = db.prepare(`
+      INSERT OR IGNORE INTO payment_webhook_events (provider, id, event_type, event_created)
+      VALUES (?, ?, ?, ?)
+    `).run(eventMeta.provider, eventMeta.id, eventMeta.type, eventMeta.created);
+
+    return result.changes > 0;
+  } finally {
+    db.close();
+  }
+}
+
+export function releasePaymentWebhookEvent(provider: string, eventId: string): void {
+  const db = getAuthDb();
+  try {
+    db.prepare(`
+      DELETE FROM payment_webhook_events
+      WHERE provider = ? AND id = ?
+    `).run(provider, eventId);
   } finally {
     db.close();
   }

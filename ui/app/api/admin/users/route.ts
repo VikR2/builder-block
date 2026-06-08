@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser, getAuthDb } from '@/lib/auth';
 import { createUser, getUserByEmail, updateUserManualPremium, updateUserEmailVerified } from '@/lib/auth/db';
 import { sendWelcomeEmail } from '@/lib/auth/email';
+import { requireAdminApi } from '@/lib/security/api';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  const guard = await requireAdminApi(request);
+  if (!guard.ok) {
+    return guard.response;
+  }
+
   try {
     // Check admin authentication
     const user = await getCurrentUser();
@@ -47,7 +53,6 @@ export async function GET(request: NextRequest) {
         u.email_verified,
         u.role,
         u.manual_premium,
-        u.stripe_customer_id,
         u.created_at,
         u.updated_at,
         s.status as subscription_status,
@@ -72,7 +77,6 @@ export async function GET(request: NextRequest) {
       email_verified: number;
       role: string;
       manual_premium: number;
-      stripe_customer_id: string | null;
       created_at: string;
       updated_at: string;
       subscription_status: string | null;
@@ -86,10 +90,9 @@ export async function GET(request: NextRequest) {
       emailVerified: u.email_verified === 1,
       role: u.role,
       manualPremium: u.manual_premium === 1,
-      hasStripeSubscription: u.subscription_status === 'active' || u.subscription_status === 'trialing',
+      hasPaidSubscription: u.subscription_status === 'active' || u.subscription_status === 'trialing',
       subscriptionStatus: u.subscription_status,
       subscriptionEnd: u.subscription_end,
-      stripeCustomerId: u.stripe_customer_id,
       isPremium: u.manual_premium === 1 || u.subscription_status === 'active' || u.subscription_status === 'trialing',
       createdAt: u.created_at,
       updatedAt: u.updated_at
@@ -115,6 +118,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/admin/users - Create a new user (admin only)
 export async function POST(request: NextRequest) {
+  const guard = await requireAdminApi(request);
+  if (!guard.ok) {
+    return guard.response;
+  }
+
   try {
     // Check admin authentication
     const currentUser = await getCurrentUser();
@@ -192,7 +200,6 @@ export async function POST(request: NextRequest) {
         u.email_verified,
         u.role,
         u.manual_premium,
-        u.stripe_customer_id,
         u.created_at,
         u.updated_at,
         s.status as subscription_status,
@@ -206,7 +213,6 @@ export async function POST(request: NextRequest) {
       email_verified: number;
       role: string;
       manual_premium: number;
-      stripe_customer_id: string | null;
       created_at: string;
       updated_at: string;
       subscription_status: string | null;
@@ -221,10 +227,9 @@ export async function POST(request: NextRequest) {
         emailVerified: user.email_verified === 1,
         role: user.role,
         manualPremium: user.manual_premium === 1,
-        hasStripeSubscription: false,
+        hasPaidSubscription: false,
         subscriptionStatus: null,
         subscriptionEnd: null,
-        stripeCustomerId: null,
         isPremium: user.manual_premium === 1,
         createdAt: user.created_at,
         updatedAt: user.updated_at

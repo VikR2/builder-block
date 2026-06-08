@@ -97,7 +97,7 @@ For medium or high-risk changes:
 ### High-risk
 
 - database migrations
-- Stripe or billing changes
+- Whop or billing changes
 - credit accounting changes
 - embedding corpus rebuilds
 - file layout changes under `/app/data`
@@ -113,10 +113,10 @@ Production env vars are declared in [render.yaml](../render.yaml). At minimum, v
 - `NEXT_PUBLIC_BASE_URL`
 - `EMAIL_FROM`
 - `RESEND_API_KEY`
-- `STRIPE_SECRET_KEY`
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-- `STRIPE_PRICE_ID`
-- `STRIPE_WEBHOOK_SECRET`
+- `WHOP_API_KEY`
+- `WHOP_PLAN_ID`
+- `WHOP_COMPANY_ID`
+- `WHOP_WEBHOOK_SECRET`
 - `OPENAI_API_KEY`
 - `ANTHROPIC_API_KEY`
 - `GOOGLE_API_KEY` or `GEMINI_API_KEY`
@@ -180,7 +180,7 @@ After each production deploy:
 5. Send one Knowledge Bot question
 6. Confirm chat response, sources, and credits behavior
 7. Open `/pricing`
-8. Verify Stripe checkout loads
+8. Verify Whop checkout loads
 9. Open `/account/subscription`
 10. Open `/tcm/admin/videos`
 11. Confirm the admin users page loads

@@ -14,7 +14,7 @@ export default function SubscriptionPage() {
     setError(null);
 
     try {
-      const response = await fetch('/api/stripe/portal', {
+      const response = await fetch('/api/whop/portal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -25,7 +25,7 @@ export default function SubscriptionPage() {
         throw new Error(data.error || 'Failed to open subscription portal');
       }
 
-      // Redirect to Stripe Customer Portal
+      // Redirect to Whop membership management
       window.location.href = data.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -69,7 +69,7 @@ export default function SubscriptionPage() {
     );
   }
 
-  if (!user.hasStripeSubscription) {
+  if (!user.hasPaidSubscription) {
     return (
       <div className="container py-12 max-w-2xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
@@ -87,7 +87,7 @@ export default function SubscriptionPage() {
         <div className="bg-[#12121a] border border-amber-500/20 rounded-xl p-8">
           <h2 className="text-xl font-semibold text-white mb-3">Premium access is active</h2>
           <p className="text-neutral-400 mb-6">
-            This account has premium access, but it is not managed through Stripe, so there is no billing portal to open.
+            This account has premium access, but it is not managed through Whop, so there is no billing portal to open.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
@@ -147,7 +147,7 @@ export default function SubscriptionPage() {
         <h2 className="text-lg font-semibold text-white mb-4">Manage Subscription</h2>
 
         <p className="text-neutral-400 mb-6">
-          Use the Stripe Customer Portal to update your payment method, view invoices, or cancel your subscription.
+          Use Whop to update your payment method, view billing history, or cancel your subscription.
         </p>
 
         {error && (
@@ -174,7 +174,7 @@ export default function SubscriptionPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
-              Open Stripe Portal
+              Open Whop Portal
             </>
           )}
         </button>

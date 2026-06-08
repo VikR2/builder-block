@@ -9,13 +9,13 @@ export {
   getUserById,
   updateUserPassword,
   updateUserEmailVerified,
-  updateUserStripeCustomerId,
   updateUserManualPremium,
-  getUserByStripeCustomerId,
   createSubscription,
-  getSubscriptionByStripeId,
+  getSubscriptionByProviderId,
   getActiveSubscriptionByUserId,
   updateSubscription,
+  claimPaymentWebhookEvent,
+  releasePaymentWebhookEvent,
   getAllUsers,
   searchUsers,
   getUserCount,
@@ -28,9 +28,11 @@ export {
   type Session,
   type Subscription,
   type AuthToken,
+  type PaymentSyncEventMeta,
   type UserCreditAccount,
   type UserCreditTransaction,
   type UserWithSubscription,
+  type PaymentWebhookEventMeta,
 } from './db';
 
 // Password utilities

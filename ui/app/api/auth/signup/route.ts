@@ -10,8 +10,18 @@ import {
   buildEmailVerifyUrl,
   sendEmailVerificationEmail,
 } from '@/lib/auth';
+import { enforceRateLimit } from '@/lib/security/api';
 
 export async function POST(request: NextRequest) {
+  const rateLimitError = enforceRateLimit(request, {
+    scope: 'auth-signup',
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (rateLimitError) {
+    return rateLimitError;
+  }
+
   try {
     const body = await request.json();
     const { email, password } = body;
@@ -59,7 +69,7 @@ export async function POST(request: NextRequest) {
         isPremium: false,
         creditBalance: 0,
         hasChatAccess: false,
-        hasStripeSubscription: false,
+        hasPaidSubscription: false,
         isAdmin: false,
         emailVerified: false,
       },
