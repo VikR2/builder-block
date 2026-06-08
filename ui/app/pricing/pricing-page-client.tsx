@@ -114,9 +114,9 @@ export default function PricingPageClient() {
   const features = [
     'Invite-only TradingView indicator access managed through Whop',
     'TradingView username collected at checkout for access setup',
+    'Trade ideas, video walkthroughs, and practical guides for using the indicators',
     'Indicators designed to highlight range context, order flow, and key reaction areas',
     'Chart tools for spotting participation, absorption, and execution zones',
-    'Subscription access synced through the native Whop TradingView integration',
     'Cancel anytime from your account',
   ];
 
@@ -257,7 +257,7 @@ export default function PricingPageClient() {
 
             {/* Description */}
             <p className="text-neutral-400 mb-8">
-              The indicators help mark range context, order-flow cues, absorption, and key reaction zones so your chart read is cleaner and faster.
+              The indicators help mark range context, order-flow cues, absorption, and key reaction zones, with trade ideas, videos, and guides to help you apply them.
             </p>
 
             {/* Features */}
