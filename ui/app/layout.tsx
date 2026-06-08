@@ -6,7 +6,7 @@ import { MainNav } from "@/components/main-nav";
 
 export const metadata: Metadata = {
   title: "The Currency Merchant",
-  description: "Master trading concepts with TCM's comprehensive learning platform",
+  description: "Get access to The Currency Merchant TradingView indicators.",
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
                 <div className="ml-auto flex items-center gap-4">
                   <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs font-medium">
                     <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                    <span className="text-amber-500">Learning Active</span>
+                    <span className="text-amber-500">Indicator Access</span>
                   </div>
                   <UserMenu />
                 </div>
@@ -43,12 +43,11 @@ export default function RootLayout({
             <footer className="border-t border-amber-500/20 bg-background/95">
               <div className="container flex items-center justify-between h-14">
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-amber-500 font-medium">TCM</span> · Trading Education Platform
+                  <span className="text-amber-500 font-medium">TCM</span> · TradingView Indicator Access
                 </p>
                 <nav className="flex items-center gap-6 text-xs">
-                  <a href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+                  <a href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">Indicator Access</a>
                   <a href="/account" className="text-muted-foreground hover:text-foreground transition-colors">Account</a>
-                  <a href="/skills" className="text-muted-foreground hover:text-foreground transition-colors">Skills Library</a>
                   <span className="text-muted-foreground/50">|</span>
                   <span className="text-muted-foreground">v2.0</span>
                   <span className="text-amber-500">●</span>

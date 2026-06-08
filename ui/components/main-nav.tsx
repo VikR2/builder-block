@@ -39,27 +39,11 @@ export function MainNav() {
         )}
 
         <Link
-          href="/tcm"
+          href="/pricing"
           className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-amber-500/10 rounded-lg transition-all"
         >
-          <span className="text-violet-500 mr-1.5">&#9679;</span>
-          Knowledge Bot
-        </Link>
-
-        <Link
-          href="/tcm/library"
-          className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-amber-500/10 rounded-lg transition-all"
-        >
-          <span className="text-rose-500 mr-1.5">&#9654;</span>
-          Video Courses
-        </Link>
-
-        <Link
-          href="/skills"
-          className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-amber-500/10 rounded-lg transition-all"
-        >
-          <span className="text-emerald-500 mr-1.5">&#9670;</span>
-          Skills Library
+          <span className="text-emerald-500 mr-1.5">&#9679;</span>
+          Indicator Access
         </Link>
 
         {/* Admin - only for admin users */}
