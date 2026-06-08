@@ -248,6 +248,22 @@ export function updateUserManualPremium(userId: number, manualPremium: boolean):
   }
 }
 
+export function promoteUserToAdminOwner(userId: number): void {
+  const db = getAuthDb();
+  try {
+    db.prepare(`
+      UPDATE users
+      SET role = 'admin',
+          manual_premium = 1,
+          email_verified = 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(userId);
+  } finally {
+    db.close();
+  }
+}
+
 // Session queries
 export function createSession(sessionId: string, userId: number, expiresAt: Date): Session {
   const db = getAuthDb();

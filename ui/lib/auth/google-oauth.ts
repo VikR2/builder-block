@@ -7,6 +7,7 @@ import {
   getUserByGoogleSubject,
   getUserById,
   linkUserToGoogle,
+  promoteUserToAdminOwner,
   updateUserEmailVerified,
   type User,
 } from './db';
@@ -18,6 +19,7 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 const GOOGLE_SCOPE = 'openid email profile';
 const OAUTH_COOKIE_MAX_AGE_SECONDS = 10 * 60;
+const DEFAULT_OWNER_EMAIL = 'satvik.ramineni@gmail.com';
 
 export const GOOGLE_OAUTH_STATE_COOKIE = 'tcm_google_oauth_state';
 export const GOOGLE_OAUTH_NONCE_COOKIE = 'tcm_google_oauth_nonce';
@@ -79,6 +81,28 @@ export function buildAppUrl(request: NextRequest, path: string): URL {
 
 function getGoogleRedirectUri(request: NextRequest): string {
   return buildAppUrl(request, '/api/auth/google/callback').toString();
+}
+
+function isDefaultOwnerEmail(email: string): boolean {
+  return email.toLowerCase().trim() === DEFAULT_OWNER_EMAIL;
+}
+
+function ensureDefaultOwnerAdmin(user: User): User {
+  if (!isDefaultOwnerEmail(user.email)) {
+    return user;
+  }
+
+  if (user.role === 'admin' && user.manual_premium === 1 && user.email_verified === 1) {
+    return user;
+  }
+
+  promoteUserToAdminOwner(user.id);
+  return getUserById(user.id) || {
+    ...user,
+    role: 'admin',
+    manual_premium: 1,
+    email_verified: 1,
+  };
 }
 
 function randomOAuthValue(): string {
@@ -223,10 +247,10 @@ export function getOrCreateGoogleUser(profile: GoogleOAuthProfile): User {
   if (userBySubject) {
     if (userBySubject.email_verified === 0) {
       updateUserEmailVerified(userBySubject.id);
-      return getUserById(userBySubject.id) || userBySubject;
+      return ensureDefaultOwnerAdmin(getUserById(userBySubject.id) || userBySubject);
     }
 
-    return userBySubject;
+    return ensureDefaultOwnerAdmin(userBySubject);
   }
 
   let user = getUserByEmail(profile.email);
@@ -241,9 +265,9 @@ export function getOrCreateGoogleUser(profile: GoogleOAuthProfile): User {
   }
 
   linkUserToGoogle(user.id, profile.subject);
-  return getUserById(user.id) || {
+  return ensureDefaultOwnerAdmin(getUserById(user.id) || {
     ...user,
     google_subject: profile.subject,
     email_verified: 1,
-  };
+  });
 }
