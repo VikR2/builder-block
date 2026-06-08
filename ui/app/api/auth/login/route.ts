@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     // Check password
     if (!user.password_hash) {
       return NextResponse.json(
-        { error: 'Please use the magic link to sign in' },
+        { error: 'This account does not have a password. Sign in with Google or reset your password to add one.' },
         { status: 401 }
       );
     }

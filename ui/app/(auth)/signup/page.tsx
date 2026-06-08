@@ -14,6 +14,7 @@ export default function SignupPage() {
 
   const router = useRouter();
   const { refresh } = useAuth();
+  const googleHref = '/api/auth/google?redirect=/pricing';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +63,22 @@ export default function SignupPage() {
           {error}
         </div>
       )}
+
+      <a
+        href={googleHref}
+        className="flex w-full items-center justify-center gap-3 rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:border-neutral-500 hover:bg-neutral-900"
+      >
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-neutral-900">
+          G
+        </span>
+        Continue with Google
+      </a>
+
+      <div className="my-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-neutral-800"></div>
+        <span className="text-xs uppercase tracking-wide text-neutral-500">or email</span>
+        <div className="h-px flex-1 bg-neutral-800"></div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

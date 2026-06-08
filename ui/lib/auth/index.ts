@@ -6,7 +6,9 @@ export {
   ensureAuthTables,
   createUser,
   getUserByEmail,
+  getUserByGoogleSubject,
   getUserById,
+  linkUserToGoogle,
   updateUserPassword,
   updateUserEmailVerified,
   updateUserManualPremium,
@@ -58,7 +60,6 @@ export {
   validateToken,
   consumeToken,
   cleanupTokens,
-  buildMagicLinkUrl,
   buildPasswordResetUrl,
   buildEmailVerifyUrl,
 } from './tokens';
@@ -76,7 +77,6 @@ export {
 
 // Email
 export {
-  sendMagicLinkEmail,
   sendPasswordResetEmail,
   sendEmailVerificationEmail,
   sendWelcomeEmail,

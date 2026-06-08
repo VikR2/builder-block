@@ -12,12 +12,12 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [mode, setMode] = useState<'password' | 'magic-link'>('password');
 
   const searchParams = useSearchParams();
   const router = useRouter();
   const { refresh } = useAuth();
   const redirect = getSafeRedirectPath(searchParams.get('redirect'), '/home');
+  const googleHref = `/api/auth/google?redirect=${encodeURIComponent(redirect)}`;
 
   // Handle URL error/success messages
   useEffect(() => {
@@ -25,9 +25,21 @@ function LoginContent() {
     const verifiedParam = searchParams.get('verified');
 
     if (errorParam === 'invalid_token') {
-      setError('The sign-in link is invalid or has expired. Please request a new one.');
+      setError('The verification link is invalid or has expired.');
     } else if (errorParam === 'missing_token') {
-      setError('Invalid sign-in link. Please request a new one.');
+      setError('Invalid verification link.');
+    } else if (errorParam === 'google_not_configured') {
+      setError('Google sign-in is not configured yet. Use email and password for now.');
+    } else if (errorParam === 'google_invalid_state') {
+      setError('Your Google sign-in session expired. Please try again.');
+    } else if (errorParam === 'google_denied') {
+      setError('Google sign-in was cancelled.');
+    } else if (errorParam === 'google_email_unverified') {
+      setError('Google did not confirm a verified email for this account.');
+    } else if (errorParam === 'google_account_mismatch') {
+      setError('This email is already linked to a different Google account.');
+    } else if (errorParam?.startsWith('google_')) {
+      setError('Google sign-in failed. Please try again or use email and password.');
     }
 
     if (verifiedParam === 'true') {
@@ -62,63 +74,10 @@ function LoginContent() {
     }
   };
 
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch('/api/auth/magic-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send magic link');
-      }
-
-      setSuccess('Check your email for the sign-in link!');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="bg-[#12121a] border border-neutral-800 rounded-xl p-8">
       <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
       <p className="text-neutral-400 mb-6">Sign in to your account</p>
-
-      {/* Mode toggle */}
-      <div className="flex gap-2 mb-6">
-        <button
-          type="button"
-          onClick={() => setMode('password')}
-          className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-            mode === 'password'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-neutral-800 text-neutral-400 hover:text-white'
-          }`}
-        >
-          Password
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('magic-link')}
-          className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-            mode === 'magic-link'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-neutral-800 text-neutral-400 hover:text-white'
-          }`}
-        >
-          Magic Link
-        </button>
-      </div>
 
       {/* Error/Success messages */}
       {error && (
@@ -132,85 +91,70 @@ function LoginContent() {
         </div>
       )}
 
-      {mode === 'password' ? (
-        <form onSubmit={handlePasswordLogin} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-neutral-300 mb-1">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="you@example.com"
-              required
-            />
-          </div>
+      <a
+        href={googleHref}
+        className="flex w-full items-center justify-center gap-3 rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:border-neutral-500 hover:bg-neutral-900"
+      >
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-neutral-900">
+          G
+        </span>
+        Continue with Google
+      </a>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-neutral-300 mb-1">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="Enter your password"
-              required
-            />
-          </div>
+      <div className="my-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-neutral-800"></div>
+        <span className="text-xs uppercase tracking-wide text-neutral-500">or email</span>
+        <div className="h-px flex-1 bg-neutral-800"></div>
+      </div>
 
-          <div className="flex justify-end">
-            <Link
-              href="/reset-password"
-              className="text-sm text-indigo-400 hover:text-indigo-300"
-            >
-              Forgot password?
-            </Link>
-          </div>
+      <form onSubmit={handlePasswordLogin} className="space-y-4">
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-neutral-300 mb-1">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            placeholder="you@example.com"
+            required
+          />
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 text-white font-medium rounded-lg transition-colors"
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-neutral-300 mb-1">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            placeholder="Enter your password"
+            required
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <Link
+            href="/reset-password"
+            className="text-sm text-indigo-400 hover:text-indigo-300"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-      ) : (
-        <form onSubmit={handleMagicLink} className="space-y-4">
-          <div>
-            <label htmlFor="magic-email" className="block text-sm font-medium text-neutral-300 mb-1">
-              Email
-            </label>
-            <input
-              id="magic-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="you@example.com"
-              required
-            />
-          </div>
+            Forgot password?
+          </Link>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 text-white font-medium rounded-lg transition-colors"
-          >
-            {loading ? 'Sending...' : 'Send Magic Link'}
-          </button>
-
-          <p className="text-center text-sm text-neutral-500">
-            We'll send you a link to sign in instantly, no password needed.
-          </p>
-        </form>
-      )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 text-white font-medium rounded-lg transition-colors"
+        >
+          {loading ? 'Signing in...' : 'Sign In'}
+        </button>
+      </form>
 
       <div className="mt-6 pt-6 border-t border-neutral-800 text-center">
         <p className="text-neutral-400">

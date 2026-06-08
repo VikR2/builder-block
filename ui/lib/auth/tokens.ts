@@ -8,7 +8,6 @@ import {
 } from './db';
 
 const TOKEN_EXPIRY_HOURS = {
-  magic_link: 1,        // 1 hour
   password_reset: 1,    // 1 hour
   email_verify: 24,     // 24 hours
 } as const;
@@ -74,13 +73,6 @@ export function consumeToken(token: string): void {
  */
 export function cleanupTokens(): void {
   deleteExpiredAuthTokens();
-}
-
-/**
- * Build magic link URL
- */
-export function buildMagicLinkUrl(token: string, baseUrl: string): string {
-  return `${baseUrl}/api/auth/magic-link/verify?token=${encodeURIComponent(token)}`;
 }
 
 /**

@@ -22,46 +22,6 @@ interface EmailResult {
 }
 
 /**
- * Send magic link email
- */
-export async function sendMagicLinkEmail(
-  to: string,
-  magicLinkUrl: string
-): Promise<EmailResult> {
-  try {
-    await getResend().emails.send({
-      from: FROM_EMAIL,
-      to,
-      subject: `Sign in to ${APP_NAME}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1a1a2e;">Sign in to ${APP_NAME}</h1>
-          <p>Click the link below to sign in to your account. This link expires in 1 hour.</p>
-          <a href="${magicLinkUrl}" style="display: inline-block; background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0;">
-            Sign In
-          </a>
-          <p style="color: #666; font-size: 14px;">
-            If you didn't request this email, you can safely ignore it.
-          </p>
-          <p style="color: #666; font-size: 12px;">
-            Or copy and paste this URL into your browser:<br>
-            ${magicLinkUrl}
-          </p>
-        </div>
-      `,
-    });
-
-    return { success: true };
-  } catch (error) {
-    console.error('Failed to send magic link email:', error);
-    return {
-      success: false,
-      error: 'Failed to send email. Please try again.'
-    };
-  }
-}
-
-/**
  * Send password reset email
  */
 export async function sendPasswordResetEmail(
@@ -154,14 +114,9 @@ export async function sendWelcomeEmail(to: string): Promise<EmailResult> {
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #1a1a2e;">Welcome to ${APP_NAME}!</h1>
           <p>Thank you for joining us. Your account has been created successfully.</p>
-          <p>With ${APP_NAME}, you'll have access to:</p>
-          <ul>
-            <li>Trading video courses with synchronized transcripts</li>
-            <li>Comprehensive skills library</li>
-            <li>AI-powered Knowledge Bot</li>
-            <li>Premium trading documentation and learning resources</li>
-          </ul>
-          <p>Get started by exploring our content library!</p>
+          <p>With ${APP_NAME}, you'll be able to manage your account and indicator access from the member portal.</p>
+          <p>Your premium indicator access is connected through Whop and TradingView.</p>
+          <p>Get started by opening the indicator access page after signing in.</p>
           <p style="color: #666; font-size: 14px;">
             If you have any questions, feel free to reach out to our support team.
           </p>

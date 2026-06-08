@@ -55,6 +55,8 @@ export function ensureAuthTables() {
     ensureColumn(db, 'subscriptions', 'provider', "TEXT DEFAULT 'legacy'");
     ensureColumn(db, 'subscriptions', 'provider_latest_payment_id', 'TEXT');
     ensureColumn(db, 'subscriptions', 'provider_manage_url', 'TEXT');
+    ensureColumn(db, 'users', 'google_subject', 'TEXT');
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_subject ON users(google_subject) WHERE google_subject IS NOT NULL');
 
     authTablesEnsured = true;
   } finally {
@@ -68,6 +70,7 @@ export interface User {
   email: string;
   email_verified: number;
   password_hash: string | null;
+  google_subject: string | null;
   role: 'user' | 'admin';
   manual_premium: number;
   stripe_customer_id: string | null;
@@ -175,10 +178,32 @@ export function getUserByEmail(email: string): User | undefined {
   }
 }
 
+export function getUserByGoogleSubject(googleSubject: string): User | undefined {
+  const db = getAuthDb();
+  try {
+    return db.prepare('SELECT * FROM users WHERE google_subject = ?').get(googleSubject) as User | undefined;
+  } finally {
+    db.close();
+  }
+}
+
 export function getUserById(id: number): User | undefined {
   const db = getAuthDb();
   try {
     return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as User | undefined;
+  } finally {
+    db.close();
+  }
+}
+
+export function linkUserToGoogle(userId: number, googleSubject: string): void {
+  const db = getAuthDb();
+  try {
+    db.prepare(`
+      UPDATE users
+      SET google_subject = ?, email_verified = 1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(googleSubject, userId);
   } finally {
     db.close();
   }

@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User with this email already exists' }, { status: 409 });
     }
 
-    // Create user (no password - they'll use magic link)
+    // Create user without a password. They can sign in with Google or set one through password reset.
     const newUser = createUser(email, null);
 
     // Mark email as verified since admin is creating the account
