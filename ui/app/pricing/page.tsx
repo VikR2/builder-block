@@ -86,7 +86,7 @@ function PricingContent() {
 
               setActivationStatus('active');
               redirectTimer = setTimeout(() => {
-                router.push('/tcm/library');
+                router.push('/account/subscription');
               }, 1200);
               return;
             }
@@ -112,12 +112,12 @@ function PricingContent() {
   }, [isSuccess, refresh, router]);
 
   const features = [
-    'Full access to video courses with synchronized transcripts',
-    'Complete trading skills library with code snippets',
-    'AI-powered Knowledge Bot for instant answers',
-    'Comprehensive trading documentation and platform resources',
-    'Pine Script examples and implementation notes',
-    'New content added regularly',
+    'Invite-only TradingView indicator access managed through Whop',
+    'TradingView username collected at checkout for access setup',
+    'Indicators designed to highlight range context, order flow, and key reaction areas',
+    'Chart tools for spotting participation, absorption, and execution zones',
+    'Subscription access synced through the native Whop TradingView integration',
+    'Cancel anytime from your account',
   ];
 
   if (isSuccess) {
@@ -134,32 +134,32 @@ function PricingContent() {
             )}
           </div>
           <h1 className="text-2xl font-bold text-white mb-3">
-            {activationStatus === 'delayed' ? 'Payment Received' : 'Welcome to Premium!'}
+            {activationStatus === 'delayed' ? 'Payment Received' : 'Indicator Access Started'}
           </h1>
           {activationStatus === 'checking' && (
             <>
               <p className="text-neutral-400 mb-6">
-                Payment complete. Activating your premium access...
+                Payment complete. Activating your indicator access through Whop...
               </p>
               <p className="text-sm text-neutral-500">
-                This usually takes a few seconds.
+                TradingView access uses the username you entered at checkout.
               </p>
             </>
           )}
           {activationStatus === 'active' && (
             <>
               <p className="text-neutral-400 mb-6">
-                Your subscription is active. You have full access to all content.
+                Your subscription is active. Whop will manage your TradingView indicator access.
               </p>
               <p className="text-sm text-neutral-500">
-                Redirecting you to the video library...
+                Redirecting you to your subscription page...
               </p>
             </>
           )}
           {activationStatus === 'delayed' && (
             <>
               <p className="text-neutral-400 mb-6">
-                Whop confirmed the payment, and premium access is still finishing activation.
+                Whop confirmed the payment, and indicator access is still finishing activation.
               </p>
               <div className="flex flex-col gap-3">
                 <button
@@ -192,21 +192,15 @@ function PricingContent() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-3">You're Premium!</h1>
+          <h1 className="text-2xl font-bold text-white mb-3">Indicator Access Active</h1>
           <p className="text-neutral-400 mb-6">
-            You have full access to all content. Explore the platform:
+            Your subscription is active and tied to the TradingView indicator access flow.
           </p>
           <div className="flex flex-col gap-3">
-            <Link
-              href="/tcm/library"
-              className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors"
-            >
-              Browse Video Courses
-            </Link>
             {user.hasPaidSubscription ? (
               <Link
                 href="/account/subscription"
-                className="px-6 py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-lg transition-colors"
+                className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors"
               >
                 Manage Subscription
               </Link>
@@ -233,13 +227,13 @@ function PricingContent() {
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
             </svg>
-            TCM Premium Access
+            TCM Indicator Access
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Unlock All Trading Education
+            Unlock TCM TradingView Indicators
           </h1>
           <p className="text-lg text-neutral-400 max-w-2xl mx-auto">
-            Get complete access to video courses, skills library, AI-powered Q&A, and more.
+            Get invite-only access to the TCM indicators built to organize market context directly on your TradingView charts.
           </p>
         </div>
 
@@ -263,7 +257,7 @@ function PricingContent() {
 
             {/* Description */}
             <p className="text-neutral-400 mb-8">
-              Everything you need to master trading concepts from The Currency Merchant.
+              The indicators help mark range context, order-flow cues, absorption, and key reaction zones so your chart read is cleaner and faster.
             </p>
 
             {/* Features */}
@@ -291,7 +285,7 @@ function PricingContent() {
               disabled={loading || authLoading}
               className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 text-white font-semibold rounded-xl text-lg transition-all shadow-lg shadow-amber-500/25"
             >
-              {loading ? 'Redirecting to checkout...' : 'Subscribe Now'}
+              {loading ? 'Redirecting to checkout...' : 'Get Indicator Access'}
             </button>
 
             {!user && (
@@ -311,7 +305,7 @@ function PricingContent() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
-                Secure checkout
+                TradingView access
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,7 +319,7 @@ function PricingContent() {
 
         {/* FAQ or Trust signals */}
         <div className="mt-12 text-center text-sm text-neutral-500">
-          <p>Questions? Contact support for help with your subscription.</p>
+          <p>Enter your TradingView username at checkout so Whop can manage indicator access.</p>
         </div>
       </div>
     </div>
