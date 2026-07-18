@@ -3,6 +3,10 @@ import { getCurrentUser } from '@/lib/auth';
 import { getUserById } from '@/lib/auth/db';
 import { enforceRateLimit, requireSameOrigin } from '@/lib/security/api';
 import { createCheckoutSession, isWhopConfigured } from '@/lib/whop';
+import {
+  type BillingPeriod,
+  isBillingPeriod,
+} from '@/lib/pricing';
 
 export async function POST(request: Request) {
   const originError = requireSameOrigin(request);
@@ -20,9 +24,39 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (!isWhopConfigured()) {
+    let billingPeriod: BillingPeriod = 'monthly';
+    const rawBody = await request.text();
+
+    if (rawBody.trim()) {
+      let body: unknown;
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        return NextResponse.json(
+          { error: 'Invalid checkout request' },
+          { status: 400 }
+        );
+      }
+
+      const requestedPeriod =
+        body && typeof body === 'object' && 'billingPeriod' in body
+          ? (body as { billingPeriod?: unknown }).billingPeriod
+          : undefined;
+
+      if (requestedPeriod !== undefined) {
+        if (!isBillingPeriod(requestedPeriod)) {
+          return NextResponse.json(
+            { error: 'Invalid billing period' },
+            { status: 400 }
+          );
+        }
+        billingPeriod = requestedPeriod;
+      }
+    }
+
+    if (!isWhopConfigured(billingPeriod)) {
       return NextResponse.json(
-        { error: 'Payment system is not configured' },
+        { error: `The ${billingPeriod} payment plan is not configured` },
         { status: 500 }
       );
     }
@@ -55,6 +89,7 @@ export async function POST(request: Request) {
     const checkoutUrl = await createCheckoutSession({
       userId: user.id,
       email: user.email,
+      billingPeriod,
     });
 
     return NextResponse.json({ url: checkoutUrl });

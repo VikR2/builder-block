@@ -75,9 +75,10 @@ function LoginContent() {
   };
 
   return (
-    <div className="bg-[#12121a] border border-neutral-800 rounded-xl p-8">
-      <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
-      <p className="text-neutral-400 mb-6">Sign in to your account</p>
+    <div className="rounded-[24px] border border-white/10 bg-[#111317]/95 p-7 shadow-2xl shadow-black/20 sm:p-8">
+      <p className="eyebrow text-[#c9974f]">Member sign in</p>
+      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">Welcome back</h1>
+      <p className="mb-7 mt-2 text-sm leading-6 text-neutral-400">Open your TCM trading workspace.</p>
 
       {/* Error/Success messages */}
       {error && (
@@ -93,7 +94,7 @@ function LoginContent() {
 
       <a
         href={googleHref}
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:border-neutral-500 hover:bg-neutral-900"
+        className="flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.035] px-4 text-sm font-semibold text-white transition-colors hover:bg-white/[0.07]"
       >
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-neutral-900">
           G
@@ -117,7 +118,7 @@ function LoginContent() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="min-h-12 w-full rounded-xl border border-white/10 bg-black/20 px-4 text-white placeholder-neutral-500 focus:border-[#c9974f]/60 focus:outline-none focus:ring-2 focus:ring-[#c9974f]/25"
             placeholder="you@example.com"
             required
           />
@@ -132,7 +133,7 @@ function LoginContent() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="min-h-12 w-full rounded-xl border border-white/10 bg-black/20 px-4 text-white placeholder-neutral-500 focus:border-[#c9974f]/60 focus:outline-none focus:ring-2 focus:ring-[#c9974f]/25"
             placeholder="Enter your password"
             required
           />
@@ -141,7 +142,7 @@ function LoginContent() {
         <div className="flex justify-end">
           <Link
             href="/reset-password"
-            className="text-sm text-indigo-400 hover:text-indigo-300"
+            className="text-sm text-[#d5aa68] hover:text-[#e7c58d]"
           >
             Forgot password?
           </Link>
@@ -150,7 +151,7 @@ function LoginContent() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 text-white font-medium rounded-lg transition-colors"
+          className="min-h-12 w-full rounded-full bg-[#c9974f] px-5 text-sm font-semibold text-[#15171a] transition-colors hover:bg-[#dfb36e] disabled:opacity-50"
         >
           {loading ? 'Signing in...' : 'Sign In'}
         </button>
@@ -159,7 +160,7 @@ function LoginContent() {
       <div className="mt-6 pt-6 border-t border-neutral-800 text-center">
         <p className="text-neutral-400">
           Don't have an account?{' '}
-          <Link href="/signup" className="text-indigo-400 hover:text-indigo-300">
+          <Link href="/signup" className="font-semibold text-[#d5aa68] hover:text-[#e7c58d]">
             Sign up
           </Link>
         </p>
@@ -201,7 +202,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="bg-[#12121a] border border-neutral-800 rounded-xl p-8">
+        <div className="rounded-[24px] border border-white/10 bg-[#111317] p-8">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-neutral-800 rounded w-2/3"></div>
             <div className="h-4 bg-neutral-800 rounded w-1/2"></div>

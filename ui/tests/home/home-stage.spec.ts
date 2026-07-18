@@ -18,6 +18,8 @@ test.describe('Home page stage-one UX', () => {
 
     await expect(page.getByText('What’s on your mind?')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Quick Actions' })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: /Ask the Bot/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Ask the Knowledge Bot/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+    await expect(page.getByText('Indicator status')).toBeVisible();
   });
 });

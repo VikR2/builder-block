@@ -1,29 +1,38 @@
-import { getAppUrl, getWhopClient, normalizeWhopCheckoutUrl } from './client';
+import type { BillingPeriod } from '@/lib/pricing';
+import {
+  getAppUrl,
+  getWhopClient,
+  getWhopPlanId,
+  normalizeWhopCheckoutUrl,
+} from './client';
 
 interface CreateCheckoutSessionOptions {
   userId: number;
   email: string;
+  billingPeriod?: BillingPeriod;
 }
 
 export async function createCheckoutSession({
   userId,
   email,
+  billingPeriod = 'monthly',
 }: CreateCheckoutSessionOptions): Promise<string> {
   const appUrl = getAppUrl();
-  const planId = process.env.WHOP_PLAN_ID;
+  const planId = getWhopPlanId(billingPeriod);
   if (!planId) {
-    throw new Error('WHOP_PLAN_ID is not configured');
+    throw new Error(`Whop ${billingPeriod} plan is not configured`);
   }
 
   const checkout = await getWhopClient().checkoutConfigurations.create({
     plan_id: planId,
     mode: 'payment',
     allow_promo_codes: true,
-    redirect_url: `${appUrl}/pricing?success=true`,
-    source_url: `${appUrl}/pricing`,
+    redirect_url: `${appUrl}/pricing?success=true&plan=${billingPeriod}`,
+    source_url: `${appUrl}/pricing#plans`,
     metadata: {
       userId: String(userId),
       email,
+      billingPeriod,
     },
   });
 

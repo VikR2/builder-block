@@ -54,9 +54,10 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="bg-[#12121a] border border-neutral-800 rounded-xl p-8">
-      <h1 className="text-2xl font-bold text-white mb-2">Create an account</h1>
-      <p className="text-neutral-400 mb-6">Join The Currency Merchant</p>
+    <div className="rounded-[24px] border border-white/10 bg-[#111317]/95 p-7 shadow-2xl shadow-black/20 sm:p-8">
+      <p className="eyebrow text-[#c9974f]">Create your workspace</p>
+      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">Join The Currency Merchant</h1>
+      <p className="mb-7 mt-2 text-sm leading-6 text-neutral-400">Set up the account used for indicator access and education.</p>
 
       {error && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
@@ -66,7 +67,7 @@ export default function SignupPage() {
 
       <a
         href={googleHref}
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:border-neutral-500 hover:bg-neutral-900"
+        className="flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.035] px-4 text-sm font-semibold text-white transition-colors hover:bg-white/[0.07]"
       >
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-neutral-900">
           G
@@ -90,7 +91,7 @@ export default function SignupPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="min-h-12 w-full rounded-xl border border-white/10 bg-black/20 px-4 text-white placeholder-neutral-500 focus:border-[#c9974f]/60 focus:outline-none focus:ring-2 focus:ring-[#c9974f]/25"
             placeholder="you@example.com"
             required
           />
@@ -105,7 +106,7 @@ export default function SignupPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="min-h-12 w-full rounded-xl border border-white/10 bg-black/20 px-4 text-white placeholder-neutral-500 focus:border-[#c9974f]/60 focus:outline-none focus:ring-2 focus:ring-[#c9974f]/25"
             placeholder="At least 8 characters"
             required
             minLength={8}
@@ -124,7 +125,7 @@ export default function SignupPage() {
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="min-h-12 w-full rounded-xl border border-white/10 bg-black/20 px-4 text-white placeholder-neutral-500 focus:border-[#c9974f]/60 focus:outline-none focus:ring-2 focus:ring-[#c9974f]/25"
             placeholder="Confirm your password"
             required
           />
@@ -133,7 +134,7 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 text-white font-medium rounded-lg transition-colors"
+          className="min-h-12 w-full rounded-full bg-[#c9974f] px-5 text-sm font-semibold text-[#15171a] transition-colors hover:bg-[#dfb36e] disabled:opacity-50"
         >
           {loading ? 'Creating account...' : 'Create Account'}
         </button>
@@ -146,7 +147,7 @@ export default function SignupPage() {
       <div className="mt-6 pt-6 border-t border-neutral-800 text-center">
         <p className="text-neutral-400">
           Already have an account?{' '}
-          <Link href="/login" className="text-indigo-400 hover:text-indigo-300">
+          <Link href="/login" className="font-semibold text-[#d5aa68] hover:text-[#e7c58d]">
             Sign in
           </Link>
         </p>

@@ -1,6 +1,7 @@
 export {
   WHOP_PROVIDER,
   getWhopClient,
+  getWhopPlanId,
   getWhopWebhookKey,
   isWhopConfigured,
   isWhopWebhookConfigured,

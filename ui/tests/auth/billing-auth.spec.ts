@@ -72,6 +72,7 @@ test.describe('Auth and billing smoke flows', () => {
   test('keeps a new signup authenticated before starting checkout', async ({ page }) => {
     let signedUp = false;
     let checkoutRequested = false;
+    let requestedBillingPeriod: string | undefined;
 
     const newUser = {
       id: 901,
@@ -104,6 +105,7 @@ test.describe('Auth and billing smoke flows', () => {
 
     await page.route('**/api/whop/checkout', async route => {
       checkoutRequested = true;
+      requestedBillingPeriod = route.request().postDataJSON().billingPeriod;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -118,15 +120,17 @@ test.describe('Auth and billing smoke flows', () => {
     await page.getByRole('button', { name: 'Create Account' }).click();
 
     await expect(page).toHaveURL(/\/pricing$/);
-    await page.getByRole('button', { name: 'Subscribe Now' }).click();
+    await page.getByRole('button', { name: 'Choose quarterly' }).click();
 
     await expect.poll(() => checkoutRequested).toBe(true);
+    expect(requestedBillingPeriod).toBe('quarterly');
     await expect(page).toHaveURL(/\/pricing\?checkout-created=1$/);
   });
 
   test('keeps a login redirect authenticated before starting checkout', async ({ page }) => {
     let loggedIn = false;
     let checkoutRequested = false;
+    let requestedBillingPeriod: string | undefined;
 
     const user = {
       id: 902,
@@ -159,6 +163,7 @@ test.describe('Auth and billing smoke flows', () => {
 
     await page.route('**/api/whop/checkout', async route => {
       checkoutRequested = true;
+      requestedBillingPeriod = route.request().postDataJSON().billingPeriod;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -172,9 +177,10 @@ test.describe('Auth and billing smoke flows', () => {
     await page.getByRole('button', { name: 'Sign In' }).click();
 
     await expect(page).toHaveURL(/\/pricing$/);
-    await page.getByRole('button', { name: 'Subscribe Now' }).click();
+    await page.getByRole('button', { name: 'Choose yearly' }).click();
 
     await expect.poll(() => checkoutRequested).toBe(true);
+    expect(requestedBillingPeriod).toBe('yearly');
     await expect(page).toHaveURL(/\/pricing\?checkout-created=1$/);
   });
 
@@ -211,10 +217,12 @@ test.describe('Auth and billing smoke flows', () => {
 
     await page.goto('/pricing?success=true&session_id=cs_test');
 
-    await expect(page.getByText('Payment complete. Activating your premium access...')).toBeVisible();
-    await expect(page.getByText('Your subscription is active. You have full access to all content.')).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Indicator access is active' })).toBeVisible({
       timeout: 5000,
     });
+    await expect(
+      page.getByText('Your membership is active. Redirecting you to your subscription workspace.')
+    ).toBeVisible();
   });
 
   test('renders the login page without a prerender bailout', async ({ page }) => {
@@ -222,16 +230,17 @@ test.describe('Auth and billing smoke flows', () => {
 
     await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
-
-    await page.getByRole('button', { name: 'Magic Link' }).click();
-    await expect(page.getByRole('button', { name: 'Send Magic Link' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Continue with Google' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Forgot password?' })).toBeVisible();
   });
 
   test('redirects unauthenticated pricing users to login before checkout', async ({ page }) => {
     await page.goto('/pricing');
-    await page.getByRole('button', { name: 'Subscribe Now' }).click();
+    await page.getByRole('button', { name: 'Choose monthly' }).click();
 
-    await expect(page).toHaveURL(/\/login\?redirect=(?:%2F|\/)pricing$/);
+    await expect(page).toHaveURL(
+      /\/login\?redirect=%2Fpricing%3Fplan%3Dmonthly%23plans$/
+    );
   });
 
   test('does not offer Whop portal actions to manual premium users', async ({ page }) => {
@@ -241,8 +250,9 @@ test.describe('Auth and billing smoke flows', () => {
       await attachSessionCookie(page, sessionId);
 
       await page.goto('/pricing');
-      await expect(page.getByRole('link', { name: 'Account Settings' })).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Manage Subscription' })).toHaveCount(0);
+      await expect(page.getByText('Your TCM indicator membership is active.')).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Manage subscription' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Open Whop Portal' })).toHaveCount(0);
 
       await page.goto('/account');
       await expect(page.getByText(/not managed through the Whop billing portal/i)).toBeVisible();

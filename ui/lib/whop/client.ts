@@ -1,4 +1,5 @@
 import Whop from '@whop/sdk';
+import type { BillingPeriod } from '@/lib/pricing';
 
 export const WHOP_PROVIDER = 'whop';
 const WHOP_CHECKOUT_ORIGIN = 'https://whop.com';
@@ -13,8 +14,22 @@ export function getAppUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 }
 
-export function isWhopConfigured(): boolean {
-  return Boolean(process.env.WHOP_API_KEY && process.env.WHOP_PLAN_ID);
+export function getWhopPlanId(
+  billingPeriod: BillingPeriod = 'monthly'
+): string | undefined {
+  const configuredPlans: Record<BillingPeriod, string | undefined> = {
+    monthly: process.env.WHOP_PLAN_ID_MONTHLY || process.env.WHOP_PLAN_ID,
+    quarterly: process.env.WHOP_PLAN_ID_QUARTERLY,
+    yearly: process.env.WHOP_PLAN_ID_YEARLY,
+  };
+
+  return configuredPlans[billingPeriod]?.trim() || undefined;
+}
+
+export function isWhopConfigured(
+  billingPeriod: BillingPeriod = 'monthly'
+): boolean {
+  return Boolean(process.env.WHOP_API_KEY && getWhopPlanId(billingPeriod));
 }
 
 export function isWhopWebhookConfigured(): boolean {
