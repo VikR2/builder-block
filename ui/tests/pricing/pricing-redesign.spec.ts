@@ -14,6 +14,79 @@ const subscriber = {
 };
 
 test.describe('TCM pricing redesign', () => {
+  test('serves every generated TCM chart image from static public assets', async ({
+    page,
+  }) => {
+    await page.route('**/api/auth/me', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ user: null }),
+      });
+    });
+
+    const failedImages: string[] = [];
+    page.on('response', response => {
+      if (
+        response.url().includes('/images/tcm-suite/') &&
+        response.status() !== 200
+      ) {
+        failedImages.push(`${response.status()} ${response.url()}`);
+      }
+    });
+
+    await page.goto('/pricing');
+
+    const heroImage = page
+      .getByAltText(
+        'TCM pseudo order-flow indicator organizing range and reaction zones on a TradingView chart'
+      )
+      .first();
+    await expect(heroImage).toHaveAttribute(
+      'src',
+      '/images/tcm-suite/hero-market-context-4k.webp'
+    );
+    await expect
+      .poll(() =>
+        heroImage.evaluate(
+          image =>
+            (image as HTMLImageElement).complete &&
+            (image as HTMLImageElement).naturalWidth === 3840 &&
+            (image as HTMLImageElement).naturalHeight === 2160
+        )
+      )
+      .toBe(true);
+
+    const features = [
+      ['Range context', 'range-context-4k.webp'],
+      ['Pseudo order flow', 'pseudo-order-flow-4k.webp'],
+      ['Absorption', 'absorption-levels-4k.webp'],
+      ['Reaction zones', 'reaction-zones-4k.webp'],
+      ['Bias and sessions', 'session-bias-4k.webp'],
+    ] as const;
+
+    for (const [label, filename] of features) {
+      await page.getByRole('tab', { name: label }).click();
+      const image = page.locator('#feature-panel img').first();
+      await expect(image).toHaveAttribute(
+        'src',
+        `/images/tcm-suite/${filename}`
+      );
+      await expect
+        .poll(() =>
+          image.evaluate(
+            element =>
+              (element as HTMLImageElement).complete &&
+              (element as HTMLImageElement).naturalWidth === 3840 &&
+              (element as HTMLImageElement).naturalHeight === 2160
+          )
+        )
+        .toBe(true);
+    }
+
+    expect(failedImages).toEqual([]);
+  });
+
   test('keeps the product story and plan controls usable from mobile to desktop', async ({ page }) => {
     await page.route('**/api/auth/me', async route => {
       await route.fulfill({

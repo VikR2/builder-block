@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -34,13 +34,10 @@ interface Feature {
   label: string;
   title: string;
   description: string;
-  frame: number;
+  image: string;
   eyebrow: string;
   callouts: string[];
 }
-
-const INDICATOR_VIDEO_ID =
-  'how_to_use_the_tcm_pseudo_orderflow_indicator_u8gs_f377c33e';
 
 const FEATURES: Feature[] = [
   {
@@ -49,7 +46,7 @@ const FEATURES: Feature[] = [
     title: 'See the range price is actually working through.',
     description:
       'Frame the active auction before looking for execution. TCM organizes the surrounding range, key boundaries, and the areas where participation changes.',
-    frame: 3,
+    image: '/images/tcm-suite/range-context-4k.webp',
     eyebrow: 'Market structure',
     callouts: ['Working range', 'External liquidity', 'Midpoint context'],
   },
@@ -59,7 +56,7 @@ const FEATURES: Feature[] = [
     title: 'Read participation without adding more chart noise.',
     description:
       'Track where buyers and sellers are showing initiative, where price is being accepted, and where the auction begins to lose efficiency.',
-    frame: 10,
+    image: '/images/tcm-suite/pseudo-order-flow-4k.webp',
     eyebrow: 'Participation',
     callouts: ['Initiative move', 'Responsive activity', 'Order-flow shift'],
   },
@@ -69,7 +66,7 @@ const FEATURES: Feature[] = [
     title: 'Identify effort that is no longer producing progress.',
     description:
       'TCM highlights the context around repeated tests and stalled delivery so absorption can be judged inside the larger range.',
-    frame: 7,
+    image: '/images/tcm-suite/absorption-levels-4k.webp',
     eyebrow: 'Reaction quality',
     callouts: ['Repeated test', 'Stalled delivery', 'Responsive zone'],
   },
@@ -79,7 +76,7 @@ const FEATURES: Feature[] = [
     title: 'Keep the areas that matter visible at decision time.',
     description:
       'Map reaction zones and potential execution areas without turning the chart into a collection of disconnected levels.',
-    frame: 5,
+    image: '/images/tcm-suite/reaction-zones-4k.webp',
     eyebrow: 'Execution context',
     callouts: ['Reaction zone', 'Invalidation area', 'Delivery objective'],
   },
@@ -89,7 +86,7 @@ const FEATURES: Feature[] = [
     title: 'Align the intraday idea with the higher-timeframe auction.',
     description:
       'Use session structure and directional context as filters. The indicator supports a thesis; it does not replace one.',
-    frame: 12,
+    image: '/images/tcm-suite/session-bias-4k.webp',
     eyebrow: 'Directional filter',
     callouts: ['Session range', 'Higher-timeframe bias', 'Execution window'],
   },
@@ -219,11 +216,6 @@ export default function PricingPageClient() {
 
   const feature =
     FEATURES.find((candidate) => candidate.id === activeFeature) ?? FEATURES[0];
-
-  const heroFrame = useMemo(
-    () => `/api/tcm/frames/${INDICATOR_VIDEO_ID}/10`,
-    []
-  );
 
   const handleSubscribe = async (billingPeriod: BillingPeriod) => {
     if (!user) {
@@ -376,8 +368,13 @@ export default function PricingPageClient() {
           <div className="relative">
             <div className="relative aspect-[16/10] overflow-hidden rounded-[26px] border border-white/10 bg-[#15181c] shadow-2xl shadow-black/40">
               <img
-                src={heroFrame}
+                src="/images/tcm-suite/hero-market-context-4k.webp"
                 alt="TCM pseudo order-flow indicator organizing range and reaction zones on a TradingView chart"
+                width={3840}
+                height={2160}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
                 className="h-full w-full object-cover opacity-90"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d10]/80 via-transparent to-transparent" />
@@ -506,9 +503,13 @@ export default function PricingPageClient() {
             >
               <div className="relative aspect-[16/9] overflow-hidden border-b border-black/10 bg-[#101216]">
                 <img
-                  key={feature.frame}
-                  src={`/api/tcm/frames/${INDICATOR_VIDEO_ID}/${feature.frame}`}
+                  key={feature.image}
+                  src={feature.image}
                   alt={`${feature.label} shown on a TCM TradingView chart`}
+                  width={3840}
+                  height={2160}
+                  loading="eager"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
