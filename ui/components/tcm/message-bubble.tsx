@@ -25,6 +25,9 @@ export interface Message {
   recommendedClips?: VideoClipInfo[];
   watchLink?: string;
   lessonLink?: string;
+  usedLLM?: boolean;
+  fallbackReason?: "provider_unavailable" | "generation_failed" | null;
+  model?: string | null;
 }
 
 // Re-export VideoClipInfo for external use
@@ -300,10 +303,14 @@ export function MessageBubble({ message, onSourceClick }: MessageBubbleProps) {
             : "border border-border/70 bg-card/95 shadow-[0_12px_30px_rgba(0,0,0,0.12)]"
         }`}
       >
+        {!isUser && message.usedLLM === false && !message.isLoading && (
+          <div className="mb-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-200">
+            The AI tutor was unavailable, so this answer uses retrieved lesson notes only.
+          </div>
+        )}
+
         {/* Message Content */}
-        {message.structuredAnswer ? (
-          renderStructuredAnswer(message.structuredAnswer, Boolean(message.isLoading))
-        ) : message.isLoading ? (
+        {message.isLoading && !message.content ? (
           <div className="flex items-center gap-2">
             <div className="flex gap-1">
               <span className="w-2 h-2 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }} />
@@ -314,6 +321,12 @@ export function MessageBubble({ message, onSourceClick }: MessageBubbleProps) {
           </div>
         ) : isUser ? (
           <div className="whitespace-pre-wrap">{message.content}</div>
+        ) : message.content ? (
+          <div className="space-y-3 text-sm leading-relaxed">
+            {renderAssistantContent(message.content)}
+          </div>
+        ) : message.structuredAnswer ? (
+          renderStructuredAnswer(message.structuredAnswer, Boolean(message.isLoading))
         ) : (
           <div className="space-y-3 text-sm leading-relaxed">
             {renderAssistantContent(message.content)}

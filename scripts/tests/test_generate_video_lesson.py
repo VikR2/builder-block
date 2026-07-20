@@ -139,6 +139,75 @@ class GenerateVideoLessonTests(unittest.TestCase):
             any("actionable liquidity" in item.lower() for item in tutor_pack["commonMisconceptions"])
         )
 
+    def test_psychology_lesson_stays_grounded_in_psychology(self) -> None:
+        seeds = [
+            {
+                "title": "Fear, Clarity, and Decision Quality",
+                "startTime": 60.0,
+                "endTime": 150.0,
+                "timestampLabel": "1:00",
+                "studySummary": "Fear creates confusion when a trader has not defined the setup and risk clearly before entry.",
+                "transcriptExcerpt": "The mentor asks the student to separate fear from new evidence and return to the original plan.",
+            },
+            {
+                "title": "Trading Psychology and Emotional Control",
+                "startTime": 180.0,
+                "endTime": 270.0,
+                "timestampLabel": "3:00",
+                "studySummary": "Emotional control means responding to evidence instead of reacting to profit and loss.",
+                "transcriptExcerpt": "The mentor explains that confidence comes from clarity about the setup and invalidation.",
+            },
+            {
+                "title": "Patience and Execution Discipline",
+                "startTime": 300.0,
+                "endTime": 390.0,
+                "timestampLabel": "5:00",
+                "studySummary": "Execution discipline keeps the trader from inventing a new rule once the position is open.",
+                "transcriptExcerpt": "The student practices pausing, checking confirmation, and accepting the predefined loss.",
+            },
+        ]
+
+        payload = lesson.build_deterministic_lesson("Psychology", seeds)
+        tutor_pack = payload["tutorPack"]
+        generated_text = " ".join([
+            payload["summary"],
+            tutor_pack["mentorApproach"],
+            *tutor_pack["commonMisconceptions"],
+            *tutor_pack["chartReadingRules"],
+            *tutor_pack["diagnosticQuestions"],
+            *tutor_pack["practicePrompts"],
+        ]).lower()
+
+        self.assertIn("fear", generated_text)
+        self.assertIn("clarity", generated_text)
+        self.assertNotIn("submission range", generated_text)
+        self.assertNotIn("matching window", generated_text)
+        self.assertNotIn("book high", generated_text)
+
+    def test_build_windows_falls_back_to_transcript_timing_without_frames(self) -> None:
+        manifest = {
+            "video_duration_sec": 180,
+            "frames": [],
+        }
+        transcript_segments = [
+            {
+                "start": 0,
+                "end": 45,
+                "text": "Fear creates confusion when the setup and invalidation are not clear before entry.",
+            },
+            {
+                "start": 95,
+                "end": 140,
+                "text": "Execution discipline means returning to evidence instead of reacting to the open position.",
+            },
+        ]
+
+        windows = lesson.build_windows(manifest, transcript_segments)
+
+        self.assertEqual(len(windows), 2)
+        self.assertEqual(windows[0]["timestampLabel"], "0:00")
+        self.assertIn("Fear creates confusion", windows[0]["text"])
+
 
 if __name__ == "__main__":
     unittest.main()

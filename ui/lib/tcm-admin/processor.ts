@@ -60,6 +60,7 @@ async function generateEmbeddings(videoDir: string): Promise<Record<string, unkn
   return runPythonJsonScript([
     join(SCRIPTS_PATH, 'embed_transcripts.py'),
     '--video-dir', videoDir,
+    '--profiles', 'coarse,fine',
     '--json'
   ]);
 }
@@ -224,7 +225,7 @@ export async function startProcessing(jobId: number): Promise<{ success: boolean
 
       try {
         const lessonArtifacts = getVideoArtifactStatus({ file_path: video.file_path, folder_id: video.folder_id });
-        if (!lessonArtifacts.lesson) {
+        if (!lessonArtifacts.lessonReady) {
           setStage(jobId, video.id, 'lesson_building', 97, 'Building lesson guide...');
           await generateLesson(videoDir);
         }

@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import re
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -23,8 +24,31 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 ARCHITECTURES_DIR = PROJECT_ROOT / "data" / "architectures"
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-LESSON_MODEL = os.environ.get("TCM_LESSON_MODEL", "claude-3-5-haiku-latest")
+
+
+def project_env_value(name: str) -> str | None:
+    direct_value = os.environ.get(name)
+    if direct_value:
+        return direct_value
+
+    for env_path in (PROJECT_ROOT / ".env.local", PROJECT_ROOT / "ui" / ".env.local"):
+        if not env_path.exists():
+            continue
+
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+
+            key, value = line.split("=", 1)
+            if key.strip() == name:
+                return value.strip().strip("'\"") or None
+
+    return None
+
+
+ANTHROPIC_API_KEY = project_env_value("ANTHROPIC_API_KEY")
+LESSON_MODEL = os.environ.get("TCM_LESSON_MODEL", "claude-haiku-4-5-20251001")
 LESSON_MAX_SECTIONS = 6
 
 STOP_WORDS = {
@@ -73,14 +97,43 @@ DOMAIN_KEYWORDS = {
     "submission", "range", "matching", "window", "book", "liquidity", "matched",
     "unmatched", "fill", "filled", "distribution", "bias", "eq", "equilibrium",
     "gap", "gaps", "deviation", "continuation", "reversal", "delivery", "orders",
+    "psychology", "fear", "clarity", "confusion", "discipline", "confidence",
+    "hesitation", "emotion", "emotional", "patient", "patience", "impulsive",
+    "risk", "leverage", "stop", "loss", "losses", "position", "sizing", "exposure",
+    "volume", "profile", "value", "acceptance", "rejection", "participation",
+    "expansion", "compression", "fractal", "consolidation", "breakout", "structure",
+    "execution", "entry", "entries", "setup", "setups", "confirmation", "invalidation",
 }
 
 FALLBACK_SECTION_LABELS = [
+    ("Fear, Clarity, and Decision Quality", {"fear", "clarity", "confusion", "hesitation"}),
+    ("Trading Psychology and Emotional Control", {"psychology", "emotion", "emotional", "discipline"}),
+    ("Patience and Execution Discipline", {"patient", "patience", "execution", "discipline"}),
+    ("Risk, Leverage, and Position Sizing", {"risk", "leverage", "position", "sizing", "exposure"}),
+    ("Stops, Losses, and Invalidation", {"stop", "loss", "losses", "invalidation"}),
+    ("Volume, Value, and Market Participation", {"volume", "profile", "value", "participation"}),
+    ("Acceptance and Rejection", {"acceptance", "rejection", "value", "volume"}),
+    ("Expansion, Compression, and Structure", {"expansion", "compression", "structure", "consolidation"}),
+    ("Fractal Range Development", {"fractal", "range", "expansion", "compression"}),
+    ("Execution and Confirmation", {"execution", "entry", "entries", "confirmation"}),
     ("Submission Range and Matching Window", {"submission", "matching", "window", "range"}),
     ("Book Formation and Liquidity", {"book", "liquidity", "matched"}),
     ("Matched vs Unmatched Orders", {"matched", "unmatched", "orders", "gap"}),
     ("Bias and Delivery", {"bias", "delivery", "continuation", "reversal"}),
     ("Fill Logic and Objectives", {"fill", "filled", "distribution", "equilibrium", "eq"}),
+]
+
+SINGLE_KEYWORD_SECTION_LABELS = [
+    ("Fear, Clarity, and Decision Quality", {"fear", "clarity", "confusion", "hesitation"}),
+    ("Trading Psychology and Emotional Control", {"psychology", "emotion", "emotional"}),
+    ("Patience and Execution Discipline", {"patient", "patience", "discipline"}),
+    ("Risk, Leverage, and Position Sizing", {"risk", "leverage", "sizing", "exposure"}),
+    ("Stops, Losses, and Invalidation", {"stop", "losses", "invalidation"}),
+    ("Volume, Value, and Market Participation", {"volume", "profile", "participation"}),
+    ("Acceptance and Rejection", {"acceptance", "rejection"}),
+    ("Expansion, Compression, and Structure", {"expansion", "compression", "consolidation"}),
+    ("Fractal Range Development", {"fractal"}),
+    ("Execution and Confirmation", {"execution", "confirmation"}),
 ]
 
 SECTION_TITLE_REWRITES = {
@@ -98,6 +151,50 @@ SECTION_TITLE_REWRITES = {
 }
 
 CONCEPT_SUMMARY_TEMPLATES = {
+    "Fear, Clarity, and Decision Quality": (
+        "Fear becomes most disruptive when the trader cannot clearly state the setup, risk, and invalidation. "
+        "Clarity turns emotion into a prompt to re-check evidence instead of reacting impulsively."
+    ),
+    "Trading Psychology and Emotional Control": (
+        "Trading psychology is the ability to follow an evidence-based plan while uncertainty, profit, and loss "
+        "create emotional pressure."
+    ),
+    "Patience and Execution Discipline": (
+        "Patience means waiting for the planned evidence, while execution discipline means following the risk and "
+        "invalidation rules after the trade is active."
+    ),
+    "Risk, Leverage, and Position Sizing": (
+        "Risk is defined before entry by pairing the invalidation distance with a position size the account can "
+        "absorb without forcing an emotional decision."
+    ),
+    "Stops, Losses, and Invalidation": (
+        "A stop belongs at the point where the trade thesis is no longer valid. A controlled loss is the cost of "
+        "testing an idea, not a reason to abandon the decision process."
+    ),
+    "Volume, Value, and Market Participation": (
+        "Volume becomes useful when it is read at a meaningful location. It shows where participation is building, "
+        "but price response is still needed to distinguish acceptance from rejection."
+    ),
+    "Acceptance and Rejection": (
+        "Acceptance appears when the market sustains trade around a location; rejection appears when price tests it "
+        "and quickly moves away."
+    ),
+    "Expansion, Compression, and Structure": (
+        "Expansion is a move away from balance, while compression is a tightening structure that can prepare the "
+        "next directional auction."
+    ),
+    "Fractal Range Development": (
+        "Market ranges repeat across timeframes. Reading the active range and its internal structure helps a trader "
+        "avoid treating every small break as a new directional move."
+    ),
+    "Execution and Confirmation": (
+        "Execution follows confirmation rather than anticipation alone. The entry, risk, and invalidation should all "
+        "come from the same setup evidence."
+    ),
+    "Trading Decision Process": (
+        "Move from observation to confirmation, execution, and invalidation in a fixed sequence. This prevents one "
+        "interesting clue or emotional reaction from becoming a complete trade thesis."
+    ),
     "Book Formation and Liquidity": (
         "Matched buy and sell orders create the book. Once orders are matched, that zone becomes real liquidity "
         "that price can revisit and fill."
@@ -145,6 +242,33 @@ CONCEPT_SUMMARY_TEMPLATES = {
 }
 
 GLOSSARY_DEFINITIONS = {
+    "Fear": (
+        "An emotional response to uncertainty that should trigger a review of evidence and risk, not an automatic trade decision."
+    ),
+    "Clarity": (
+        "The ability to state the setup, confirmation, risk, and invalidation before capital is committed."
+    ),
+    "Discipline": (
+        "Following the predefined decision and risk process even when the open trade creates emotional pressure."
+    ),
+    "Invalidation": (
+        "The market condition that proves the current trade thesis is no longer the working explanation."
+    ),
+    "Position Sizing": (
+        "Choosing trade size from the distance to invalidation and the maximum account risk allowed."
+    ),
+    "Acceptance": (
+        "Sustained trade around a price or value area, showing that the market is willing to keep transacting there."
+    ),
+    "Rejection": (
+        "A test followed by a decisive move away, showing that the market did not sustain trade at that location."
+    ),
+    "Compression": (
+        "A tightening market structure that reflects balance and can precede an expansion away from the range."
+    ),
+    "Expansion": (
+        "Directional movement away from balance toward the next structural objective."
+    ),
     "Submission Range": (
         "The time window where larger orders are placed before the market proves which prices were actually matched."
     ),
@@ -462,6 +586,38 @@ def build_windows(
             "score": domain_hits + max(len(transcript_text) / 220, 0),
         })
 
+    if not windows and transcript_segments:
+        transcript_end = max(
+            float(segment.get("end", segment.get("start", 0)))
+            for segment in transcript_segments
+        )
+        fallback_duration = max(duration_sec, transcript_end)
+        window_seconds = 90.0
+        start_time = 0.0
+        window_id = 0
+
+        while start_time < fallback_duration:
+            end_time = min(start_time + window_seconds, fallback_duration)
+            transcript_text = group_transcript_for_window(
+                transcript_segments,
+                start_time,
+                end_time,
+            )
+            if transcript_text:
+                domain_hits = len(tokenize(transcript_text) & DOMAIN_KEYWORDS)
+                windows.append({
+                    "id": window_id,
+                    "startTime": start_time,
+                    "endTime": end_time,
+                    "timestampLabel": format_timestamp(start_time),
+                    "text": transcript_text,
+                    "keywords": tokenize(transcript_text),
+                    "domainHits": domain_hits,
+                    "score": domain_hits + max(len(transcript_text) / 220, 0),
+                })
+                window_id += 1
+            start_time = end_time
+
     return windows
 
 
@@ -472,11 +628,33 @@ def score_window_for_section(window: dict[str, Any], section: dict[str, str]) ->
     return overlap * 2.5 + window["domainHits"] * 0.5 + phrase_bonus
 
 
-def fallback_label_for_window(window: dict[str, Any]) -> str:
+def fallback_label_for_window(window: dict[str, Any], source_title: str = "") -> str:
+    source_tokens = tokenize(source_title)
+    if "psychology" in source_tokens:
+        if window["keywords"] & {"fear", "clarity", "confusion", "hesitation"}:
+            return "Fear, Clarity, and Decision Quality"
+        return "Trading Psychology and Emotional Control"
+    if "patience" in source_tokens:
+        return "Patience and Execution Discipline"
+    if source_tokens & {"volume", "profile"}:
+        if window["keywords"] & {"acceptance", "rejection"}:
+            return "Acceptance and Rejection"
+        return "Volume, Value, and Market Participation"
+    if source_tokens & {"expansion", "expansions"}:
+        return "Expansion, Compression, and Structure"
+    if source_tokens & {"risk", "leverage"}:
+        return "Risk, Leverage, and Position Sizing"
+
     for label, keywords in FALLBACK_SECTION_LABELS:
-        if len(window["keywords"] & keywords) >= 2:
+        overlap = len(window["keywords"] & keywords)
+        if overlap >= 2:
             return label
-    return "Key Teaching Moment"
+
+    for label, keywords in SINGLE_KEYWORD_SECTION_LABELS:
+        if window["keywords"] & keywords:
+            return label
+
+    return "Trading Decision Process"
 
 
 def build_seed_sections(
@@ -520,7 +698,7 @@ def build_seed_sections(
     ranked_windows = sorted(windows, key=lambda item: item["score"], reverse=True)
     for window in ranked_windows[:LESSON_MAX_SECTIONS]:
         seeds.append({
-            "title": fallback_label_for_window(window),
+            "title": fallback_label_for_window(window, source_title),
             "startTime": window["startTime"],
             "endTime": window["endTime"],
             "timestampLabel": window["timestampLabel"],
@@ -552,15 +730,52 @@ def build_concept_summary(title: str, fallback_text: str) -> str:
     return summarize_text(fallback_text, 240)
 
 
+def lesson_topic_text(seeds: list[dict[str, Any]]) -> str:
+    return " ".join(
+        " ".join([
+            seed.get("title", ""),
+            seed.get("studySummary", ""),
+            seed.get("transcriptExcerpt", ""),
+        ]).lower()
+        for seed in seeds
+    )
+
+
+def lesson_title_text(seeds: list[dict[str, Any]]) -> str:
+    return " ".join(seed.get("title", "").lower() for seed in seeds)
+
+
+def topic_matches(seeds: list[dict[str, Any]], keywords: set[str]) -> bool:
+    return bool(tokenize(lesson_topic_text(seeds)) & keywords)
+
+
+def is_order_flow_lesson(seeds: list[dict[str, Any]]) -> bool:
+    title_tokens = tokenize(lesson_title_text(seeds))
+    return bool(
+        title_tokens
+        & {
+            "submission", "matching", "liquidity", "matched", "unmatched",
+            "fill", "distribution", "orders", "equilibrium", "eq",
+        }
+    )
+
+
 def build_fallback_summary(source_title: str, seeds: list[dict[str, Any]]) -> str:
-    titles = [seed["title"] for seed in seeds[:3]]
+    titles = list(dict.fromkeys(seed["title"] for seed in seeds))[:3]
     if not titles:
         return (
-            f"{source_title} explains how TCM order flow moves from submission, to matching, to filling, "
-            "and how traders can turn that process into a practical bias framework."
+            f"{source_title} explains a TCM trading decision process and turns it into practical rules "
+            "for reading evidence, planning a trade, and knowing when the original idea is invalid."
         )
 
     joined_titles = ", ".join(titles[:-1]) + (f", and {titles[-1]}" if len(titles) > 1 else titles[0])
+    if not is_order_flow_lesson(seeds):
+        return (
+            f"{source_title} connects {joined_titles} into a practical decision process. "
+            "The lesson shows what evidence to notice, how the mentor applies it before execution, "
+            "and what should make a trader pause or revise the plan."
+        )
+
     return (
         f"{source_title} teaches how to read the book by connecting {joined_titles}. "
         "The lesson keeps returning to one core idea: liquidity only matters after orders are matched, "
@@ -580,12 +795,19 @@ def build_suggested_questions(seeds: list[dict[str, Any]]) -> list[str]:
 def build_mentor_approach(source_title: str, seeds: list[dict[str, Any]]) -> str:
     if not seeds:
         return (
-            f"Treat {source_title} like a sequencing lesson instead of a vocabulary list. "
-            "Start by locating submitted interest, confirm where matching turned it into real liquidity, "
-            "and then let that confirmed book shape your bias and objective."
+            f"Treat {source_title} like a mentor-led decision lesson instead of a vocabulary list. "
+            "Identify what the mentor notices, connect that evidence to the planned action, "
+            "and state what would invalidate the read before considering execution."
         )
 
-    first_titles = ", ".join(seed["title"] for seed in seeds[:3])
+    first_titles = ", ".join(list(dict.fromkeys(seed["title"] for seed in seeds))[:3])
+    if not is_order_flow_lesson(seeds):
+        return (
+            f"Treat {source_title} like a mentor walkthrough, not a search result. "
+            f"The teaching flow moves through {first_titles}; at each step, identify the evidence the mentor uses, "
+            "the decision that follows from it, and the condition that would make the trader stop or reassess."
+        )
+
     return (
         f"Treat {source_title} like a mentor walkthrough, not a search result. "
         f"The teaching flow moves through {first_titles}, and it keeps coming back to the same discipline: "
@@ -627,7 +849,15 @@ def build_teaching_step(title: str) -> str:
         return "Let delivery at the level tell you whether the next expectation is continuation or reversal."
     if "fill" in lowered or "objective" in lowered or "distribution" in lowered:
         return "Project the next fill or objective from the liquidity that remains open rather than guessing direction in isolation."
-    return f"Use {title.lower()} as one step in the overall order-flow story, not as a standalone signal."
+    if any(term in lowered for term in ("fear", "psychology", "emotion", "clarity", "discipline", "patience")):
+        return f"Use {title.lower()} to separate an evidence-based decision from an emotional reaction before taking risk."
+    if any(term in lowered for term in ("risk", "leverage", "position", "stop", "loss")):
+        return f"Translate {title.lower()} into a defined risk limit and invalidation point before planning the entry."
+    if any(term in lowered for term in ("volume", "value", "acceptance", "rejection", "participation")):
+        return f"Read {title.lower()} as evidence of where the market is accepting trade or refusing to stay."
+    if any(term in lowered for term in ("expansion", "compression", "fractal", "structure", "range")):
+        return f"Place {title.lower()} inside the current market structure before projecting the next expansion."
+    return f"Use {title.lower()} as one step in the mentor's decision process, not as a standalone signal."
 
 
 def build_teaching_sequence(seeds: list[dict[str, Any]]) -> list[str]:
@@ -651,7 +881,7 @@ def build_core_concepts(seeds: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def build_common_misconceptions(seeds: list[dict[str, Any]]) -> list[str]:
     candidates: list[str] = []
-    titles = " ".join(seed["title"].lower() for seed in seeds)
+    titles = lesson_title_text(seeds)
 
     if "submission range" in titles or "matching window" in titles:
         candidates.append(
@@ -673,23 +903,70 @@ def build_common_misconceptions(seeds: list[dict[str, Any]]) -> list[str]:
         candidates.append(
             "A fill objective is not a blind target. It has to line up with the book or imbalance that created the unfinished business."
         )
+    if any(term in titles for term in ("fear", "psychology", "emotion", "clarity", "discipline")):
+        candidates.extend([
+            "Fear is not proof that the setup is wrong. It is a prompt to return to the chart evidence and the predefined risk.",
+            "Confidence does not come from eliminating uncertainty. It comes from knowing the setup, invalidation, and acceptable loss before entry.",
+        ])
+    if any(term in titles for term in ("risk", "leverage", "position sizing", "stop")):
+        candidates.append(
+            "More conviction does not justify undefined risk. Position size still has to respect the invalidation point and account limit."
+        )
+    if any(term in titles for term in ("volume", "profile", "acceptance", "rejection")):
+        candidates.append(
+            "A single volume spike is not a complete trade signal. Its location and the market's response determine what it means."
+        )
+    if any(term in titles for term in ("expansion", "compression", "fractal", "structure")):
+        candidates.append(
+            "Expansion is not permission to chase. First identify the structure it left and the evidence needed for continuation."
+        )
 
     if not candidates:
         candidates.append(
-            "The lesson is not asking you to memorize labels. It is asking you to follow the order-flow sequence in the right order."
+            "The lesson is not asking you to memorize labels. It is asking you to connect evidence, decision, risk, and invalidation in the right order."
+        )
+    if len(candidates) < 2:
+        candidates.append(
+            "One clue is not a complete setup. The observation still needs confirmation, a defined risk, and a condition that invalidates the idea."
         )
 
     return dedupe_text_items(candidates, 5)
 
 
 def build_chart_reading_rules(seeds: list[dict[str, Any]]) -> list[str]:
-    candidates = [
-        "Mark the submission range before the matching session so you can compare intent with actual execution.",
-        "Only promote a level to real liquidity after price trades back through it and matching is confirmed.",
-        "Use the book high, low, and EQ as your first map for later fills, sweeps, and reactions.",
-    ]
+    titles = lesson_topic_text(seeds)
+    candidates: list[str] = []
 
-    titles = " ".join(seed["title"].lower() for seed in seeds)
+    if is_order_flow_lesson(seeds):
+        candidates.extend([
+            "Mark the submission range before the matching session so you can compare intent with actual execution.",
+            "Only promote a level to real liquidity after price trades back through it and matching is confirmed.",
+            "Use the book high, low, and EQ as your first map for later fills, sweeps, and reactions.",
+        ])
+    elif any(term in titles for term in ("fear", "psychology", "emotion", "clarity", "discipline")):
+        candidates.extend([
+            "Write the setup evidence, invalidation, and acceptable loss before entry so emotion cannot silently rewrite the plan.",
+            "When fear or confusion rises, pause and compare the live chart with the conditions that originally justified the trade.",
+            "Treat hesitation after valid confirmation differently from hesitation caused by missing evidence.",
+        ])
+    elif any(term in titles for term in ("volume", "profile", "acceptance", "rejection")):
+        candidates.extend([
+            "Read volume at a location, not in isolation; compare participation with the structure price is testing.",
+            "Use sustained trade around value as evidence of acceptance and a fast response away as evidence of rejection.",
+            "Wait for price response to confirm what a volume event means before setting the directional expectation.",
+        ])
+    elif any(term in titles for term in ("expansion", "compression", "fractal", "structure")):
+        candidates.extend([
+            "Mark the range or compression that precedes expansion so the move has a structural origin.",
+            "Separate a clean structural break from a temporary probe by checking whether price accepts beyond the boundary.",
+            "Project objectives from the active structure and define the level that invalidates continuation.",
+        ])
+    else:
+        candidates.extend([
+            "Name the market evidence before naming the trade direction.",
+            "Define the confirming condition and invalidation condition before entry.",
+            "Use the mentor's sequence to move from observation to plan instead of treating one clue as a signal.",
+        ])
 
     if "bias" in titles or "delivery" in titles:
         candidates.append(
@@ -734,6 +1011,55 @@ def dedupe_rule_items(items: list[dict[str, Any]], limit: int | None = None) -> 
 
 
 def build_if_then_rules(seeds: list[dict[str, Any]]) -> list[dict[str, str]]:
+    titles = lesson_topic_text(seeds)
+
+    if any(term in titles for term in ("fear", "psychology", "emotion", "clarity", "discipline")):
+        return dedupe_rule_items([
+            {
+                "ifYouSee": "fear rising while the original setup evidence remains valid",
+                "thenExpect": "a pause to re-check the plan rather than an automatic exit or impulsive reversal",
+                "because": "emotion is information about the trader, not new evidence about the market",
+            },
+            {
+                "ifYouSee": "confusion about the setup, invalidation, or acceptable loss",
+                "thenExpect": "the trader to reduce risk or stand aside",
+                "because": "clarity has to exist before capital is committed",
+            },
+            {
+                "ifYouSee": "the market violate the predefined invalidation condition",
+                "thenExpect": "the thesis to be closed or reassessed",
+                "because": "discipline means responding to contrary evidence instead of defending the original opinion",
+            },
+        ], 4)
+
+    if any(term in titles for term in ("volume", "profile", "acceptance", "rejection")):
+        return dedupe_rule_items([
+            {
+                "ifYouSee": "sustained participation and trade holding around a level",
+                "thenExpect": "acceptance and further auction around that value",
+                "because": "the market is spending time and volume there instead of immediately rejecting it",
+            },
+            {
+                "ifYouSee": "a sharp response away from a tested value area",
+                "thenExpect": "rejection to remain the working read until price reclaims it",
+                "because": "price failed to attract continued participation at that location",
+            },
+        ], 4)
+
+    if any(term in titles for term in ("expansion", "compression", "fractal", "structure")):
+        return dedupe_rule_items([
+            {
+                "ifYouSee": "compression resolve with acceptance beyond its boundary",
+                "thenExpect": "expansion toward the next structural objective",
+                "because": "the market has left balance and is sustaining trade outside it",
+            },
+            {
+                "ifYouSee": "a breakout return and hold back inside the prior range",
+                "thenExpect": "the expansion thesis to weaken",
+                "because": "price failed to maintain acceptance beyond the structure",
+            },
+        ], 4)
+
     rules = [
         {
             "ifYouSee": "submission overlap with the matching window",
@@ -757,7 +1083,6 @@ def build_if_then_rules(seeds: list[dict[str, Any]]) -> list[dict[str, str]]:
         },
     ]
 
-    titles = " ".join(seed["title"].lower() for seed in seeds)
     if "bias" not in titles and "delivery" not in titles:
         rules = rules[:2] + rules[3:]
     if "unmatched" not in titles and "gap" not in titles and "fill" not in titles:
@@ -767,12 +1092,35 @@ def build_if_then_rules(seeds: list[dict[str, Any]]) -> list[dict[str, str]]:
 
 
 def build_diagnostic_questions(seeds: list[dict[str, Any]]) -> list[str]:
-    questions = [
-        "Where on the chart did submitted interest become matched liquidity instead of staying theoretical?",
-        "Which level is the real book high, low, or EQ here, and what evidence proves it?",
-        "What would invalidate your current bias read if the market handled this zone differently?",
-        "If price returns to this book, who is most likely being filled or defended?",
-    ]
+    titles = lesson_topic_text(seeds)
+    if any(term in titles for term in ("fear", "psychology", "emotion", "clarity", "discipline")):
+        questions = [
+            "Which part of your reaction comes from new market evidence, and which part comes from fear or uncertainty?",
+            "Can you state the setup, invalidation, and acceptable loss without adding a new rule after entry?",
+            "What evidence would justify staying with the plan, and what evidence would require you to exit?",
+            "Would you make the same decision if no open position or profit-and-loss number were visible?",
+        ]
+    elif any(term in titles for term in ("volume", "profile", "acceptance", "rejection")):
+        questions = [
+            "Where is the volume event occurring relative to value and the active structure?",
+            "Does price show acceptance, rejection, or only a brief test at this location?",
+            "What response would confirm your interpretation of participation here?",
+            "What would invalidate the current acceptance or rejection read?",
+        ]
+    elif is_order_flow_lesson(seeds):
+        questions = [
+            "Where on the chart did submitted interest become matched liquidity instead of staying theoretical?",
+            "Which level is the real book high, low, or EQ here, and what evidence proves it?",
+            "What would invalidate your current bias read if the market handled this zone differently?",
+            "If price returns to this book, who is most likely being filled or defended?",
+        ]
+    else:
+        questions = [
+            "What is the first piece of evidence the mentor identifies before forming a trade idea?",
+            "How does that evidence change the plan rather than merely describe the chart?",
+            "What confirmation is required before execution?",
+            "What market behavior would invalidate the current interpretation?",
+        ]
 
     for seed in seeds[:2]:
         questions.append(
@@ -783,11 +1131,31 @@ def build_diagnostic_questions(seeds: list[dict[str, Any]]) -> list[str]:
 
 
 def build_practice_prompts(source_title: str, seeds: list[dict[str, Any]]) -> list[str]:
-    prompts = [
-        "Open a recent session and mark the submission range, the matching window, and the book high, low, and EQ.",
-        "Find a day where submission and matching did not overlap cleanly, then write down where unfinished business was left behind.",
-        "Replay one lesson clip and narrate the exact moment submitted prices became actionable liquidity.",
-    ]
+    titles = lesson_topic_text(seeds)
+    if any(term in titles for term in ("fear", "psychology", "emotion", "clarity", "discipline")):
+        prompts = [
+            "Before a replay trade, write the setup evidence, invalidation, acceptable loss, and the emotion you expect to feel.",
+            "Replay a difficult decision and pause when fear or confusion appears; separate new market evidence from your internal reaction.",
+            "Review one losing trade and identify whether the plan failed or execution discipline failed.",
+        ]
+    elif any(term in titles for term in ("volume", "profile", "acceptance", "rejection")):
+        prompts = [
+            "Open a recent session and mark one accepted value area and one rejected value area with the price response that proves each label.",
+            "Find a volume spike and explain what its location adds that the spike alone cannot tell you.",
+            "Replay one lesson clip and narrate the evidence that confirms participation or rejection.",
+        ]
+    elif is_order_flow_lesson(seeds):
+        prompts = [
+            "Open a recent session and mark the submission range, the matching window, and the book high, low, and EQ.",
+            "Find a day where submission and matching did not overlap cleanly, then write down where unfinished business was left behind.",
+            "Replay one lesson clip and narrate the exact moment submitted prices became actionable liquidity.",
+        ]
+    else:
+        prompts = [
+            "Open a recent session and narrate the mentor's sequence from observation, to confirmation, to execution, to invalidation.",
+            "Find one example where the setup evidence was present and one where a similar-looking setup lacked confirmation.",
+            "Replay one lesson clip and pause before the mentor's conclusion so you can state the next decision yourself.",
+        ]
 
     if seeds:
         prompts.append(
@@ -798,15 +1166,7 @@ def build_practice_prompts(source_title: str, seeds: list[dict[str, Any]]) -> li
 
 
 def build_glossary(seeds: list[dict[str, Any]]) -> list[dict[str, str]]:
-    corpus_parts: list[str] = []
-    for seed in seeds:
-        corpus_parts.extend([
-            seed["title"],
-            seed.get("studySummary", ""),
-            seed.get("transcriptExcerpt", ""),
-        ])
-
-    corpus = " ".join(corpus_parts).lower()
+    corpus = lesson_title_text(seeds)
 
     glossary: list[dict[str, str]] = []
     for term, definition in GLOSSARY_DEFINITIONS.items():
@@ -939,7 +1299,17 @@ def call_anthropic(prompt: str) -> dict[str, Any] | None:
             data = json.loads(response.read().decode("utf-8"))
             text = data.get("content", [{}])[0].get("text", "")
             return extract_json_block(text)
-    except (urllib.error.URLError, TimeoutError, KeyError, IndexError, json.JSONDecodeError):
+    except urllib.error.HTTPError as exc:
+        print(
+            f"Anthropic lesson generation returned HTTP {exc.code}; using validated deterministic lesson",
+            file=sys.stderr,
+        )
+        return None
+    except (urllib.error.URLError, TimeoutError, KeyError, IndexError, json.JSONDecodeError) as exc:
+        print(
+            f"Anthropic lesson generation failed ({type(exc).__name__}); using validated deterministic lesson",
+            file=sys.stderr,
+        )
         return None
 
 
@@ -1326,8 +1696,10 @@ def build_lesson(video_dir: Path) -> dict[str, Any]:
 
     lesson_core: dict[str, Any]
     generation_mode = "deterministic-fallback"
-    status = "fallback"
     quality = validate_lesson_payload(fallback)
+    non_blocking_flags = {"section_summary_quote_like"}
+    only_non_blocking_flags = set(quality["flags"]).issubset(non_blocking_flags)
+    status = "ready" if quality["valid"] or (quality["score"] >= 0.88 and only_non_blocking_flags) else "fallback"
 
     hybrid_lesson, hybrid_quality = generate_hybrid_lesson(source_title, fallback, seeds)
     if hybrid_lesson and hybrid_quality:
@@ -1362,8 +1734,10 @@ def main() -> None:
 
     lesson = build_lesson(args.video_dir)
     lesson_path = args.video_dir / "lesson.json"
-    with open(lesson_path, "w", encoding="utf-8") as handle:
+    temp_lesson_path = lesson_path.with_suffix(".json.tmp")
+    with open(temp_lesson_path, "w", encoding="utf-8") as handle:
         json.dump(lesson, handle, indent=2)
+    temp_lesson_path.replace(lesson_path)
 
     if args.json:
         print(json.dumps({

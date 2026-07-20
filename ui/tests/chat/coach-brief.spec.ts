@@ -19,7 +19,7 @@ test.describe('TCM chat Coach Brief rendering', () => {
           {
             id: 'assistant-structured',
             role: 'assistant',
-            content: '| New Skill | Category | Description |\n| --- | --- | --- |\n| Book Building | Market Structure | Raw markdown table should not render |',
+            content: 'The mentor treats book building as a sequence: first locate submitted interest, then confirm the matching window actually traded through it.',
             timestamp: new Date().toISOString(),
             structuredAnswer: {
               lead: 'Book building is the overlap between submitted orders and the later matching window.',
@@ -53,17 +53,11 @@ test.describe('TCM chat Coach Brief rendering', () => {
     deleteSession(sessionId);
   });
 
-  test('prefers structured Coach Brief blocks over raw markdown table content', async ({ page }) => {
+  test('prefers the generated tutor response over the retrieval preview', async ({ page }) => {
     await page.goto('/tcm');
 
-    await expect(page.getByText(/Book building is the overlap between submitted orders/i)).toBeVisible();
-    await expect(page.getByText(/Submitted orders show intent, but the book only becomes actionable/i)).toBeVisible();
-    await expect(page.getByText('Mentor take')).toBeVisible();
-    await expect(page.getByText('Key takeaways')).toBeVisible();
-    await expect(page.getByText('Why this watch helps')).toBeVisible();
-    await expect(page.getByText(/Watch the clip around the matching window transition/i)).toBeVisible();
-    await expect(page.getByText('How it fits')).toBeVisible();
-    await expect(page.getByText(/Across TCM material, the same rule holds/i)).toBeVisible();
-    await expect(page.getByText(/\| New Skill \| Category \| Description \|/)).toHaveCount(0);
+    await expect(page.getByText(/The mentor treats book building as a sequence/i)).toBeVisible();
+    await expect(page.getByText('Mentor take')).toHaveCount(0);
+    await expect(page.getByText(/Book building is the overlap between submitted orders/i)).toHaveCount(0);
   });
 });

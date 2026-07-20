@@ -218,6 +218,47 @@ class TestVideoSearcherCorpusValidation(unittest.TestCase):
             with self.assertRaises(ValueError):
                 VideoSearcher(videos_path)
 
+    def test_search_keeps_coarse_only_videos_when_fine_profile_exists(self):
+        from faiss_search import SearchResult, VideoSearcher
+
+        searcher = VideoSearcher.__new__(VideoSearcher)
+        searcher.available_profiles = ["coarse", "fine"]
+        searcher.primary_profile = "coarse"
+        searcher.profile_indexes = {
+            "coarse": {"fine-video": object(), "coarse-only-video": object()},
+            "fine": {"fine-video": object()},
+        }
+
+        coarse_candidates = [
+            SearchResult("fine-video", "fine candidate", 0.0, 10.0, 0.7),
+            SearchResult("coarse-only-video", "coarse candidate", 20.0, 30.0, 0.69),
+        ]
+
+        with (
+            patch.object(searcher, "_embed_query", return_value=object()),
+            patch.object(
+                searcher,
+                "_build_candidate_video_ids",
+                return_value=(coarse_candidates, [], ["fine-video", "coarse-only-video"]),
+            ),
+            patch.object(searcher, "_build_video_prior_scores", return_value={}),
+            patch.object(
+                searcher,
+                "_rank_profile_results",
+                side_effect=[
+                    [SearchResult("fine-video", "fine result", 0.0, 10.0, 0.8)],
+                    [SearchResult("coarse-only-video", "coarse-only result", 20.0, 30.0, 0.75)],
+                ],
+            ) as rank_results,
+        ):
+            results = searcher.search("psychology fear", top_k=5)
+
+        self.assertEqual(
+            [result.video_id for result in results],
+            ["fine-video", "coarse-only-video"],
+        )
+        self.assertEqual(rank_results.call_args_list[1].args[3], ["coarse-only-video"])
+
     def test_video_searcher_rejects_fine_profile_with_wrong_dimension(self):
         from faiss_search import VideoSearcher
 

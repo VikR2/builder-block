@@ -53,10 +53,10 @@ function resolveChatProvider(): ChatProvider {
 export const CHAT_PROVIDER = resolveChatProvider();
 export const CHAT_MODEL = process.env.TCM_CHAT_MODEL || (
   CHAT_PROVIDER === 'openai'
-    ? 'gpt-5-mini'
+    ? 'gpt-5.4-mini'
     : CHAT_PROVIDER === 'anthropic'
-      ? 'claude-3-5-haiku-latest'
-      : 'gpt-5-mini'
+      ? 'claude-haiku-4-5-20251001'
+      : 'gpt-5.4-mini'
 );
 const CHAT_TIMEOUT_MS = Number.parseInt(process.env.TCM_CHAT_TIMEOUT_MS || '15000', 10);
 export const USE_LLM = CHAT_PROVIDER !== 'none';
@@ -121,6 +121,7 @@ export interface LLMResult {
   usedLLM: boolean;
   generationMs: number;
   model: string | null;
+  fallbackReason: 'provider_unavailable' | 'generation_failed' | null;
 }
 
 function parsePreferredPlaylistId(value: ChatRequestBody['preferredPlaylistId']): number | null {
@@ -509,7 +510,7 @@ function getLessonMomentDescription(videoId: string, targetTimestamp: number): s
   }
 
   const lesson = readVideoLesson(videoDir);
-  if (!lesson || !lessonHasUsableChatContent(lesson)) {
+  if (!lesson || !isLessonUsableForChat(lesson) || !lessonHasUsableChatContent(lesson)) {
     return null;
   }
 
@@ -556,7 +557,9 @@ function buildPreferredLessonClip(videoId: string, preferredTimestamp?: number |
   }
 
   const lesson = readVideoLesson(videoDir);
-  const lessonForClip = lesson && lessonHasUsableChatContent(lesson) ? lesson : null;
+  const lessonForClip = lesson && isLessonUsableForChat(lesson) && lessonHasUsableChatContent(lesson)
+    ? lesson
+    : null;
   const targetTimestamp = typeof preferredTimestamp === 'number' && Number.isFinite(preferredTimestamp)
     ? preferredTimestamp
     : null;
@@ -609,7 +612,7 @@ function getLessonSources(videoId: string): TCMSearchResult[] {
   }
 
   const lesson = readVideoLesson(videoDir);
-  if (!lesson || !lessonHasUsableChatContent(lesson)) {
+  if (!lesson || !isLessonUsableForChat(lesson) || !lessonHasUsableChatContent(lesson)) {
     return [];
   }
 
@@ -893,7 +896,7 @@ function buildContext(params: {
 
   const relatedLessonDocuments = Array.from(new Set(transcriptResults.map((result) => result.videoId)))
     .filter((videoId) => videoId !== resolvedPreferredVideoId)
-    .slice(0, 3)
+    .slice(0, 2)
     .flatMap((videoId) => getLessonSources(videoId));
 
   const documents = [
@@ -1104,6 +1107,7 @@ async function generateOpenAIResponse(params: {
     usedLLM: true,
     generationMs: 0,
     model: CHAT_MODEL,
+    fallbackReason: null,
   };
 }
 
@@ -1150,6 +1154,7 @@ async function generateAnthropicResponse(params: {
     usedLLM: true,
     generationMs: 0,
     model: CHAT_MODEL,
+    fallbackReason: null,
   };
 }
 
@@ -1232,6 +1237,7 @@ async function streamOpenAIResponse(params: {
     usedLLM: true,
     generationMs: 0,
     model: CHAT_MODEL,
+    fallbackReason: null,
   };
 }
 
@@ -1312,6 +1318,7 @@ async function streamAnthropicResponse(params: {
     usedLLM: true,
     generationMs: 0,
     model: CHAT_MODEL,
+    fallbackReason: null,
   };
 }
 
@@ -1328,7 +1335,8 @@ export async function generateLLMResponse(params: {
       response: normalizeAssistantResponse(generateContextBasedResponse(params.context)),
       usedLLM: false,
       generationMs: Date.now() - generationStartedAt,
-      model: null
+      model: null,
+      fallbackReason: 'provider_unavailable',
     };
   }
 
@@ -1356,7 +1364,8 @@ export async function generateLLMResponse(params: {
       response: normalizeAssistantResponse(generateContextBasedResponse(params.context)),
       usedLLM: false,
       generationMs: Date.now() - generationStartedAt,
-      model: CHAT_MODEL
+      model: CHAT_MODEL,
+      fallbackReason: 'generation_failed',
     };
   } finally {
     clearTimeout(timeout);
@@ -1379,7 +1388,8 @@ export async function streamLLMResponse(params: {
       response: fallback,
       usedLLM: false,
       generationMs: Date.now() - generationStartedAt,
-      model: null
+      model: null,
+      fallbackReason: 'provider_unavailable',
     };
   }
 
@@ -1409,7 +1419,8 @@ export async function streamLLMResponse(params: {
       response: fallback,
       usedLLM: false,
       generationMs: Date.now() - generationStartedAt,
-      model: CHAT_MODEL
+      model: CHAT_MODEL,
+      fallbackReason: 'generation_failed',
     };
   } finally {
     clearTimeout(timeout);

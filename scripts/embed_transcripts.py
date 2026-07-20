@@ -9,6 +9,7 @@ fine exact-clip rerank corpus side by side.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from dataclasses import dataclass
@@ -85,6 +86,11 @@ def load_video_title(video_path: Path) -> str | None:
         return None
 
 
+def transcript_fingerprint(video_path: Path) -> str:
+    transcript_file = video_path / "transcript_timed.json"
+    return hashlib.sha256(transcript_file.read_bytes()).hexdigest()
+
+
 def parse_profiles(raw_profiles: str) -> list[IndexProfile]:
     selected_profiles: list[IndexProfile] = []
     seen_names: set[str] = set()
@@ -154,6 +160,7 @@ def write_profile_index(
     *,
     video_id: str,
     video_title: str | None,
+    source_fingerprint: str,
     segments: list[dict],
     profile: IndexProfile,
 ) -> dict | None:
@@ -174,7 +181,9 @@ def write_profile_index(
 
     index_path = video_path / profile.index_filename
     metadata_path = video_path / profile.metadata_filename
-    faiss.write_index(index, str(index_path))
+    temporary_index_path = video_path / f"{profile.index_filename}.tmp"
+    temporary_metadata_path = video_path / f"{profile.metadata_filename}.tmp"
+    faiss.write_index(index, str(temporary_index_path))
 
     metadata = {
         "video_id": video_id,
@@ -190,10 +199,13 @@ def write_profile_index(
         "title_prefix_mode": profile.title_prefix_mode,
         "dimension": dimension,
         "num_embeddings": int(embeddings.shape[0]),
+        "source_fingerprint": source_fingerprint,
         "segments": windows,
     }
-    with open(metadata_path, "w", encoding="utf-8") as handle:
+    with open(temporary_metadata_path, "w", encoding="utf-8") as handle:
         json.dump(metadata, handle, indent=2)
+    temporary_index_path.replace(index_path)
+    temporary_metadata_path.replace(metadata_path)
 
     print(
         f"  [{profile.name}] Saved {embeddings.shape[0]} embeddings "
@@ -208,7 +220,57 @@ def write_profile_index(
     }
 
 
-def embed_video(embedder, config, video_path: Path, profiles: list[IndexProfile]) -> list[dict]:
+def current_profile_result(
+    config,
+    video_path: Path,
+    *,
+    source_fingerprint: str,
+    profile: IndexProfile,
+) -> dict | None:
+    index_path = video_path / profile.index_filename
+    metadata_path = video_path / profile.metadata_filename
+    if not index_path.exists() or not metadata_path.exists():
+        return None
+
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    expected = {
+        "provider": config.provider,
+        "model": config.model,
+        "modality": config.modality,
+        "index_version": config.index_version,
+        "profile": profile.name,
+        "source_fingerprint": source_fingerprint,
+    }
+    if any(metadata.get(key) != value for key, value in expected.items()):
+        return None
+
+    windows = metadata.get("num_embeddings")
+    dimension = metadata.get("dimension")
+    if not isinstance(windows, int) or windows <= 0 or not isinstance(dimension, int) or dimension <= 0:
+        return None
+
+    return {
+        "profile": profile.name,
+        "indexFile": profile.index_filename,
+        "metadataFile": profile.metadata_filename,
+        "windows": windows,
+        "dimension": dimension,
+        "skipped": True,
+    }
+
+
+def embed_video(
+    embedder,
+    config,
+    video_path: Path,
+    profiles: list[IndexProfile],
+    *,
+    skip_valid: bool = False,
+) -> list[dict]:
     video_id = video_path.name
     segments = load_transcript(video_path)
     if not segments:
@@ -216,17 +278,31 @@ def embed_video(embedder, config, video_path: Path, profiles: list[IndexProfile]
         return []
 
     video_title = load_video_title(video_path)
+    source_fingerprint = transcript_fingerprint(video_path)
     if video_title:
         print(f"  Title: '{video_title}'")
 
     generated: list[dict] = []
     for profile in profiles:
+        if skip_valid:
+            current_result = current_profile_result(
+                config,
+                video_path,
+                source_fingerprint=source_fingerprint,
+                profile=profile,
+            )
+            if current_result is not None:
+                print(f"  [{profile.name}] Current index already valid; skipping")
+                generated.append(current_result)
+                continue
+
         result = write_profile_index(
             embedder,
             config,
             video_path,
             video_id=video_id,
             video_title=video_title,
+            source_fingerprint=source_fingerprint,
             segments=segments,
             profile=profile,
         )
@@ -251,7 +327,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--profiles",
-        default="coarse",
+        default="coarse,fine",
         help="Comma-separated embedding profiles to build (coarse, fine, or coarse,fine)",
     )
     parser.add_argument(
@@ -266,6 +342,11 @@ def main() -> None:
     parser.add_argument(
         "--model",
         help="Embedding model override",
+    )
+    parser.add_argument(
+        "--skip-valid",
+        action="store_true",
+        help="Skip profile indexes already matching the transcript fingerprint and embedding configuration",
     )
     args = parser.parse_args()
 
@@ -302,7 +383,13 @@ def main() -> None:
 
         total += 1
         print(f"\n{video_dir.name}")
-        generated = embed_video(embedder, config, video_dir, profiles)
+        generated = embed_video(
+            embedder,
+            config,
+            video_dir,
+            profiles,
+            skip_valid=args.skip_valid,
+        )
         if len(generated) == len(profiles):
             success += 1
             embedded_dirs.append({

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -41,6 +42,10 @@ GOOGLE_INDEX_VERSION = "tcm-gemini-v3"
 GOOGLE_API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 GOOGLE_API_KEY_ENV_VARS = ("GOOGLE_API_KEY", "GEMINI_API_KEY")
 GOOGLE_BATCH_SIZE = 32
+GOOGLE_MIN_REQUEST_INTERVAL_SECONDS = float(
+    os.environ.get("TCM_GOOGLE_EMBED_MIN_INTERVAL_SECONDS", "2.1")
+)
+GOOGLE_MAX_RETRIES = int(os.environ.get("TCM_GOOGLE_EMBED_MAX_RETRIES", "5"))
 
 
 @dataclass(frozen=True)
@@ -279,6 +284,42 @@ class GoogleGeminiEmbedder(BaseEmbedder):
                 "Google Gemini embeddings require GOOGLE_API_KEY or GEMINI_API_KEY to be set"
             )
         self._api_key = api_key
+        self._last_request_started_at = 0.0
+
+    def _wait_for_request_slot(self) -> None:
+        elapsed = time.monotonic() - self._last_request_started_at
+        remaining = GOOGLE_MIN_REQUEST_INTERVAL_SECONDS - elapsed
+        if remaining > 0:
+            time.sleep(remaining)
+
+    def _send_batch_request(self, request: urllib.request.Request) -> dict:
+        for attempt in range(GOOGLE_MAX_RETRIES + 1):
+            self._wait_for_request_slot()
+            self._last_request_started_at = time.monotonic()
+
+            try:
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")
+                if exc.code != 429 or attempt >= GOOGLE_MAX_RETRIES:
+                    raise RuntimeError(
+                        f"Google Gemini embedding request failed with {exc.code}: {detail}"
+                    ) from exc
+
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                try:
+                    retry_delay = float(retry_after) if retry_after else 10.0 * (2 ** attempt)
+                except ValueError:
+                    retry_delay = 10.0 * (2 ** attempt)
+                retry_delay = min(max(retry_delay, 2.0), 60.0)
+                print(
+                    f"  Gemini quota limit reached; retrying batch in {retry_delay:.0f}s "
+                    f"({attempt + 1}/{GOOGLE_MAX_RETRIES})"
+                )
+                time.sleep(retry_delay)
+
+        raise RuntimeError("Google Gemini embedding request retry loop ended unexpectedly")
 
     def _embed(self, texts: Sequence[str], task_type: str) -> list[list[float]]:
         vectors: list[list[float]] = []
@@ -310,14 +351,7 @@ class GoogleGeminiEmbedder(BaseEmbedder):
                 method="POST",
             )
 
-            try:
-                with urllib.request.urlopen(request, timeout=60) as response:
-                    body = json.loads(response.read().decode("utf-8"))
-            except urllib.error.HTTPError as exc:
-                detail = exc.read().decode("utf-8", errors="replace")
-                raise RuntimeError(
-                    f"Google Gemini embedding request failed with {exc.code}: {detail}"
-                ) from exc
+            body = self._send_batch_request(request)
 
             embeddings = body.get("embeddings")
             if not isinstance(embeddings, list):

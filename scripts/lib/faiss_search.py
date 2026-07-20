@@ -911,8 +911,26 @@ class VideoSearcher:
                 per_video_k=max(top_k * 12, 40),
                 video_prior_scores=video_prior_scores,
             )
-            if fine_results:
-                return fine_results
+            fine_video_ids = set(self._get_profile_indexes("fine"))
+            coarse_only_video_ids = [
+                video_id
+                for video_id in candidate_video_ids
+                if video_id not in fine_video_ids
+            ]
+            coarse_only_results = self._rank_profile_results(
+                self.primary_profile,
+                normalized_query,
+                query_embedding,
+                coarse_only_video_ids,
+                top_k=top_k,
+                per_video_k=max(top_k * 12, 40),
+                video_prior_scores=video_prior_scores,
+            ) if coarse_only_video_ids else []
+
+            combined_results = fine_results + coarse_only_results
+            if combined_results:
+                combined_results.sort(key=lambda result: result.score, reverse=True)
+                return combined_results[:top_k]
 
         return coarse_results[:top_k]
 

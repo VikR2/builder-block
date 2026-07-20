@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
       watchLink: payload.watchLink,
       lessonLink: payload.lessonLink,
       usedLLM: llmResult.usedLLM,
+      fallbackReason: llmResult.fallbackReason,
       chargedCredits: creditReserved && llmResult.usedLLM ? 1 : 0,
       remainingCredits,
       contextSize: payload.contextSize,

@@ -346,6 +346,9 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
           recommendedClips: data.recommendedClips || [],
           watchLink: data.watchLink || undefined,
           lessonLink: data.lessonLink || undefined,
+          usedLLM: typeof data.usedLLM === "boolean" ? data.usedLLM : undefined,
+          fallbackReason: data.fallbackReason || null,
+          model: data.model || null,
         }));
       };
 
@@ -430,6 +433,11 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
                 isLoading: false,
                 content: accumulatedContent,
                 structuredAnswer: parsed.structuredAnswer as StructuredCoachBrief | undefined || current.structuredAnswer,
+                usedLLM: typeof parsed.usedLLM === "boolean" ? parsed.usedLLM : undefined,
+                fallbackReason: parsed.fallbackReason === "provider_unavailable" || parsed.fallbackReason === "generation_failed"
+                  ? parsed.fallbackReason
+                  : null,
+                model: typeof parsed.model === "string" ? parsed.model : null,
               }));
             } else if (eventName === "error") {
               throw new Error(typeof parsed.error === "string" ? parsed.error : "Streaming response failed");
