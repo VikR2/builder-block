@@ -42,6 +42,8 @@ interface SkillSuggestion {
   description: string;
 }
 
+type TCMResponseStyle = "explain" | "checklist";
+
 const DEFAULT_WELCOME_MESSAGE =
   "Welcome to the TCM Knowledge Bot! Ask me anything about TCM trading concepts like:\n\n- What is the Submission Range?\n- How does book building work?\n- Explain order fulfillment\n- What is the matching window?";
 const LEGACY_NAMESPACE_SEPARATOR = "\u0001";
@@ -86,6 +88,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
     },
   ]);
   const [input, setInput] = useState("");
+  const [responseStyle, setResponseStyle] = useState<TCMResponseStyle>("explain");
   const [isSearching, setIsSearching] = useState(false);
   const [hasHydratedStorage, setHasHydratedStorage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -311,6 +314,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
         preferredPlaylistId,
         preferredTimestamp,
         chatMode,
+        responseStyle,
       };
 
       const setAssistantState = (updater: (current: Message) => Message) => {
@@ -473,7 +477,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
       setIsSearching(false);
       inputRef.current?.focus();
     }
-  }, [chatMode, isSearching, messages, preferredPlaylistId, preferredTimestamp, preferredVideoId]);
+  }, [chatMode, isSearching, messages, preferredPlaylistId, preferredTimestamp, preferredVideoId, responseStyle]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -495,6 +499,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
   const handleNewChat = () => {
     setMessages([createWelcomeMessage()]);
     setInput("");
+    setResponseStyle("explain");
     setShowAutocomplete(false);
     inputRef.current?.focus();
   };
@@ -540,6 +545,45 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
 
       {/* Input */}
       <div className="border-t border-border/70 bg-background/80 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div
+            className="inline-flex rounded-lg border border-border/70 bg-secondary/40 p-1"
+            role="group"
+            aria-label="Answer style"
+          >
+            {([
+              { value: "explain", label: "Explain" },
+              { value: "checklist", label: "Checklist" },
+            ] as const).map((option) => {
+              const isSelected = responseStyle === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={isSelected}
+                  disabled={isSearching}
+                  onClick={() => {
+                    setResponseStyle(option.value);
+                    inputRef.current?.focus();
+                  }}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    isSelected
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {responseStyle === "checklist"
+              ? "Turn the lesson into confirmations and invalidations."
+              : "Teach the concept and connect it to the strongest clip."}
+          </p>
+        </div>
         <form onSubmit={handleSubmit} className="flex gap-2 relative">
           {/* Autocomplete Dropdown */}
           {showAutocomplete && suggestions.length > 0 && (

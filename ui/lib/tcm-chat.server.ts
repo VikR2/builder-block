@@ -68,10 +68,14 @@ export interface ChatRequestBody {
   preferredPlaylistId?: number | string | null;
   preferredTimestamp?: number | null;
   chatMode?: TCMChatMode;
+  responseStyle?: TCMResponseStyle;
 }
+
+export type TCMResponseStyle = 'explain' | 'checklist';
 
 export interface AssembledChatContext {
   query: string;
+  responseStyle: TCMResponseStyle;
   skills: TCMSearchResult[];
   documents: TCMSearchResult[];
   transcripts: TCMSearchResult[];
@@ -859,11 +863,12 @@ function buildFrameReferences(results: RankedTranscriptResult[], clips: VideoCli
 
 function buildContext(params: {
   query: string;
+  responseStyle: TCMResponseStyle;
   transcriptResults: RankedTranscriptResult[];
   mode: TCMChatMode;
   resolvedPreferredVideoId: string | null;
 }): AssembledChatContext {
-  const { query, transcriptResults, mode, resolvedPreferredVideoId } = params;
+  const { query, responseStyle, transcriptResults, mode, resolvedPreferredVideoId } = params;
   const searchedSkills = searchTCMSkills(query, 4).map((skill) => ({
     type: 'skill' as const,
     id: `skill-${skill.id}`,
@@ -922,6 +927,7 @@ function buildContext(params: {
 
   return {
     query,
+    responseStyle,
     skills,
     documents,
     transcripts,
@@ -931,6 +937,7 @@ function buildContext(params: {
 
 export async function buildChatResponsePayload(body: ChatRequestBody): Promise<ChatResponsePayload> {
   const retrievalStartedAt = Date.now();
+  const responseStyle: TCMResponseStyle = body.responseStyle === 'checklist' ? 'checklist' : 'explain';
   const inferredPreferredVideoId = body.preferredVideoId ? null : inferPreferredVideoIdFromQuery(body.message);
   const effectivePreferredVideoId = body.preferredVideoId ?? inferredPreferredVideoId ?? undefined;
   const mode = body.chatMode === 'lesson' || Boolean(inferredPreferredVideoId) ? 'lesson' : 'knowledge';
@@ -948,6 +955,7 @@ export async function buildChatResponsePayload(body: ChatRequestBody): Promise<C
 
   const context = buildContext({
     query: body.message,
+    responseStyle,
     transcriptResults,
     mode,
     resolvedPreferredVideoId
@@ -991,11 +999,32 @@ export async function buildChatResponsePayload(body: ChatRequestBody): Promise<C
   };
 }
 
+const RESPONSE_STYLE_INSTRUCTIONS: Record<TCMResponseStyle, string> = {
+  explain: `## Selected Answer Style: Explain
+- Teach the concept in plain language before giving practical application.
+- Use the mentor's sequence and vocabulary only when the retrieved evidence supports it.
+- Keep the answer focused, then recommend the strongest supporting clip.`,
+  checklist: `## Selected Answer Style: Checklist
+- This selected style overrides the default Coach Brief response format.
+- Start with one sentence stating what the checklist helps the student decide.
+- Then use only these supported sections: **Before**, **Confirm**, **Execute**, and **Invalidate**.
+- Under each included section, write flat markdown checkbox items in the exact form "- [ ] Observable action or condition".
+- Do not use nested bullets, numbered lists, or explanatory paragraphs between checklist items.
+- Use no more than two checkbox items per included section and eight items total. Prioritize the strongest evidence.
+- Include confirmations, invalidations, and when to wait only when they appear in the retrieved evidence.
+- Keep the checklist compact and specific. Do not pad it with generic trading or risk advice.
+- Do not add a Sources section or a Best clip sentence; the interface displays the supporting lesson clip separately.`,
+};
+
 function buildUserPrompt(message: string, context: AssembledChatContext, mode: TCMChatMode): string {
   const allResults = [...context.skills, ...context.documents, ...context.transcripts];
-  return buildContextAssemblyPrompt(mode)
+  const groundedPrompt = buildContextAssemblyPrompt(mode)
     .replace('{context}', formatContextForLLM(allResults))
     .replace('{question}', message);
+
+  return `${groundedPrompt}
+
+${RESPONSE_STYLE_INSTRUCTIONS[context.responseStyle]}`;
 }
 
 function buildConversationHistory(
