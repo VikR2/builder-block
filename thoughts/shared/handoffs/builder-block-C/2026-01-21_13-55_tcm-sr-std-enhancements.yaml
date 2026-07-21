@@ -1,0 +1,51 @@
+---
+session: builder-block-C
+date: 2026-01-21
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Added configurable opening price line end times and info box size controls to TCM-SR-STD.pine
+now: Test the new settings in TradingView - verify Compact mode shrinks info box, Hidden removes it
+
+test: Load TCM-SR-STD.pine in TradingView, check Visual Settings for "Info Box Size" dropdown
+
+done_this_session:
+  - task: Implemented configurable opening price line endpoints (replaces global toggle)
+    files: [scripts-output/TradingView/TCM-SR-STD.pine:92-143]
+  - task: Added getTimeEndBar() helper function for line endpoint calculation
+    files: [scripts-output/TradingView/TCM-SR-STD.pine:158-165]
+  - task: Updated all 10 opening price drawing locations to use per-input dropdowns
+    files: [scripts-output/TradingView/TCM-SR-STD.pine:1465-1648]
+  - task: Added info box size control (Normal/Compact/Hidden)
+    files: [scripts-output/TradingView/TCM-SR-STD.pine:27, 1662-1669]
+  - task: Fixed Pine Script v6 syntax error (multi-line ternary)
+    files: [scripts-output/TradingView/TCM-SR-STD.pine:162]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - per_input_dropdowns: Each opening price type gets its own "Line Ends At" dropdown instead of global toggle - more granular control
+  - session_end_default: Default "Session End" produces cleaner charts than previous "extend all" behavior
+  - compact_size_mapping: Compact mode shifts all sizes down one level (large→normal, normal→small, small→tiny)
+
+findings:
+  - pine_v6_ternary: Multi-line ternary expressions cause syntax errors in Pine Script v6 - must be single line
+  - info_box_is_table: The "toolbox" is actually a table.new() at position.top_right with 3 cols x 12 rows
+
+worked:
+  - Using dropdown with options array for configurable line endpoints
+  - Size variables (szLarge, szNormal, szSmall) computed once and reused in all table.cell() calls
+
+failed:
+  - Multi-line ternary in helper function caused "end of line without continuation" error - fixed by single-lining
+
+next:
+  - Future enhancement: Implement specific time endpoints (11:40, 14:00, etc.) with timestamp-to-bar lookup
+  - Consider adding more info box positions (top-left, bottom-right, etc.)
+
+files:
+  created: []
+  modified: [scripts-output/TradingView/TCM-SR-STD.pine]

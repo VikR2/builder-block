@@ -1,0 +1,112 @@
+---
+session: builder-block-C
+date: 2026-01-18
+status: complete
+outcome: PARTIAL_MINUS
+---
+
+goal: Implement YouTube Studio-style video organization admin panel with categories, tags, playlists, and Playwright testing
+now: Run manual tests on /tcm/admin/organize and /tcm/library to verify features work correctly
+
+test: cd ui && npx playwright test tests/admin/organize.spec.ts tests/library/organization.spec.ts --headed
+
+done_this_session:
+  - task: Created database migration for video organization tables
+    files: [data/migrations/040_add_video_organization.sql]
+  - task: Created data layer with full CRUD for categories, tags, playlists
+    files: [ui/lib/tcm-admin/organization.ts]
+  - task: Created admin API routes for categories CRUD
+    files: [ui/app/api/tcm/admin/categories/route.ts, ui/app/api/tcm/admin/categories/[id]/route.ts]
+  - task: Created admin API routes for tags CRUD
+    files: [ui/app/api/tcm/admin/tags/route.ts, ui/app/api/tcm/admin/tags/[id]/route.ts]
+  - task: Created admin API routes for playlists with items management
+    files: [ui/app/api/tcm/admin/playlists/route.ts, ui/app/api/tcm/admin/playlists/[id]/route.ts, ui/app/api/tcm/admin/playlists/[id]/items/route.ts]
+  - task: Created admin API routes for video category/tag assignment
+    files: [ui/app/api/tcm/admin/videos/[id]/category/route.ts, ui/app/api/tcm/admin/videos/[id]/tags/route.ts]
+  - task: Created public API routes for library browsing
+    files: [ui/app/api/tcm/library/categories/route.ts, ui/app/api/tcm/library/tags/route.ts, ui/app/api/tcm/library/playlists/route.ts, ui/app/api/tcm/library/playlists/[slug]/route.ts]
+  - task: Created CategoryManager component with drag-drop reordering and color picker
+    files: [ui/components/admin/category-manager.tsx]
+  - task: Created TagManager component with pill-style UI
+    files: [ui/components/admin/tag-manager.tsx]
+  - task: Created PlaylistEditor component with drag-drop video ordering
+    files: [ui/components/admin/playlist-editor.tsx]
+  - task: Created organization dashboard page at /tcm/admin/organize
+    files: [ui/app/tcm/admin/organize/page.tsx]
+  - task: Updated admin videos page with category/tag filters
+    files: [ui/app/tcm/admin/videos/page.tsx]
+  - task: Created LibraryContent client component with category tabs, tag chips, playlists section
+    files: [ui/components/tcm/library-content.tsx]
+  - task: Updated public library page to use LibraryContent
+    files: [ui/app/tcm/library/page.tsx]
+  - task: Created public playlist page with ordered video list
+    files: [ui/app/tcm/library/playlists/[slug]/page.tsx]
+  - task: Ran database migration successfully
+    files: [data/builder.db]
+  - task: Created Playwright testing rule
+    files: [.claude/rules/playwright-testing.md]
+  - task: Created Playwright tests for admin organization features
+    files: [ui/tests/admin/organize.spec.ts]
+  - task: Created Playwright tests for library organization features
+    files: [ui/tests/library/organization.spec.ts]
+
+blockers: []
+
+questions:
+  - Should video-to-category/tag assignments be shown inline in the video table?
+  - Should category/tag filtering actually filter videos (currently shows all videos)?
+
+decisions:
+  - client_component_for_filtering: Created LibraryContent client component to handle interactive filtering while keeping auth check server-side
+  - native_drag_drop: Used HTML5 native drag events instead of react-beautiful-dnd for simpler implementation
+  - slug_based_routing: Used slug-based URLs for public playlist pages for SEO-friendly URLs
+
+findings:
+  - next14_async_params: Next.js 14+ requires `await context.params` pattern for dynamic route parameters
+  - sqlite_boolean_handling: SQLite uses INTEGER (0/1) for boolean values, not native BOOLEAN
+  - playlist_api_flexibility: Added `?all=true` query param to playlists API to get all playlists including unpublished
+
+worked:
+  - Modal pattern with backdrop blur and fixed positioning
+  - Optimistic UI updates with revert on failure for reordering
+  - Color picker with preset colors displayed as circular buttons
+  - Promise.all for concurrent data fetching
+
+failed:
+  - Playwright MCP browser launch failed due to Chrome session conflicts on Windows
+
+next:
+  - Run manual tests with dev server on /tcm/admin/organize
+  - Test playlist creation and video ordering
+  - Test public library filtering and playlist viewing
+  - Consider adding video-to-category/tag assignment UI in video table
+
+files:
+  created:
+    - data/migrations/040_add_video_organization.sql
+    - ui/lib/tcm-admin/organization.ts
+    - ui/app/api/tcm/admin/categories/route.ts
+    - ui/app/api/tcm/admin/categories/[id]/route.ts
+    - ui/app/api/tcm/admin/tags/route.ts
+    - ui/app/api/tcm/admin/tags/[id]/route.ts
+    - ui/app/api/tcm/admin/playlists/route.ts
+    - ui/app/api/tcm/admin/playlists/[id]/route.ts
+    - ui/app/api/tcm/admin/playlists/[id]/items/route.ts
+    - ui/app/api/tcm/admin/videos/[id]/category/route.ts
+    - ui/app/api/tcm/admin/videos/[id]/tags/route.ts
+    - ui/app/api/tcm/library/categories/route.ts
+    - ui/app/api/tcm/library/tags/route.ts
+    - ui/app/api/tcm/library/playlists/route.ts
+    - ui/app/api/tcm/library/playlists/[slug]/route.ts
+    - ui/components/admin/category-manager.tsx
+    - ui/components/admin/tag-manager.tsx
+    - ui/components/admin/playlist-editor.tsx
+    - ui/components/tcm/library-content.tsx
+    - ui/app/tcm/admin/organize/page.tsx
+    - ui/app/tcm/library/playlists/[slug]/page.tsx
+    - .claude/rules/playwright-testing.md
+    - ui/tests/admin/organize.spec.ts
+    - ui/tests/library/organization.spec.ts
+  modified:
+    - ui/app/tcm/admin/videos/page.tsx
+    - ui/app/tcm/library/page.tsx

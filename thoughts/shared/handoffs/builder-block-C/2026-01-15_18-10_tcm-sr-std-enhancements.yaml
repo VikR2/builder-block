@@ -1,0 +1,53 @@
+---
+session: builder-block-C
+date: 2026-01-15
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Enhanced TCM-SR-STD.pine indicator with session boxes, opening prices, and optional STD levels
+now: Test indicator in TradingView to verify all new features render correctly
+
+test: Load TCM-SR-STD.pine in TradingView and verify session boxes, opening prices, and STD lines display
+
+done_this_session:
+  - task: Fixed session box opacity (was too dark at 85%, changed to 92%)
+    files: [scripts-output/TradingView/TCM-SR-STD.pine]
+  - task: Added optional 0.5 STD and 2.0 STD target lines with toggles
+    files: [scripts-output/TradingView/TCM-SR-STD.pine]
+  - task: Added lineExtension and labelOffset controls for horizontal line positioning
+    files: [scripts-output/TradingView/TCM-SR-STD.pine]
+  - task: Updated default settings (Days of SR Lines=1, Label Offset=68, Days of Opening Prices=1)
+    files: [scripts-output/TradingView/TCM-SR-STD.pine]
+  - task: Reverted 1H bias change (user requested revert after initial implementation)
+    files: [scripts-output/TradingView/TCM-SR-STD.pine]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - separate_line_extension: Split lineExtension (50 bars) from labelOffset (68 bars) for finer control over line length vs label placement
+  - dotted_half_std: Used line.style_dotted for 0.5 STD lines to visually differentiate from main targets
+  - keep_daily_bias: Kept bias calculation on Daily timeframe after user requested revert from 1H
+
+findings:
+  - color_transparency: color.new() overwrites transparency, so explicit opacity values needed in drawing loops
+  - array_storage: Indicator uses array-based storage for multi-day history (srHighs, srLows, etc.)
+
+worked:
+  - Adding separate arrays for new line types (longHalfLines, short2Lines, etc.)
+  - Using 92% transparency for session boxes (more see-through)
+  - Separate lineExtension vs labelOffset inputs
+
+failed:
+  - 1H bias calculation (user preferred daily timeframe, reverted)
+
+next:
+  - Test all visual elements in TradingView
+  - Verify hit tracking works for new 0.5 STD and 2.0 STD levels
+  - Consider adding custom opening price slots (A-F) like TCM-OF.pine has
+
+files:
+  created: []
+  modified: [scripts-output/TradingView/TCM-SR-STD.pine]

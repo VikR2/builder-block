@@ -1,0 +1,320 @@
+SHAWN'S 7AM / 4:40AM OPEN PRICE TRADING MODEL - STUDY GUIDE
+============================================================
+
+Source: shawn1-1.mp4 (65 minutes)
+Format: 1-on-1 Mentorship Session
+Focus: Futures Trading (Gold, Nasdaq) - NY Session
+Skills: #115-122 (Shawn Model Series)
+
+
+PART 1: THE CORE FRAMEWORK
+--------------------------
+
+This model is built on one simple principle:
+
+    Open prices tell you what orders are being matched and filled.
+
+The two key open prices for futures trading are:
+
+    7:00 AM  = Start of New York Session (like 9:30 for equities)
+    4:40 AM  = Secondary timing level
+
+When price returns to these open prices, you get information about
+what the market makers are doing. Your job is to READ the reaction.
+
+
+PART 2: THE 7AM / 4:40AM RELATIONSHIP
+-------------------------------------
+
+SCENARIO A: 7AM and 4:40AM are CLOSE together
+    -> Expect a LARGE EXPANSION away from them
+    -> Size up on these trades
+    -> Direction determined by first reaction
+
+SCENARIO B: 7AM and 4:40AM are FAR apart
+    -> Expect price to trade FROM one TO the other
+    -> 7AM to 4:40AM or 4:40AM to 7AM
+    -> Scalp between the levels
+
+EXAMPLE:
+    7AM at 5000, 4:40AM at 5002 (close)
+    -> Expect 50-100 point move away
+
+    7AM at 5000, 4:40AM at 5050 (far)
+    -> Trade from 7AM targeting 4:40AM
+
+
+PART 3: OPEN PRICE REJECTION THEORY
+-----------------------------------
+
+This is how you determine bias WITHOUT patterns:
+
+    +-------------------------------------------+
+    | PRICE ABOVE OPEN + NOT CLOSING BELOW      |
+    | = REJECTION = HIGHER PRICES EXPECTED      |
+    +-------------------------------------------+
+
+    +-------------------------------------------+
+    | PRICE CLOSES THROUGH OPEN                 |
+    | = BREAK = CONTINUATION IN THAT DIRECTION  |
+    +-------------------------------------------+
+
+BULLISH SETUP:
+    - Price is above 7AM open
+    - Price wicks below but does NOT close below
+    - This is a REJECTION
+    - Look for longs
+
+BEARISH SETUP:
+    - Price closes THROUGH 7AM open (closes below)
+    - This confirms bearish direction
+    - Look for shorts to next level (often 4:40AM)
+
+
+PART 4: THE ZOOM FRACTAL
+------------------------
+
+Between 4:40AM and 7AM, a fractal often forms:
+
+BULLISH ZOOM FRACTAL:
+
+         4:40AM        7AM
+            |           |
+    High ---+-----------+---
+            |   ___     |
+            |  /   \    |
+    Low  ---+-X-----\---+--- (sweep)
+            |        \__|  <- Close back above
+            |           |
+
+    - Low gets swept (run below)
+    - Price closes back above 4:40AM
+    - This signals HIGHER prices
+
+BEARISH ZOOM FRACTAL:
+    - High gets swept
+    - Price closes back below 4:40AM
+    - This signals LOWER prices
+
+KEY INSIGHT:
+    "This is not pattern trading. A pattern trader looks at the candle.
+    We look at the OPEN PRICES and what's happening there."
+
+
+PART 5: THE THREE BAR RULE (OLR)
+--------------------------------
+
+After an Order Liquidity Run (OLR) sweeps liquidity:
+
+1. Find the THREE BAR HIGH/LOW to the LEFT of the expansion
+2. Wait for a CLOSE beyond that three bar point
+3. Only then is direction confirmed
+
+BULLISH EXAMPLE:
+
+    Before OLR:
+         ___
+        |   |
+        |___|  <- 3-bar high (LEFT of expansion)
+
+    After OLR sweeps lows:
+        Wait for close ABOVE the 3-bar high
+
+    Confirmation = Close above 3-bar high
+    Now expect: Retracement, then higher prices
+
+
+WHY THIS WORKS:
+    - Most traders chase after the sweep
+    - Smart money waits for the CLOSE confirmation
+    - The close proves the market is ready
+
+
+PART 6: THE RETRACEMENT RULE
+----------------------------
+
+After OLR + Close beyond 3-bar:
+
+    ALWAYS EXPECT A RETRACEMENT
+
+Rules of retracements:
+    1. Retracements cannot leave the expansion range
+    2. Most logical target = Order block
+    3. Or the 50% of the order block
+    4. Or the open price
+
+WHAT TO DO:
+    - Take profits at 3-bar confirmation
+    - Re-enter at the retracement
+    - Or move to breakeven before retrace
+
+CRITICAL WARNING:
+    If the order block is retraced BEFORE taking the 3-bar:
+    -> Change in order of delivery
+    -> Look for FVG or Dark Pool entry instead
+
+
+PART 7: THE ORDER BLOCK ENTRY
+-----------------------------
+
+Standard Order Block:
+    - The down candle at the low (for bullish)
+    - The up candle at the high (for bearish)
+    - Identified by: first candle that closes beyond a key level
+
+DARK POOL ENTRY (alternative):
+    When there's no clear FVG:
+    1. Identify the order block candle
+    2. Find the first candle whose LOW is ABOVE the OB high
+    3. That zone is your Dark Pool entry
+    4. Price can retrace there and still be bullish
+
+
+PART 8: SESSION TIMING RULES
+----------------------------
+
+TRADEABLE WINDOWS:
+    - 7:00 AM to 11:40 AM (primary)
+    - After 9:20 (equities open) - watch for retest of 7AM
+    - After 9:30 (market open) - fresh OLRs
+
+AVOID:
+    - PM Session (after noon)
+    - "Stars have to align for me to trade PM"
+    - "I know where I lose money and where I make money"
+
+WHY 7AM TO 4:40AM MATTERS:
+    - Between these times, fractals print
+    - After 8:00, price often moves from 7AM toward 4:40AM
+    - Use 9:20 and 9:30 for confirmation
+
+
+PART 9: QUICK REFERENCE CHECKLIST
+---------------------------------
+
+BEFORE 7AM:
+[ ] Mark 4:40AM open price
+[ ] Note if 7AM and 4:40AM will be close or far
+[ ] Identify any fractal forming between them
+
+AT 7AM:
+[ ] Mark 7AM open price
+[ ] Watch for rejection or close through
+[ ] If rejection above = bullish
+[ ] If close through = bearish
+
+AFTER OLR:
+[ ] Find 3-bar high/low to the LEFT
+[ ] Wait for close beyond it
+[ ] Do NOT enter before confirmation
+
+AFTER CONFIRMATION:
+[ ] Expect retracement to order block
+[ ] Take profits or move to BE
+[ ] Re-enter at retrace if desired
+
+TARGETS:
+[ ] First target = 3-bar high/low
+[ ] Second target = SR deviation
+[ ] Third target = Half deviation (large ranges)
+
+
+PART 10: COMMON MISTAKES TO AVOID
+---------------------------------
+
+1. FAMOUS LAST WORDS
+   "You know what you expect. It doesn't print. You trade anyway."
+   -> If confirmation doesn't print, DO NOT TRADE
+   -> Your expectation is no greater than what works
+
+2. CHASING THE SWEEP
+   -> Don't enter on the sweep itself
+   -> Wait for the 3-bar close
+   -> THEN expect the retrace
+
+3. HOLDING THROUGH RETRACEMENT
+   -> After OLR confirmation, take profits
+   -> Or move to breakeven immediately
+   -> 20-30 points = BE your trade
+
+4. TRADING PM SESSION
+   -> After noon, rules get overridden
+   -> "I go quiet. Radio silence. I'm done."
+   -> Stay in your profitable window
+
+5. PATTERN TRADING VS LOGIC
+   -> Patterns without timing = gambling
+   -> Use OPEN PRICES as the foundation
+   -> Then patterns confirm
+
+6. IGNORING THE FRACTAL
+   -> If both 7AM and 4:40AM inside a range
+   -> The range itself is the fractal
+   -> First side swept = opposite side is target
+
+
+PART 11: MODEL SUMMARY
+----------------------
+
+              +------------------------+
+              |  MARK 7AM AND 4:40AM   |
+              +------------------------+
+                         |
+              +------------------------+
+              | CLOSE TOGETHER = BIG   |
+              | FAR APART = TRADE TO   |
+              +------------------------+
+                         |
+              +------------------------+
+              | WATCH 7AM REACTION     |
+              | REJECTION = DIRECTION  |
+              | CLOSE THROUGH = BREAK  |
+              +------------------------+
+                         |
+              +------------------------+
+              | WAIT FOR OLR + 3-BAR   |
+              | CLOSE = CONFIRMATION   |
+              +------------------------+
+                         |
+              +------------------------+
+              | EXPECT RETRACE TO OB   |
+              | TAKE PROFITS OR BE     |
+              +------------------------+
+                         |
+              +------------------------+
+              | RE-ENTER AT RETRACE    |
+              | TARGET: NEXT LEVEL     |
+              +------------------------+
+
+
+QUOTES FROM SHAWN:
+------------------
+
+"Famous last words - you know what you expect, it doesn't print,
+and you trade anyway. No. It has to be handed to you."
+
+"Most people are pattern traders. They don't know why a pattern works.
+You know what's going on. You just need to translate it to a trade."
+
+"If I know where I lose money and where I make money, why would I
+intentionally leave the comfort of my profitability?"
+
+"50 points a day. 1000 points a month. With one lot, that's $1000.
+What stops you from doing the same with 10 lots? 50 lots?"
+
+
+RELATED SKILLS (Database IDs):
+------------------------------
+#115 - 7AM Open Price Level
+#116 - 4:40AM Open Price Level
+#117 - Open Price Rejection Theory
+#118 - Zoom Fractal
+#119 - Three Bar Rule (OLR)
+#120 - Retracement Expectation Rule
+#121 - Dark Pool Entry
+#122 - Famous Last Words Psychology
+#49  - Order Block (existing)
+#103 - Order Lifecycle Timeline (related TCM)
+
+
+Last Updated: 2026-01-31

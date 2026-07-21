@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { createError, ErrorCode } from '@/lib/errors';
 
 const DB_PATH = join(process.cwd(), '..', 'data', 'builder.db');
+const SCRIPTS_OUTPUT_PATH = join(process.cwd(), '..', 'data', 'scripts-output');
 
 interface UploadScriptResult {
   success: boolean;
@@ -66,8 +67,8 @@ export async function uploadScript(formData: FormData): Promise<UploadScriptResu
     // Generate file hash
     const hash = crypto.createHash('sha256').update(content).digest('hex');
 
-    // Save file to scripts-output directory
-    const scriptsDir = join(process.cwd(), '..', 'scripts-output');
+    // Keep generated scripts on the persistent app data volume in production.
+    const scriptsDir = SCRIPTS_OUTPUT_PATH;
     try {
       mkdirSync(scriptsDir, { recursive: true });
       const fileName = file.name;

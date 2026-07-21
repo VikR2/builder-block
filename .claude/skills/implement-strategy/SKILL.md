@@ -347,10 +347,86 @@ CONTINUE only after verification
 
 ---
 
+## Pre-Debugged Templates (RECOMMENDED)
+
+Use these templates for common patterns debugged through multiple iterations:
+
+### CISD + OB Close Entry
+
+**Template:** `scripts/templates/cisd_ob_close.cs.template`
+
+Contains debugged patterns from V34 iterations:
+- Opposing series tracking (open, close, high, low)
+- CISD confirmation (close through series OPEN)
+- OB close entry (first candle of opposing series)
+- Protected swing stop placement
+- State reset patterns
+
+**Usage:**
+```csharp
+// Copy CISD Variables section to #region Variables
+// Copy CISD Properties section to #region Properties
+// Use TrackOpposingSeries() in state machine
+// Use CheckCISDConfirmation() for CISD validation
+// Use CalculateEntryPrice() for OB close entry
+```
+
+**Why use this template:**
+- V34.1: 23 trades (too few - strict CISD)
+- V34.2: 440 trades (too many - midpoint CISD)
+- V34.3: Balanced (series OPEN CISD + OB close entry)
+
+---
+
+## Quality Gates
+
+After code generation, verify these quality targets:
+
+| Metric | Target | Action if Outside Range |
+|--------|--------|------------------------|
+| Trade frequency | 8-50 entries/month | Adjust CISD/filters |
+| CISD success rate | >= 10% | Relax CISD threshold |
+| Skip "risk too wide" | <= 30% | Increase MaxRiskTicks |
+| Compile errors | 0 | Fix syntax |
+
+### Automated Quality Check
+
+After user runs backtest, parse the NinjaTrader log:
+
+```bash
+python scripts/nt_log_parser.py <log_path> --json
+```
+
+**If metrics fail:**
+
+| Issue | Auto-fix |
+|-------|----------|
+| CISD success rate < 10% | Relax CISD from `>` to `>=` |
+| Too many "kill zone" skips | Set `UseKillZonesOnly = false` |
+| Too many "risk wide" skips | Increase `MaxRiskTicks` by 10 |
+| Too few entries (<8/month) | Reduce `CISDMinCandles` |
+| Too many entries (>50/month) | Add kill zone filter |
+
+### Iteration Loop
+
+```
+LOOP (max 3 iterations):
+    1. Generate/modify code
+    2. User runs backtest
+    3. Parse log: python scripts/nt_log_parser.py <log> --json
+    4. Check quality gates
+    5. IF all pass → EXIT success
+    6. ELSE → Apply auto-fix, bump version
+```
+
+---
+
 ## Files
 
 - Models: `skill_combinations` table (query via MCP)
 - Visual Interpretations: `skill_combinations.visual_interpretations` column
 - SADs: `data/architectures/` (reference documentation)
 - Video Frames: `data/video-frames/{video_id}/frames/`
+- Templates: `scripts/templates/` (pre-debugged patterns)
+- Log Parser: `scripts/nt_log_parser.py`
 - Output: `scripts-output/Strategies/`

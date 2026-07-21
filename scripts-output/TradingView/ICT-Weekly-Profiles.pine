@@ -1,0 +1,903 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © builder-block-C
+
+//@version=6
+indicator("ICT Weekly Profile Predictor", overlay=true, max_labels_count=500, max_lines_count=500)
+
+// =============================================================================
+// INPUTS
+// =============================================================================
+GRP_BIAS = "Bias Settings"
+biasThreshold = input.float(0.002, "Bias Threshold (%)", minval=0.0001, maxval=0.01, step=0.0001, group=GRP_BIAS, tooltip="Daily close change % to determine directional bias")
+inputTimezone = input.string("America/New_York", "Exchange Timezone", group=GRP_BIAS,
+    tooltip="Timezone for day-of-week detection (use America/New_York for US futures)")
+
+GRP_VISUAL = "Visual Settings"
+showLabels = input.bool(true, "Show Profile Labels", group=GRP_VISUAL)
+showBackground = input.bool(true, "Show Prediction Background", group=GRP_VISUAL)
+bgTransparency = input.int(92, "Background Transparency", minval=80, maxval=98, group=GRP_VISUAL)
+labelSize = input.string("small", "Label Size", options=["tiny", "small", "normal"], group=GRP_VISUAL)
+displayWeeks = input.int(4, "Display Weeks", minval=0, maxval=52, group=GRP_VISUAL, tooltip="Number of recent weeks to show labels/backgrounds for (0 = show all)")
+
+GRP_COLORS = "Colors"
+bullColor = input.color(color.green, "Bullish Color", group=GRP_COLORS)
+bearColor = input.color(color.red, "Bearish Color", group=GRP_COLORS)
+neutralColor = input.color(color.gray, "Neutral Color", group=GRP_COLORS)
+
+GRP_CONF = "Confidence Settings"
+showConfidence = input.bool(true, "Show Confidence %", group=GRP_CONF, tooltip="Show historical accuracy % on prediction labels")
+showDashboard = input.bool(true, "Show Stats Dashboard", group=GRP_CONF, tooltip="Show confidence dashboard table on last bar")
+minSamples = input.int(5, "Min Samples for %", minval=1, maxval=50, group=GRP_CONF, tooltip="Minimum weeks before showing confidence percentage")
+maxHistoryWeeks = input.int(200, "Max History Weeks", minval=10, maxval=500, group=GRP_CONF, tooltip="Maximum number of past weeks to track")
+
+// =============================================================================
+// CONSTANTS & HELPERS
+// =============================================================================
+FLAT_THRESHOLD = 0.4  // body < 40% of range = flat/doji candle
+STRONG_THRESHOLD = 0.65  // body > 65% of range = strong directional candle
+REVERSAL_THRESHOLD = 0.5  // retracement of prior move > 50% = reversal
+
+getLabelSize() =>
+    switch labelSize
+        "tiny" => size.tiny
+        "small" => size.small
+        => size.normal
+
+// =============================================================================
+// BIAS CALCULATION (from TCM-SR-STD.pine / TCM-Bias.pine)
+// =============================================================================
+getBiasDiff() =>
+    yesterday = request.security(syminfo.tickerid, "1D", close[1], lookahead=barmerge.lookahead_on)
+    today = request.security(syminfo.tickerid, "1D", close, lookahead=barmerge.lookahead_on)
+    float delta = today - yesterday
+    float percentage = delta / yesterday
+    percentage
+
+biasDiff = getBiasDiff()
+var bool buying = false
+buying := biasDiff > biasThreshold ? true : biasDiff < -biasThreshold ? false : buying
+
+// =============================================================================
+// DAILY BAR DETECTION
+// =============================================================================
+// This indicator is designed for the Daily timeframe
+isDailyTF = timeframe.isdaily
+
+// Display window: only show labels/bg for recent N weeks
+// Each trading week ≈ 5 bars on daily; +2 buffer for holidays
+bool inDisplayRange = displayWeeks == 0 or bar_index >= last_bar_index - displayWeeks * 5 - 2
+
+// =============================================================================
+// WEEKLY STATE TRACKING
+// =============================================================================
+// Day of week: 1=Sun, 2=Mon, 3=Tue, 4=Wed, 5=Thu, 6=Fri, 7=Sat
+dow = dayofweek(time_close, inputTimezone)
+
+// Detect new trading week (first trading day, handles holiday Mondays)
+newWeekChange = ta.change(time("W"))
+isNewWeek = not na(newWeekChange) and newWeekChange != 0
+
+// Store each day's OHLC within the week
+var float monOpen = na
+var float monHigh = na
+var float monLow = na
+var float monClose = na
+
+var float tueOpen = na
+var float tueHigh = na
+var float tueLow = na
+var float tueClose = na
+
+var float wedOpen = na
+var float wedHigh = na
+var float wedLow = na
+var float wedClose = na
+
+var float thuOpen = na
+var float thuHigh = na
+var float thuLow = na
+var float thuClose = na
+
+var float friOpen = na
+var float friHigh = na
+var float friLow = na
+var float friClose = na
+
+// Track weekly extremes
+var float weekOpen = na
+var float weekHigh = na
+var float weekLow = na
+var int weekHighDay = 0  // which day made the weekly high (2=Mon..6=Fri)
+var int weekLowDay = 0   // which day made the weekly low
+
+// Current profile classification
+var string currentProfile = ""
+var string nextDayDirection = ""  // "bull", "bear", "neutral"
+var string profileAbbrev = ""
+var string prevAbbrev = ""
+var int currentBaseId = 0
+
+// Track completed day count in current week
+var int completedDays = 0
+
+// =============================================================================
+// HISTORY ARRAYS (Confidence Tracking)
+// =============================================================================
+// Prediction baseId stored after each day stage
+var array<int> histPredDay1 = array.new_int()
+var array<int> histPredDay2 = array.new_int()
+var array<int> histPredDay3 = array.new_int()
+var array<int> histPredDay4 = array.new_int()
+var array<int> histFinal = array.new_int()
+
+// Bias state (0=bear, 1=bull) at each stage
+var array<int> histBiasDay1 = array.new_int()
+var array<int> histBiasDay2 = array.new_int()
+var array<int> histBiasDay3 = array.new_int()
+var array<int> histBiasDay4 = array.new_int()
+var array<int> histBiasFinal = array.new_int()
+
+// Staging variables for current week (reset each Monday)
+var int stagePredDay1 = 0
+var int stagePredDay2 = 0
+var int stagePredDay3 = 0
+var int stagePredDay4 = 0
+var int stageFinal = 0
+var int stageBiasDay1 = 0
+var int stageBiasDay2 = 0
+var int stageBiasDay3 = 0
+var int stageBiasDay4 = 0
+var int stageBiasFinal = 0
+
+// =============================================================================
+// ARCHIVAL & RESET ON NEW WEEK
+// =============================================================================
+if isNewWeek
+    // Archive completed week BEFORE resetting
+    if completedDays >= 5 and stageFinal > 0
+        array.unshift(histPredDay1, stagePredDay1)
+        array.unshift(histPredDay2, stagePredDay2)
+        array.unshift(histPredDay3, stagePredDay3)
+        array.unshift(histPredDay4, stagePredDay4)
+        array.unshift(histFinal, stageFinal)
+        array.unshift(histBiasDay1, stageBiasDay1)
+        array.unshift(histBiasDay2, stageBiasDay2)
+        array.unshift(histBiasDay3, stageBiasDay3)
+        array.unshift(histBiasDay4, stageBiasDay4)
+        array.unshift(histBiasFinal, stageBiasFinal)
+        // Trim to max size
+        if array.size(histFinal) > maxHistoryWeeks
+            array.pop(histPredDay1)
+            array.pop(histPredDay2)
+            array.pop(histPredDay3)
+            array.pop(histPredDay4)
+            array.pop(histFinal)
+            array.pop(histBiasDay1)
+            array.pop(histBiasDay2)
+            array.pop(histBiasDay3)
+            array.pop(histBiasDay4)
+            array.pop(histBiasFinal)
+
+    // Reset staging
+    stagePredDay1 := 0
+    stagePredDay2 := 0
+    stagePredDay3 := 0
+    stagePredDay4 := 0
+    stageFinal := 0
+    stageBiasDay1 := 0
+    stageBiasDay2 := 0
+    stageBiasDay3 := 0
+    stageBiasDay4 := 0
+    stageBiasFinal := 0
+
+    // Reset weekly state
+    monOpen := na
+    monHigh := na
+    monLow := na
+    monClose := na
+    tueOpen := na
+    tueHigh := na
+    tueLow := na
+    tueClose := na
+    wedOpen := na
+    wedHigh := na
+    wedLow := na
+    wedClose := na
+    thuOpen := na
+    thuHigh := na
+    thuLow := na
+    thuClose := na
+    friOpen := na
+    friHigh := na
+    friLow := na
+    friClose := na
+    weekOpen := na
+    weekHigh := na
+    weekLow := na
+    weekHighDay := 0
+    weekLowDay := 0
+    currentProfile := ""
+    nextDayDirection := ""
+    profileAbbrev := ""
+    prevAbbrev := ""
+    currentBaseId := 0
+    completedDays := 0
+
+// Record each day's data
+if dow == dayofweek.monday
+    monOpen := open
+    monHigh := high
+    monLow := low
+    monClose := close
+    completedDays := 1
+
+if dow == dayofweek.tuesday
+    tueOpen := open
+    tueHigh := high
+    tueLow := low
+    tueClose := close
+    completedDays := 2
+
+if dow == dayofweek.wednesday
+    wedOpen := open
+    wedHigh := high
+    wedLow := low
+    wedClose := close
+    completedDays := 3
+
+if dow == dayofweek.thursday
+    thuOpen := open
+    thuHigh := high
+    thuLow := low
+    thuClose := close
+    completedDays := 4
+
+if dow == dayofweek.friday
+    friOpen := open
+    friHigh := high
+    friLow := low
+    friClose := close
+    completedDays := 5
+
+// Capture week open on first trading bar of the week
+if na(weekOpen) and not na(open) and dow >= dayofweek.monday and dow <= dayofweek.friday
+    weekOpen := open
+
+// Update weekly high/low tracking
+if not na(high) and (dow >= dayofweek.monday and dow <= dayofweek.friday)
+    if na(weekHigh) or high > weekHigh
+        weekHigh := high
+        weekHighDay := dow
+    if na(weekLow) or low < weekLow
+        weekLow := low
+        weekLowDay := dow
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+isCandleBullish(float candleOpen, float candleClose) =>
+    candleClose > candleOpen
+
+isCandleBearish(float candleOpen, float candleClose) =>
+    candleClose < candleOpen
+
+isCandleFlat(float candleOpen, float candleClose, float candleHigh, float candleLow) =>
+    float bodySize = math.abs(candleClose - candleOpen)
+    float rangeSize = candleHigh - candleLow
+    rangeSize > 0 ? bodySize / rangeSize < FLAT_THRESHOLD : true
+
+isCandleStrong(float candleOpen, float candleClose, float candleHigh, float candleLow) =>
+    float bodySize = math.abs(candleClose - candleOpen)
+    float rangeSize = candleHigh - candleLow
+    rangeSize > 0 ? bodySize / rangeSize > STRONG_THRESHOLD : false
+
+// Check if day2 reversed the move from day1
+isReversal(float day1Open, float day1Close, float day2Open, float day2Close) =>
+    float day1Move = day1Close - day1Open
+    float day2Move = day2Close - day2Open
+    // Opposite directions and day2 retraces at least REVERSAL_THRESHOLD of day1
+    bool oppositeDir = (day1Move > 0 and day2Move < 0) or (day1Move < 0 and day2Move > 0)
+    bool significantRetrace = math.abs(day2Move) > math.abs(day1Move) * REVERSAL_THRESHOLD
+    oppositeDir and significantRetrace
+
+// Check if a range is consolidating (Mon through given day)
+isConsolidating(float rangeHigh, float rangeLow, float refHigh, float refLow) =>
+    // Range is considered consolidating if total range is small relative to reference
+    float totalRange = rangeHigh - rangeLow
+    float refRange = refHigh - refLow
+    refRange > 0 ? totalRange / refRange < 1.5 : true
+
+// =============================================================================
+// CLASSIFICATION ENGINE (returns [profile, abbrev, nextDir, baseId])
+// =============================================================================
+// Base ID mapping:
+//  0=Unknown  1=TuLo  2=WdLo   3=TuHi   4=WdHi    5=CTR Bull
+//  6=MWR      7=CTR Bear  8=MWD  9=S&D Bull  10=WWR Bull
+// 11=S&D Bear  12=WWR Bear  13=Consolidation  14=Trend Bull  15=Trend Bear
+
+classifyProfile() =>
+    string profile = ""
+    string abbrev = ""
+    string nextDir = "neutral"
+    int baseId = 0
+
+    if completedDays == 1 and not na(monClose)
+        // After Monday - initial read
+        bool monBull = isCandleBullish(monOpen, monClose)
+        bool monBear = isCandleBearish(monOpen, monClose)
+        bool monFlat = not na(monOpen) and isCandleFlat(monOpen, monClose, monHigh, monLow)
+
+        if monFlat
+            profile := "Consolidation forming"
+            abbrev := "CON?"
+            nextDir := "neutral"
+            baseId := 13
+        else if monBear and buying
+            profile := "Tue Low likely"
+            abbrev := "TuLo?"
+            nextDir := "bear"
+            baseId := 1
+        else if monBull and not buying
+            profile := "Tue High likely"
+            abbrev := "TuHi?"
+            nextDir := "bull"
+            baseId := 3
+        else if monBull and buying
+            profile := "Trend continuation"
+            abbrev := "TR▲"
+            nextDir := "bull"
+            baseId := 14
+        else if monBear and not buying
+            profile := "Trend continuation"
+            abbrev := "TR▼"
+            nextDir := "bear"
+            baseId := 15
+
+    else if completedDays == 2 and not na(tueClose)
+        // After Tuesday - narrow down
+        bool monBull = isCandleBullish(monOpen, monClose)
+        bool monBear = isCandleBearish(monOpen, monClose)
+        bool tueBull = isCandleBullish(tueOpen, tueClose)
+        bool tueBear = isCandleBearish(tueOpen, tueClose)
+        bool monFlat = not na(monOpen) and isCandleFlat(monOpen, monClose, monHigh, monLow)
+        bool tueFlat = isCandleFlat(tueOpen, tueClose, tueHigh, tueLow)
+        bool tueReversedMon = isReversal(monOpen, monClose, tueOpen, tueClose)
+
+        if monBear and tueBear and buying
+            if tueLow <= monLow
+                profile := "Classic Tue Low"
+                abbrev := "TuLo"
+                nextDir := "bull"
+                baseId := 1
+            else
+                profile := "Wed Low likely"
+                abbrev := "WdLo?"
+                nextDir := "bear"
+                baseId := 2
+        else if monBull and tueBull and not buying
+            if tueHigh >= monHigh
+                profile := "Classic Tue High"
+                abbrev := "TuHi"
+                nextDir := "bear"
+                baseId := 3
+            else
+                profile := "Wed High likely"
+                abbrev := "WdHi?"
+                nextDir := "bull"
+                baseId := 4
+        else if monBear and tueReversedMon and buying
+            profile := "Wed Reversal Bull"
+            abbrev := "WWR↑?"
+            nextDir := "bull"
+            baseId := 10
+        else if monBull and tueReversedMon and not buying
+            profile := "Wed Reversal Bear"
+            abbrev := "WWR↓?"
+            nextDir := "bear"
+            baseId := 12
+        else if monFlat and tueFlat
+            profile := "Consolidation"
+            abbrev := "CON"
+            nextDir := "neutral"
+            baseId := 13
+        else if monBear and tueBull and buying
+            profile := "Tue Low (reversal)"
+            abbrev := "TuLo"
+            nextDir := "bull"
+            baseId := 1
+        else if monBull and tueBear and not buying
+            profile := "Tue High (reversal)"
+            abbrev := "TuHi"
+            nextDir := "bear"
+            baseId := 3
+        else
+            profile := "Developing"
+            abbrev := "DEV"
+            nextDir := "neutral"
+            baseId := 0
+
+    else if completedDays == 3 and not na(wedClose)
+        // After Wednesday - strong classification
+        bool wedBull = isCandleBullish(wedOpen, wedClose)
+        bool wedBear = isCandleBearish(wedOpen, wedClose)
+        bool monFlat = not na(monOpen) and isCandleFlat(monOpen, monClose, monHigh, monLow)
+        bool tueFlat = isCandleFlat(tueOpen, tueClose, tueHigh, tueLow)
+        bool monTueFlat = monFlat and tueFlat
+
+        bool tueMadeLow = (weekLowDay == dayofweek.tuesday)
+        bool tueMadeHigh = (weekHighDay == dayofweek.tuesday)
+        bool monTueDown = not na(monClose) and not na(tueClose) and tueClose < monOpen
+        bool monTueUp = not na(monClose) and not na(tueClose) and tueClose > monOpen
+        bool wedNewLow = wedLow <= weekLow
+        bool wedNewHigh = wedHigh >= weekHigh
+        bool wedReversedUp = wedBull and (isCandleStrong(wedOpen, wedClose, wedHigh, wedLow) or wedNewLow)
+        bool wedReversedDown = wedBear and (isCandleStrong(wedOpen, wedClose, wedHigh, wedLow) or wedNewHigh)
+
+        if tueMadeLow and wedBull
+            profile := "Classic Tue Low CONFIRMED"
+            abbrev := "TuLo✓"
+            nextDir := "bull"
+            baseId := 1
+        else if tueMadeHigh and wedBear
+            profile := "Classic Tue High CONFIRMED"
+            abbrev := "TuHi✓"
+            nextDir := "bear"
+            baseId := 3
+        else if monTueDown and wedNewLow and wedReversedUp
+            profile := "Wed Low"
+            abbrev := "WdLo"
+            nextDir := "bull"
+            baseId := 2
+        else if monTueDown and wedReversedUp
+            profile := "Wed Weekly Reversal Bull"
+            abbrev := "WWR↑"
+            nextDir := "bull"
+            baseId := 10
+        else if monTueUp and wedNewHigh and wedReversedDown
+            profile := "Wed High"
+            abbrev := "WdHi"
+            nextDir := "bear"
+            baseId := 4
+        else if monTueUp and wedReversedDown
+            profile := "Wed Weekly Reversal Bear"
+            abbrev := "WWR↓"
+            nextDir := "bear"
+            baseId := 12
+        else if monTueFlat and wedBull
+            profile := "Midweek Rally"
+            abbrev := "MWR↑"
+            nextDir := "bull"
+            baseId := 6
+        else if monTueFlat and wedBear
+            profile := "Midweek Decline"
+            abbrev := "MWD↓"
+            nextDir := "bear"
+            baseId := 8
+        else if monTueFlat and not wedBull and not wedBear
+            profile := "Consolidation - Thu breakout"
+            abbrev := "CON→"
+            nextDir := "neutral"
+            baseId := 13
+        else if monTueDown and wedBear
+            profile := "Wed Low likely"
+            abbrev := "WdLo?"
+            nextDir := "bear"
+            baseId := 2
+        else if monTueUp and wedBull
+            profile := "Wed High likely"
+            abbrev := "WdHi?"
+            nextDir := "bull"
+            baseId := 4
+        else
+            profile := "Developing"
+            abbrev := "DEV"
+            nextDir := "neutral"
+            baseId := 0
+
+    else if completedDays == 4 and not na(thuClose)
+        // After Thursday - nearly final
+        bool thuBull = isCandleBullish(thuOpen, thuClose)
+        bool thuBear = isCandleBearish(thuOpen, thuClose)
+        bool monFlat = not na(monOpen) and isCandleFlat(monOpen, monClose, monHigh, monLow)
+        bool tueFlat = isCandleFlat(tueOpen, tueClose, tueHigh, tueLow)
+        bool wedFlat = isCandleFlat(wedOpen, wedClose, wedHigh, wedLow)
+        bool monWedFlat = monFlat and tueFlat and wedFlat
+
+        bool thuMadeLow = thuLow <= weekLow
+        bool thuMadeHigh = thuHigh >= weekHigh
+        bool thuReversedUp = thuMadeLow and thuBull
+        bool thuReversedDown = thuMadeHigh and thuBear
+        bool wedConfirmedTuLo = weekLowDay == dayofweek.tuesday
+        bool wedConfirmedTuHi = weekHighDay == dayofweek.tuesday
+        bool wedConfirmedWdLo = weekLowDay == dayofweek.wednesday
+        bool wedConfirmedWdHi = weekHighDay == dayofweek.wednesday
+
+        if monWedFlat and thuReversedUp
+            profile := "Consol Thu Reversal Bull"
+            abbrev := "CTR↑"
+            nextDir := "bull"
+            baseId := 5
+        else if monWedFlat and thuReversedDown
+            profile := "Consol Thu Reversal Bear"
+            abbrev := "CTR↓"
+            nextDir := "bear"
+            baseId := 7
+        else if monWedFlat and not thuBull and not thuBear
+            profile := "Seek & Destroy Friday"
+            abbrev := "S&D?"
+            nextDir := "neutral"
+            baseId := 9
+        else if wedConfirmedTuLo and thuBull
+            profile := "Classic Tue Low CONFIRMED"
+            abbrev := "TuLo✓"
+            nextDir := "bull"
+            baseId := 1
+        else if wedConfirmedTuHi and thuBear
+            profile := "Classic Tue High CONFIRMED"
+            abbrev := "TuHi✓"
+            nextDir := "bear"
+            baseId := 3
+        else if wedConfirmedWdLo and thuBull
+            profile := "Wed Low CONFIRMED"
+            abbrev := "WdLo✓"
+            nextDir := "bull"
+            baseId := 2
+        else if wedConfirmedWdHi and thuBear
+            profile := "Wed High CONFIRMED"
+            abbrev := "WdHi✓"
+            nextDir := "bear"
+            baseId := 4
+        else if thuBull
+            profile := "Bullish continuation"
+            abbrev := "BC▲"
+            nextDir := "bull"
+            baseId := 14
+        else if thuBear
+            profile := "Bearish continuation"
+            abbrev := "BC▼"
+            nextDir := "bear"
+            baseId := 15
+        else
+            profile := "Unclear"
+            abbrev := "???"
+            nextDir := "neutral"
+            baseId := 0
+
+    else if completedDays == 5 and not na(friClose)
+        // Friday - final classification for the week
+        bool friBull = isCandleBullish(friOpen, friClose)
+        bool friBear = isCandleBearish(friOpen, friClose)
+        bool monFlat = not na(monOpen) and isCandleFlat(monOpen, monClose, monHigh, monLow)
+        bool tueFlat = isCandleFlat(tueOpen, tueClose, tueHigh, tueLow)
+        bool wedFlat = isCandleFlat(wedOpen, wedClose, wedHigh, wedLow)
+        bool thuFlat = isCandleFlat(thuOpen, thuClose, thuHigh, thuLow)
+
+        if weekLowDay == dayofweek.tuesday and friClose > weekOpen
+            profile := "Classic Tue Low"
+            abbrev := "TuLo✓"
+            nextDir := "neutral"
+            baseId := 1
+        else if weekLowDay == dayofweek.wednesday and friClose > weekOpen
+            profile := "Wed Low"
+            abbrev := "WdLo✓"
+            nextDir := "neutral"
+            baseId := 2
+        else if weekHighDay == dayofweek.tuesday and friClose < weekOpen
+            profile := "Classic Tue High"
+            abbrev := "TuHi✓"
+            nextDir := "neutral"
+            baseId := 3
+        else if weekHighDay == dayofweek.wednesday and friClose < weekOpen
+            profile := "Wed High"
+            abbrev := "WdHi✓"
+            nextDir := "neutral"
+            baseId := 4
+        else if monFlat and tueFlat and wedFlat and weekLowDay == dayofweek.thursday and friBull
+            profile := "Consol Thu Rev Bull"
+            abbrev := "CTR↑✓"
+            nextDir := "neutral"
+            baseId := 5
+        else if monFlat and tueFlat and wedFlat and weekHighDay == dayofweek.thursday and friBear
+            profile := "Consol Thu Rev Bear"
+            abbrev := "CTR↓✓"
+            nextDir := "neutral"
+            baseId := 7
+        else if monFlat and tueFlat and friBull
+            profile := "Midweek Rally"
+            abbrev := "MWR↑✓"
+            nextDir := "neutral"
+            baseId := 6
+        else if monFlat and tueFlat and friBear
+            profile := "Midweek Decline"
+            abbrev := "MWD↓✓"
+            nextDir := "neutral"
+            baseId := 8
+        else if monFlat and tueFlat and wedFlat and thuFlat and friBull
+            profile := "Seek & Destroy Bull Fri"
+            abbrev := "S&D↑"
+            nextDir := "neutral"
+            baseId := 9
+        else if monFlat and tueFlat and wedFlat and thuFlat and friBear
+            profile := "Seek & Destroy Bear Fri"
+            abbrev := "S&D↓"
+            nextDir := "neutral"
+            baseId := 11
+        else if weekLowDay == dayofweek.wednesday and weekHighDay >= dayofweek.thursday
+            profile := "Wed Weekly Rev Bull"
+            abbrev := "WWR↑✓"
+            nextDir := "neutral"
+            baseId := 10
+        else if weekHighDay == dayofweek.wednesday and weekLowDay >= dayofweek.thursday
+            profile := "Wed Weekly Rev Bear"
+            abbrev := "WWR↓✓"
+            nextDir := "neutral"
+            baseId := 12
+        else if friClose > weekOpen
+            profile := "Bullish week"
+            abbrev := "BW"
+            nextDir := "neutral"
+            baseId := 14
+        else if friClose < weekOpen
+            profile := "Bearish week"
+            abbrev := "BRW"
+            nextDir := "neutral"
+            baseId := 15
+        else
+            profile := "Neutral week"
+            abbrev := "NW"
+            nextDir := "neutral"
+            baseId := 0
+
+    [profile, abbrev, nextDir, baseId]
+
+// =============================================================================
+// RUN CLASSIFICATION
+// =============================================================================
+[classProfile, classAbbrev, classDirection, classBaseId] = classifyProfile()
+
+if isDailyTF and classProfile != ""
+    currentProfile := classProfile
+    profileAbbrev := classAbbrev
+    nextDayDirection := classDirection
+    currentBaseId := classBaseId
+
+// =============================================================================
+// STAGING UPDATES (record prediction at each day stage)
+// =============================================================================
+if isDailyTF and classBaseId > 0
+    int biasVal = buying ? 1 : 0
+    if completedDays == 1
+        stagePredDay1 := classBaseId
+        stageBiasDay1 := biasVal
+    if completedDays == 2
+        stagePredDay2 := classBaseId
+        stageBiasDay2 := biasVal
+    if completedDays == 3
+        stagePredDay3 := classBaseId
+        stageBiasDay3 := biasVal
+    if completedDays == 4
+        stagePredDay4 := classBaseId
+        stageBiasDay4 := biasVal
+    if completedDays == 5
+        stageFinal := classBaseId
+        stageBiasFinal := biasVal
+
+// =============================================================================
+// CONFIDENCE CALCULATION FUNCTIONS
+// =============================================================================
+// Calculate profile prediction accuracy: of past weeks where the same prediction
+// was made at this day stage, how often did the final profile match?
+calcConfidence(int targetBaseId, int dayStage) =>
+    int matches = 0
+    int total = 0
+    int histSize = array.size(histFinal)
+    if targetBaseId > 0 and histSize > 0
+        for i = 0 to histSize - 1
+            int predAtStage = switch dayStage
+                1 => array.get(histPredDay1, i)
+                2 => array.get(histPredDay2, i)
+                3 => array.get(histPredDay3, i)
+                4 => array.get(histPredDay4, i)
+                => 0
+            if predAtStage == targetBaseId
+                total += 1
+                if array.get(histFinal, i) == targetBaseId
+                    matches += 1
+    float pct = total > 0 ? float(matches) / float(total) * 100.0 : 0.0
+    [pct, total]
+
+// Calculate bias accuracy: of past weeks with same bias at this stage,
+// how often did the final bias match?
+calcBiasConfidence(int biasAtStage, int dayStage) =>
+    int matches = 0
+    int total = 0
+    int histSize = array.size(histBiasFinal)
+    if histSize > 0
+        for i = 0 to histSize - 1
+            int pastBias = switch dayStage
+                1 => array.get(histBiasDay1, i)
+                2 => array.get(histBiasDay2, i)
+                3 => array.get(histBiasDay3, i)
+                4 => array.get(histBiasDay4, i)
+                => -1
+            if pastBias == biasAtStage
+                total += 1
+                if array.get(histBiasFinal, i) == biasAtStage
+                    matches += 1
+    float pct = total > 0 ? float(matches) / float(total) * 100.0 : 0.0
+    [pct, total]
+
+// Format confidence for label display
+formatConfidenceLabel(float pct, int sampleCount) =>
+    string result = ""
+    if sampleCount >= minSamples
+        result := str.tostring(math.round(pct)) + "%"
+    else if sampleCount > 0
+        result := "(" + str.tostring(sampleCount) + "w)"
+    result
+
+// =============================================================================
+// LABEL RENDERING
+// =============================================================================
+if isDailyTF and showLabels and profileAbbrev != "" and inDisplayRange and completedDays >= 2 and profileAbbrev != prevAbbrev
+    string arrow = switch nextDayDirection
+        "bull" => " ▲"
+        "bear" => " ▼"
+        => " ◆"
+
+    string labelText = profileAbbrev + arrow
+
+    // Add confidence line (skip Friday - week is done)
+    if showConfidence and completedDays < 5 and currentBaseId > 0
+        [confPct, confSamples] = calcConfidence(currentBaseId, completedDays)
+        string confStr = formatConfidenceLabel(confPct, confSamples)
+        if confStr != ""
+            labelText := labelText + "\n" + confStr
+
+    color labelColor = switch nextDayDirection
+        "bull" => bullColor
+        "bear" => bearColor
+        => neutralColor
+
+    // Place bullish labels below candle, bearish above, neutral below
+    var label dayLabel = na
+    if nextDayDirection == "bear"
+        dayLabel := label.new(bar_index, high, labelText,
+             xloc=xloc.bar_index,
+             yloc=yloc.abovebar,
+             style=label.style_label_down,
+             color=color.new(labelColor, 70),
+             textcolor=labelColor,
+             size=getLabelSize())
+    else
+        dayLabel := label.new(bar_index, low, labelText,
+             xloc=xloc.bar_index,
+             yloc=yloc.belowbar,
+             style=label.style_label_up,
+             color=color.new(labelColor, 70),
+             textcolor=labelColor,
+             size=getLabelSize())
+
+// =============================================================================
+// BACKGROUND COLOR
+// =============================================================================
+color bgColor = na
+if isDailyTF and showBackground and nextDayDirection != "" and inDisplayRange
+    bgColor := switch nextDayDirection
+        "bull" => color.new(bullColor, bgTransparency)
+        "bear" => color.new(bearColor, bgTransparency)
+        => na
+
+bgcolor(bgColor, title="Prediction Background")
+
+// Track previous abbreviation for duplicate label suppression
+if isDailyTF
+    prevAbbrev := profileAbbrev
+
+// =============================================================================
+// DASHBOARD TABLE
+// =============================================================================
+if isDailyTF and showDashboard and barstate.islast and profileAbbrev != ""
+    var table dash = table.new(position.top_right, 3, 7, bgcolor=color.new(color.black, 80), border_color=color.new(color.gray, 60), border_width=1)
+
+    // Header
+    table.cell(dash, 0, 0, "ICT Weekly Profile Stats", text_color=color.white, text_size=size.small, bgcolor=color.new(color.blue, 70))
+    table.merge_cells(dash, 0, 0, 2, 0)
+
+    // Column headers
+    table.cell(dash, 0, 1, "Profile", text_color=color.gray, text_size=size.tiny, text_halign=text.align_left)
+    table.cell(dash, 1, 1, "Conf", text_color=color.gray, text_size=size.tiny, text_halign=text.align_center)
+    table.cell(dash, 2, 1, "Samples", text_color=color.gray, text_size=size.tiny, text_halign=text.align_right)
+
+    // Profile row
+    float profilePct = 0.0
+    int profileSamples = 0
+    if completedDays < 5 and currentBaseId > 0
+        [pp, ps] = calcConfidence(currentBaseId, completedDays)
+        profilePct := pp
+        profileSamples := ps
+
+    color confColor = profileSamples < minSamples ? color.gray : profilePct >= 70 ? color.green : profilePct >= 50 ? color.yellow : color.red
+
+    table.cell(dash, 0, 2, profileAbbrev, text_color=color.white, text_size=size.small, text_halign=text.align_left)
+    string confText = profileSamples >= minSamples ? str.tostring(math.round(profilePct)) + "%" : profileSamples > 0 ? "(" + str.tostring(profileSamples) + "w)" : "--"
+    table.cell(dash, 1, 2, confText, text_color=confColor, text_size=size.small, text_halign=text.align_center)
+    table.cell(dash, 2, 2, profileSamples > 0 ? str.tostring(profileSamples) : "--", text_color=color.gray, text_size=size.small, text_halign=text.align_right)
+
+    // Bias row
+    float biasPct = 0.0
+    int biasSamples = 0
+    if completedDays < 5
+        int biasVal = buying ? 1 : 0
+        [bp, bs] = calcBiasConfidence(biasVal, completedDays)
+        biasPct := bp
+        biasSamples := bs
+
+    string biasName = buying ? "Bias:Bull" : "Bias:Bear"
+    color biasColor = biasSamples < minSamples ? color.gray : biasPct >= 70 ? color.green : biasPct >= 50 ? color.yellow : color.red
+    string biasConfText = biasSamples >= minSamples ? str.tostring(math.round(biasPct)) + "%" : biasSamples > 0 ? "(" + str.tostring(biasSamples) + "w)" : "--"
+
+    table.cell(dash, 0, 3, biasName, text_color=color.white, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, 3, biasConfText, text_color=biasColor, text_size=size.small, text_halign=text.align_center)
+    table.cell(dash, 2, 3, biasSamples > 0 ? str.tostring(biasSamples) : "--", text_color=color.gray, text_size=size.small, text_halign=text.align_right)
+
+    // Highest probability profile row
+    int totalWeeks = array.size(histFinal)
+    string topName = "--"
+    float topPct = 0.0
+    int topCount = 0
+    if totalWeeks > 0
+        // Profile ID → name mapping
+        var array<string> profileNames = array.from("???", "TuLo", "WdLo", "TuHi", "WdHi", "CTR↑", "MWR↑", "CTR↓", "MWD↓", "S&D↑", "WWR↑", "S&D↓", "WWR↓", "CON", "Bull", "Bear")
+        // Count occurrences of each profile ID (0-15)
+        var array<int> profileCounts = array.new_int(16, 0)
+        for idx = 0 to 15
+            array.set(profileCounts, idx, 0)
+        for i = 0 to totalWeeks - 1
+            int pid = array.get(histFinal, i)
+            if pid >= 0 and pid <= 15
+                array.set(profileCounts, pid, array.get(profileCounts, pid) + 1)
+        // Find the max
+        int maxId = 0
+        int maxCount = 0
+        for idx = 0 to 15
+            int cnt = array.get(profileCounts, idx)
+            if cnt > maxCount
+                maxCount := cnt
+                maxId := idx
+        if maxCount > 0
+            topName := "Top:" + array.get(profileNames, maxId)
+            topPct := float(maxCount) / float(totalWeeks) * 100.0
+            topCount := totalWeeks
+
+    color topColor = topPct >= 30 ? color.green : topPct >= 20 ? color.yellow : color.gray
+    string topConfText = topCount > 0 ? str.tostring(math.round(topPct)) + "%" : "--"
+
+    table.cell(dash, 0, 4, topName, text_color=color.white, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, 4, topConfText, text_color=topColor, text_size=size.small, text_halign=text.align_center)
+    table.cell(dash, 2, 4, topCount > 0 ? str.tostring(topCount) : "--", text_color=color.gray, text_size=size.small, text_halign=text.align_right)
+
+    // Separator row (thin visual break)
+    table.cell(dash, 0, 5, "", bgcolor=color.new(color.gray, 60))
+    table.merge_cells(dash, 0, 5, 2, 5)
+
+    // Status row
+    string statusMsg = ""
+    if completedDays == 5
+        statusMsg := "Week complete · " + str.tostring(totalWeeks) + " weeks"
+    else
+        statusMsg := "Day " + str.tostring(completedDays) + "/5 · " + str.tostring(totalWeeks) + " weeks"
+        if totalWeeks < minSamples
+            statusMsg := statusMsg + " · need " + str.tostring(minSamples - totalWeeks) + " more"
+        else if completedDays <= 2
+            statusMsg := statusMsg + " · early read"
+
+    table.cell(dash, 0, 6, statusMsg, text_color=color.new(color.white, 30), text_size=size.tiny)
+    table.merge_cells(dash, 0, 6, 2, 6)
+
+// =============================================================================
+// STATUS LINE
+// =============================================================================
+// Show day progress in status line (text must be const in v6)
+plot(isDailyTF ? completedDays : na, title="Day of Week", display=display.status_line)
+plot(isDailyTF ? currentBaseId : na, title="Profile ID", display=display.status_line)

@@ -1,0 +1,75 @@
+---
+session: builder-block-C
+date: 2026-01-15
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Enhanced TCM-SR-STD.pine with session boxes, opening prices, optional STD levels, and visual controls
+now: Test indicator in TradingView - verify all features render correctly
+
+test: Load TCM-SR-STD.pine in TradingView, toggle each feature on/off
+
+done_this_session:
+  - task: Fixed session box opacity (85% -> 92% transparency)
+    files: [scripts-output/TradingView/TCM-SR-STD.pine:44-55]
+  - task: Added optional 0.5 STD and 2.0 STD target lines with hit tracking
+    files: [scripts-output/TradingView/TCM-SR-STD.pine:18-19]
+  - task: Added lineExtension (50 bars) and labelOffset (68 bars) controls
+    files: [scripts-output/TradingView/TCM-SR-STD.pine:28-29]
+  - task: Updated defaults (Days of SR Lines=1, Days of Opening Prices=1)
+    files: [scripts-output/TradingView/TCM-SR-STD.pine:15,58]
+  - task: Reverted 1H bias change back to Daily timeframe per user request
+    files: [scripts-output/TradingView/TCM-SR-STD.pine:85-90]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - separate_line_label_offset: Split lineExtension from labelOffset for independent control over line length vs label placement
+  - dotted_half_std: 0.5 STD lines use dotted style to differentiate from main targets
+  - keep_daily_bias: Bias stays on Daily timeframe (user reverted 1H change)
+  - high_transparency: 92% opacity for session boxes to be less obtrusive
+
+findings:
+  - color_new_overwrites: color.new() overwrites transparency, need explicit values in loops
+  - array_multi_day: Indicator uses array storage for multi-day history
+
+worked:
+  - Separate arrays for each line type (longHalfLines, short2Lines, etc.)
+  - 92% transparency for subtle session boxes
+  - Separate line extension vs label offset inputs
+
+failed:
+  - 1H bias calculation (user preferred daily, reverted)
+
+next:
+  - Test all visual elements in TradingView
+  - Verify hit tracking for new 0.5/2.0 STD levels
+  - Consider custom opening price slots (A-F) like TCM-OF.pine
+
+indicator_features:
+  core: STD targets from SR session (12:40-3:20 PM ET) with bias-aware coloring
+  std_lines:
+    - T1 (1.0 STD) and T2 (1.5 STD) primary targets
+    - 0.5 STD optional (dotted style)
+    - 2.0 STD optional for extended moves
+  sr_range:
+    - SR High/Low boundary lines
+    - SR EQ equilibrium line
+    - SR Box shaded range
+  session_boxes:
+    - Monday (9:20-11:40) purple "Liquidity Hunt"
+    - Tuesday (4:40-11:40 PM) teal "Offset"
+    - Wednesday (2:00-4:40 AM) cyan "Rebalance"
+  opening_prices:
+    - Daily Cycle Open (11:40 AM) black
+    - AM Open (2:00 AM) red
+    - 4:40 AM magenta
+    - 7:00 AM navy
+  bias: Daily close vs prev day determines bullish/bearish styling
+
+files:
+  created: []
+  modified: [scripts-output/TradingView/TCM-SR-STD.pine]

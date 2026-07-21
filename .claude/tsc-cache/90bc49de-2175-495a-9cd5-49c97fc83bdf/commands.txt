@@ -1,0 +1,2 @@
+ui:build:cd C:\Users\satvi\Repos\builder-block-C\ui && npm run build
+ui:tsc:cd C:\Users\satvi\Repos\builder-block-C\ui && npx tsc --noEmit

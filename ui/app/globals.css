@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,32 +6,31 @@
 
 @layer base {
   :root {
-    /* Refined financial studio theme */
-    --background: 220 13% 6%;
-    --foreground: 210 40% 98%;
-    --card: 220 13% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 220 13% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 167 76% 42%;
-    --primary-foreground: 220 13% 9%;
-    --secondary: 220 13% 15%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 220 13% 15%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217 91% 60%;
-    --accent-foreground: 220 13% 9%;
+    --background: 222 15% 5%;
+    --foreground: 36 30% 93%;
+    --card: 220 13% 8%;
+    --card-foreground: 36 30% 93%;
+    --popover: 220 13% 10%;
+    --popover-foreground: 36 30% 93%;
+    --primary: 36 52% 55%;
+    --primary-foreground: 222 15% 7%;
+    --secondary: 220 11% 13%;
+    --secondary-foreground: 36 30% 93%;
+    --muted: 220 11% 14%;
+    --muted-foreground: 218 8% 62%;
+    --accent: 36 52% 55%;
+    --accent-foreground: 222 15% 7%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
-    --border: 220 13% 18%;
+    --border: 220 10% 18%;
     --input: 220 13% 20%;
-    --ring: 167 76% 42%;
-    --radius: 0.75rem;
-    --chart-1: 167 76% 42%;
-    --chart-2: 217 91% 60%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 210 40% 98%;
-    --chart-5: 215 20.2% 65.1%;
+    --ring: 36 52% 55%;
+    --radius: 0.875rem;
+    --chart-1: 36 52% 55%;
+    --chart-2: 153 44% 45%;
+    --chart-3: 0 55% 52%;
+    --chart-4: 36 30% 93%;
+    --chart-5: 218 8% 62%;
   }
 }
 
@@ -41,20 +40,50 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
-    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
   }
   code, pre {
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-family: 'IBM Plex Mono', 'Courier New', monospace;
   }
 
-  /* Centered container */
   .container {
     @apply mx-auto px-4 sm:px-6 lg:px-8;
-    max-width: 1400px;
+    max-width: 1280px;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  ::selection {
+    background: rgba(201, 151, 79, 0.28);
+  }
+
+  :focus-visible {
+    outline: 2px solid #c9974f;
+    outline-offset: 3px;
   }
 }
 
 @layer components {
+  .site-container {
+    @apply mx-auto w-full px-5 sm:px-8;
+    max-width: 1240px;
+  }
+
+  .eyebrow {
+    @apply font-mono text-[10px] font-semibold uppercase tracking-[0.22em];
+  }
+
+  .member-panel {
+    @apply rounded-2xl border border-white/[0.08] bg-white/[0.035];
+  }
+
+  .marketing-panel {
+    @apply rounded-[24px] border border-black/10 bg-white/55;
+    box-shadow: 0 24px 70px rgba(30, 28, 24, 0.07);
+  }
+
   .stat-card {
     @apply relative overflow-hidden rounded-xl border bg-card p-6 transition-all duration-300;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -125,5 +154,16 @@
       radial-gradient(circle at 20% 20%, rgba(79, 134, 247, 0.08) 0%, transparent 50%),
       radial-gradient(circle at 80% 80%, rgba(0, 212, 170, 0.08) 0%, transparent 50%);
     z-index: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

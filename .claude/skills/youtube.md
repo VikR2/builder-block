@@ -5,6 +5,10 @@ description: Orchestrated YouTube extraction with reflective analysis and human-
 
 # YouTube Extraction Workflow
 
+**Reference Files:**
+- `.claude/rules/video-extraction.md` - Stable patterns, thresholds, model structure templates
+- `.claude/skills/youtube/CLAUDE.md` - Memory integration protocols
+
 Extract trading concepts from YouTube videos using **reflective analysis** that:
 1. Segments video by concept boundaries (not fixed intervals)
 2. Analyzes each segment like a human learner would
@@ -34,6 +38,17 @@ Extract the YouTube URL from the args. Accept formats:
 - `https://www.youtube.com/watch?v=VIDEO_ID`
 - `https://youtu.be/VIDEO_ID`
 - Just the VIDEO_ID
+
+### Step 1a: Memory Recall (AUTOMATIC - Silent)
+
+Before proceeding, silently query claude-mem for relevant learnings:
+
+```bash
+# Search for patterns related to this video/topic
+mcp__plugin_claude-mem_mcp-search__search query="extraction [keywords from URL/title]"
+```
+
+Apply any relevant patterns automatically (e.g., past model structures, skill matching decisions, known issues). Do not prompt user - this is background context.
 
 ### Step 2: Fetch Transcript
 
@@ -622,6 +637,21 @@ Show final summary:
 - Skills added/linked: [count]
 - Files generated: [list]
 - Video marked as processed
+
+### Step 11: Memory Storage (HYBRID)
+
+**For Successful Extractions (AUTO - Silent):**
+Store extraction summary to claude-mem without prompting:
+- Tags: `extraction`, `skills`, `[model-name-if-applicable]`
+- Content: Video title, skills count (new/matched), model captured (yes/no)
+
+**For Problematic Extractions (PROMPT):**
+If issues were encountered during extraction, ask user:
+> "Store this issue pattern for future avoidance?"
+
+If approved, store with tags: `extraction`, `extraction-issue`, `[issue-type]`
+
+See `.claude/skills/youtube/CLAUDE.md` for full memory protocol.
 
 ---
 

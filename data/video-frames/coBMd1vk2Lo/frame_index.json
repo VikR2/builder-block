@@ -1,0 +1,90 @@
+{
+  "video_id": "coBMd1vk2Lo",
+  "title": "Trader Maine ICT Model Interview",
+  "total_frames": 60,
+  "frame_interval_seconds": 60,
+  "extraction_date": "2026-01-06",
+  "key_frames": [
+    {
+      "frame": "frame_020.jpg",
+      "timestamp_min": 20,
+      "category": "concept_diagram",
+      "description": "Basic price leg / swing pattern drawing on whiteboard",
+      "concepts": ["swing_pattern", "price_leg"]
+    },
+    {
+      "frame": "frame_025.jpg",
+      "timestamp_min": 25,
+      "category": "concept_diagram",
+      "description": "Complete trading range concept: MSB, ERL, Order Block, 50% equilibrium, Discount zone",
+      "concepts": ["MSB", "ERL", "order_block", "equilibrium", "discount_zone", "trading_range"],
+      "key_frame": true
+    },
+    {
+      "frame": "frame_030.jpg",
+      "timestamp_min": 30,
+      "category": "concept_diagram",
+      "description": "Timeframe hierarchy diagram - H1, OB, Daily labels",
+      "concepts": ["timeframe_pairing", "HTF_LTF"]
+    },
+    {
+      "frame": "frame_031.jpg",
+      "timestamp_min": 31,
+      "category": "concept_diagram",
+      "description": "MSB swing pattern (W shape) with Order Block and Daily reference",
+      "concepts": ["MSB", "swing_pattern", "order_block"],
+      "key_frame": true
+    },
+    {
+      "frame": "frame_033.jpg",
+      "timestamp_min": 33,
+      "category": "concept_diagram",
+      "description": "H1 swing patterns showing multiple W formations and Breaker Block (BB)",
+      "concepts": ["swing_pattern", "breaker_block", "H1_timeframe"]
+    },
+    {
+      "frame": "frame_035.jpg",
+      "timestamp_min": 35,
+      "category": "concept_diagram",
+      "description": "Complete multi-timeframe diagram: H1, H4/M15, 2R target, OB, Daily, partial BB label",
+      "concepts": ["multi_timeframe", "H4_M15", "2R_target", "order_block", "breaker_block"],
+      "key_frame": true
+    },
+    {
+      "frame": "frame_036.jpg",
+      "timestamp_min": 36,
+      "category": "concept_diagram",
+      "description": "Complete whiteboard with all concepts: H1, H4/M15, 2R, OB, Daily, BB (Breaker Block)",
+      "concepts": ["multi_timeframe", "breaker_block", "order_block", "2R_target"],
+      "key_frame": true
+    },
+    {
+      "frame": "frame_050.jpg",
+      "timestamp_min": 50,
+      "category": "chart_example",
+      "description": "Real chart with annotation: 'LTF trigger can be taken with confidence due to HTF analysis'",
+      "concepts": ["HTF_LTF_confluence", "entry_trigger", "real_trade"],
+      "key_frame": true
+    },
+    {
+      "frame": "frame_053.jpg",
+      "timestamp_min": 53,
+      "category": "chart_example",
+      "description": "Candlestick chart with Order Block zone highlighted (shaded rectangle)",
+      "concepts": ["order_block", "POI_zone", "price_action"]
+    },
+    {
+      "frame": "frame_055.jpg",
+      "timestamp_min": 55,
+      "category": "chart_example",
+      "description": "Candlestick chart showing price rally from POI zone",
+      "concepts": ["order_block", "entry_zone", "price_action"]
+    }
+  ],
+  "frame_categories": {
+    "interview": ["frame_001.jpg", "frame_002.jpg", "frame_004.jpg", "frame_005.jpg", "frame_006.jpg", "frame_007.jpg", "frame_008.jpg", "frame_009.jpg", "frame_010.jpg", "frame_011.jpg", "frame_012.jpg", "frame_013.jpg", "frame_014.jpg", "frame_015.jpg", "frame_016.jpg", "frame_017.jpg", "frame_018.jpg", "frame_019.jpg", "frame_021.jpg", "frame_022.jpg", "frame_023.jpg", "frame_024.jpg", "frame_026.jpg", "frame_027.jpg", "frame_028.jpg", "frame_029.jpg", "frame_032.jpg", "frame_034.jpg", "frame_037.jpg", "frame_038.jpg", "frame_039.jpg", "frame_041.jpg", "frame_042.jpg", "frame_043.jpg", "frame_044.jpg", "frame_045.jpg", "frame_046.jpg", "frame_047.jpg", "frame_048.jpg", "frame_049.jpg", "frame_051.jpg", "frame_052.jpg", "frame_054.jpg", "frame_056.jpg", "frame_057.jpg", "frame_058.jpg", "frame_059.jpg", "frame_060.jpg"],
+    "concept_diagram": ["frame_020.jpg", "frame_025.jpg", "frame_030.jpg", "frame_031.jpg", "frame_033.jpg", "frame_035.jpg", "frame_036.jpg"],
+    "chart_example": ["frame_050.jpg", "frame_053.jpg", "frame_055.jpg"],
+    "promo": ["frame_040.jpg"]
+  }
+}

@@ -1,0 +1,54 @@
+---
+session: builder-block-C
+date: 2026-01-19
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Make Knowledge Bot Quick Topics clickable and add @ autocomplete for skills
+now: Test the implementation by running dev server and visiting /tcm page
+
+test: cd ui && npx tsc --noEmit --skipLibCheck && npx eslint app/tcm/page.tsx app/tcm/tcm-page-content.tsx components/tcm/chat-interface.tsx
+
+done_this_session:
+  - task: Added forwardRef and useImperativeHandle to ChatInterface component
+    files: [ui/components/tcm/chat-interface.tsx]
+  - task: Created client wrapper component with clickable Quick Topics
+    files: [ui/app/tcm/tcm-page-content.tsx]
+  - task: Simplified page.tsx to use client wrapper with stats props
+    files: [ui/app/tcm/page.tsx]
+  - task: Added @ autocomplete with debounced skill search API calls
+    files: [ui/components/tcm/chat-interface.tsx]
+  - task: Fixed autocomplete filter bug (r.type vs r.source, r.content vs r.description)
+    files: [ui/components/tcm/chat-interface.tsx]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - client_wrapper_pattern: Server component (page.tsx) fetches stats, client component (tcm-page-content.tsx) handles interactivity. Clean separation.
+  - autocomplete_trigger: Used @ symbol as trigger (like Claude Code) rather than slash commands
+  - debounce_timing: 300ms debounce on autocomplete API calls to avoid excessive requests
+
+findings:
+  - search_api_structure: /api/tcm/search returns {type, id, title, content, source} - type='skill' for skills, source is display text
+  - forwardRef_pattern: ChatInterface now exposes submitMessage() and setInputValue() via useImperativeHandle
+
+worked:
+  - forwardRef with useImperativeHandle pattern for parent-to-child method calls
+  - Debounced autocomplete with keyboard navigation (Arrow keys, Tab/Enter, Escape)
+  - Curated topic list with predefined queries for each label
+
+failed:
+  - Initial autocomplete filter used r.source === 'skill' but API uses r.type === 'skill'
+  - Used r.description but API returns r.content for the description field
+
+next:
+  - Manual testing: run npm run dev, visit /tcm, click Quick Topics, test @ autocomplete
+  - Consider adding more topics based on user feedback
+  - Could enhance with context-aware suggestions based on conversation history
+
+files:
+  created: [ui/app/tcm/tcm-page-content.tsx]
+  modified: [ui/app/tcm/page.tsx, ui/components/tcm/chat-interface.tsx]

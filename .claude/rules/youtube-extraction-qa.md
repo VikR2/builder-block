@@ -2,6 +2,11 @@
 
 When extracting skills from YouTube videos, you MUST use AskUserQuestion to get explicit user approval at these checkpoints.
 
+**Related Files:**
+- `.claude/rules/video-extraction.md` - Reference guide with thresholds and patterns
+- `.claude/skills/youtube.md` - Full extraction workflow
+- `.claude/skills/youtube/CLAUDE.md` - Memory integration protocols
+
 ## Trigger Phrases
 
 This rule applies when:

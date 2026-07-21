@@ -1,0 +1,92 @@
+{
+  "video_id": "MsuEQQl7L6s",
+  "video_url": "https://www.youtube.com/watch?v=MsuEQQl7L6s",
+  "video_title": "Candle 3 Closure - Core Concept Tutorial",
+  "video_type": "skills_library",
+  "created_at": "2026-01-07T14:00:00.000000",
+  "frame_count": 16,
+  "video_duration_sec": 708,
+  "frame_interval_sec": 45,
+  "skills_covered": [
+    "c3_closure",
+    "candle_counting",
+    "fvg_confirmation",
+    "model_core_components"
+  ],
+  "key_quote": "with bias, structure, CISD, and order blocks, you essentially have my entire model",
+  "frames": [
+    {
+      "filename": "frame_0001.jpg",
+      "timestamp_sec": 0,
+      "timestamp_str": "0:00",
+      "frame_type": "title",
+      "categories": ["intro"],
+      "is_contradiction_relevant": false,
+      "frame_index": 0,
+      "visual_interpretation": {
+        "asset": "N/A",
+        "timeframe": "N/A",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "Title slide: Candle 3 Closure - TTrades"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0005.jpg",
+      "timestamp_sec": 180,
+      "timestamp_str": "3:00",
+      "frame_type": "entry",
+      "categories": ["entry", "context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 4,
+      "visual_interpretation": {
+        "asset": "EURUSD",
+        "timeframe": "1D",
+        "annotation_labels": [],
+        "zones_shown": ["Yellow FVG zones"],
+        "description": "EURUSD daily showing 3-candle sequence with FVG zones - demonstrates candle counting"
+      },
+      "pattern_mappings": {
+        "c3_counting": {
+          "is_reference": true,
+          "visual_elements": ["3 consecutive candles", "FVG zone"],
+          "code_insight": "C3 closure = 3rd candle closing in/through FVG zone; confirms zone validity"
+        }
+      }
+    },
+    {
+      "filename": "frame_0010.jpg",
+      "timestamp_sec": 405,
+      "timestamp_str": "6:45",
+      "frame_type": "entry",
+      "categories": ["entry"],
+      "is_contradiction_relevant": true,
+      "frame_index": 9,
+      "visual_interpretation": {
+        "asset": "NQ1 (Nasdaq futures)",
+        "timeframe": "4h",
+        "annotation_labels": ["Pink circles on candles"],
+        "zones_shown": [],
+        "description": "NQ1 4h with pink circles marking candle positions for counting"
+      },
+      "pattern_mappings": {
+        "candle_position_marking": {
+          "is_reference": true,
+          "visual_elements": ["pink circle markers", "candle counting"],
+          "code_insight": "Visual markers show candle counting method - circle each relevant candle to track C1, C2, C3"
+        }
+      }
+    }
+  ],
+  "model_summary": {
+    "core_components": ["bias", "structure", "CISD", "order_blocks"],
+    "description": "This video explicitly states that bias + structure + CISD + order blocks = complete trading model"
+  },
+  "pipeline_notes": {
+    "inefficiencies_found": [],
+    "data_quality": "good",
+    "transcript_coverage": "complete (0:00-11:48)",
+    "silent_sections": false
+  }
+}

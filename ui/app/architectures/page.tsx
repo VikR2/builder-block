@@ -3,6 +3,8 @@ import { readdirSync, readFileSync, statSync } from "fs";
 import { join, basename } from "path";
 import matter from "gray-matter";
 
+export const dynamic = 'force-dynamic';
+
 interface ArchitectureMetadata {
   name: string;
   source_url?: string;

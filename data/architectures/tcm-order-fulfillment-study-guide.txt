@@ -1,0 +1,235 @@
+TCM ORDER FULFILLMENT TIPS - STUDY GUIDE
+========================================
+
+Source: Order-Fufilment-Tips.mp4 (81 minutes)
+Focus: Book-building process and reading matched vs unmatched orders
+
+
+PART 1: THE CORE FRAMEWORK
+--------------------------
+
+The Book Metaphor
+
+Think of all matched orders as a bag of marbles. Each marble represents
+a matched buy+sell pair. The bag contains all the liquidity at that price
+level. When price returns to that zone, it's "digging into the bag" to
+fill orders. Any unfilled orders remain as future liquidity targets.
+
+
+The Order Lifecycle (4 Steps)
+
+    SUBMISSION --> MATCHING --> FILLING --> DISTRIBUTION
+
+    1. Submission: Orders placed as "lines" - no liquidity exists yet
+    2. Matching: Counterparty found, order goes on the book, liquidity created
+    3. Filling: Time-based execution (entities must be present to fill)
+    4. Distribution: Orders settled, profits and losses realized
+
+
+Critical Insight
+
+    Submitted order + Matched counterparty = Liquidity
+
+    An order placed does NOT equal liquidity.
+    An order matched DOES equal liquidity.
+    If price never trades to a submitted level during the matching window,
+    there is NO liquidity at that level.
+
+
+PART 2: THE BOOK BUILDING PROCESS
+---------------------------------
+
+Step 1: Find the Book
+
+The "book" is the overlap between two zones:
+    - Submission Range: 12:40 PM to 3:20 PM ET
+    - Matching Window: Asian session
+
+Draw both boxes on your chart. Where they overlap is the book.
+This is the FIRST thing to identify on any chart.
+
+
+Step 2: Identify Levels from the Book
+
+From the overlap zone, extract three levels:
+    - HIGH: Highest matched order
+    - LOW: Lowest matched order
+    - EQ: 50% midpoint (the average order)
+
+
+Step 3: Determine Liquidity Type
+
+If orders matched and price moved HIGHER after:
+    - Buyers are in profit
+    - They protect with sell stops BELOW
+    - Therefore, sell-side liquidity rests below the matched zone
+
+If orders matched and price moved LOWER after:
+    - Sellers are in profit
+    - They protect with buy stops ABOVE
+    - Therefore, buy-side liquidity rests above the matched zone
+
+
+The Bias Formula
+
+    Key Level + Delivery at Key Level = BIAS
+
+    Delivery types:
+    - SWEEP (no FVG created) = Reversal expected
+    - RUN (FVG stays open) = Continuation expected
+
+
+PART 3: UNMATCHED ORDERS (GAP DAYS)
+-----------------------------------
+
+When the matching window does NOT overlap with the submission range,
+you have a gap. Orders in that gap remain unfilled.
+
+What happens next:
+    1. Market will need to return to fill those orders
+    2. Creates the pattern: run up, match, fill, run down
+
+Example flow:
+    Price gaps up
+    --> Creates matching above SR
+    --> Must pull back to fill SR levels
+    --> Then continues to original objective
+
+
+PART 4: THE 3-STEP DAILY ANALYSIS
+---------------------------------
+
+When you open any chart, do this:
+
+Step 1: Find the Book
+    - Draw the Submission Range box
+    - Draw the Matching Window box
+    - Identify where they overlap
+
+Step 2: Check the Fill Window
+    - Extend the book levels into the NY session
+    - Mark the High, Low, and EQ from the overlap
+
+Step 3: Determine NY Bias
+    Ask two questions:
+    1. Where is liquidity? (based on how price moved away from matched levels)
+    2. Is it logical for the market to turn here? (based on objectives)
+
+
+PART 5: PRACTICAL ENTRY RULES
+-----------------------------
+
+Close Confirmation Rule
+
+Before taking a reversal trade:
+    1. Wait for price to sweep the high or low
+    2. You MUST see a close above the swept high (for longs)
+       or below the swept low (for shorts)
+    3. If no close happens, expect continuation instead
+
+
+The "Don't Candle" Rule
+
+If price sweeps a level but does NOT close above or below:
+    1. Wait for a "don't candle" (a pause or rejection candle)
+    2. Only enter if the close comes AFTER the don't candle
+    3. No close = no trade
+
+
+Continuation Must End First
+
+    "Continuations must end before reversals take place."
+
+If price is expanding through a level:
+    1. Wait until the expansion objective is reached (deviation level)
+    2. OR wait until a candle shows expansion is over (failed expansion)
+    3. If BOTH are happening together, do not trade
+
+
+PART 6: DEVIATION LEVELS
+------------------------
+
+How to find deviation targets from unmatched orders:
+
+    1. Take the Submission Range box
+    2. Copy it
+    3. Place 50% of the box at the low of the gap = 1 STD down target
+    4. Place another copy above = 1 STD up target
+    5. These levels become key zones for deviation trades
+
+
+PART 7: DLP INSIGHT
+-------------------
+
+How Designated Liquidity Providers make money:
+
+    1. Paid commission for every X orders filled
+    2. Hedge by building short-term and long-term books
+    3. Goal: Commissions + Exit Profits - Losses > Target percentage
+
+Key understanding: They do not close same-day. They build positions
+over time. This explains why markets revisit levels.
+
+
+PART 8: KEY QUOTES TO REMEMBER
+------------------------------
+
+"Key level + Delivery at key level = Bias"
+
+"We get paid to make good decisions."
+
+"The more you sit and look, the more the market whispers bullish...
+and that's when you get destroyed."
+
+"You don't have to justify losses. You get paid to make good
+decisions using rules."
+
+"Continuations must end before reversals."
+
+
+PART 9: QUICK REFERENCE CHECKLIST
+---------------------------------
+
+Daily Prep:
+    [ ] Draw Submission Range (12:40-3:20 PM ET previous day)
+    [ ] Draw Matching Window (Asian session)
+    [ ] Identify overlap = the book
+    [ ] Mark High, Low, EQ from overlap
+    [ ] Note if gap exists (no overlap)
+    [ ] If gap, calculate deviation levels
+
+During NY Session:
+    [ ] Where is liquidity relative to current price?
+    [ ] Is price approaching a key level?
+    [ ] Watch for sweep vs run at the level
+    [ ] If sweep, wait for close confirmation
+    [ ] If run with FVG, expect continuation
+
+Entry Checklist:
+    [ ] Level identified from book
+    [ ] Delivery type confirmed (sweep or run)
+    [ ] Close confirmation received (for reversals)
+    [ ] No active expansion underway
+    [ ] Logical for market to turn here
+
+
+PART 10: COMMON MISTAKES TO AVOID
+---------------------------------
+
+1. Trading before continuation ends
+   - Wait for expansion to complete before looking for reversals
+
+2. Entering without close confirmation
+   - A sweep alone is not enough; need the close
+
+3. Ignoring the gap
+   - If no overlap, those levels must be filled eventually
+
+4. Overthinking during slow action
+   - The more you stare, the more you see patterns that aren't there
+
+5. Justifying losses with stories
+   - Rules-based decisions need no justification
+
+
+

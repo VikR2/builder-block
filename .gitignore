@@ -12,6 +12,7 @@ out/
 .env
 .env.local
 .env*.local
+ops/share/.env.share
 
 # IDE
 .idea/
@@ -30,12 +31,39 @@ __pycache__/
 venv/
 
 # Database (keep schema, ignore data)
+data/*.db
+data/*.db-*
 *.db-journal
+*.faiss
 
 # Local config
 *.local.json
 *.local.md
 
+# Large media files
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.wav
+*.mp3
+*.zip
+*.tar.gz
+*.ytdl
+
+# Video data directories
+data/video-frames/*/video.*
+data/local-videos/
+data/local-videos-legacy/
+
 # Temporary video frames (keep .gitkeep)
 data/temp-frames/*
 !data/temp-frames/.gitkeep
+
+# Local runtime state
+.runtime/
+.playwright-mcp/
+screenshots/
+ui/playwright-report/
+ui/test-results/
+ui/tsconfig.tsbuildinfo

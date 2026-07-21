@@ -1,0 +1,607 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © builder-block-C
+
+//@version=6
+indicator("Weekly Open & Monday-Tuesday Range", shorttitle="WO-MTR", overlay=true, max_lines_count=500, max_boxes_count=500)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INPUT GROUPS
+// ══════════════════════════════════════════════════════════════════════════════
+
+GRP_GENERAL = "General Settings"
+GRP_WEEKLY_OPEN = "Weekly Open Line"
+GRP_WEEKLY_BOX = "Weekly Box"
+GRP_MT_COMBINED = "Monday-Tuesday Combined Box"
+GRP_SUB_BOX = "Monday & Tuesday Individual Boxes"
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// General
+maxWeeks = input.int(4, "Weeks to Display", minval=1, maxval=12, group=GRP_GENERAL)
+inputTimezone = input.string("America/New_York", "Timezone", group=GRP_GENERAL)
+
+// Weekly Open Line
+showWeeklyOpen = input.bool(true, "Show Weekly Open", group=GRP_WEEKLY_OPEN)
+showWeeklyOpenLabel = input.bool(true, "Show Label", group=GRP_WEEKLY_OPEN)
+weeklyOpenColor = input.color(color.black, "Line Color", group=GRP_WEEKLY_OPEN)
+weeklyOpenWidth = input.int(1, "Line Width", minval=1, maxval=4, group=GRP_WEEKLY_OPEN)
+weeklyOpenStyleInput = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group=GRP_WEEKLY_OPEN)
+
+// Weekly Box (entire week's range)
+showWeeklyBox = input.bool(true, "Show Weekly Box", group=GRP_WEEKLY_BOX)
+weeklyBoxBorderColor = input.color(color.new(#2962FF, 50), "Border Color", group=GRP_WEEKLY_BOX)
+weeklyBoxBgColor = input.color(color.new(#2962FF, 90), "Background Color", group=GRP_WEEKLY_BOX)
+weeklyBoxShowFill = input.bool(true, "Show Fill", group=GRP_WEEKLY_BOX)
+weeklyBoxBorderWidth = input.int(1, "Border Width", minval=1, maxval=3, group=GRP_WEEKLY_BOX)
+
+// Monday-Tuesday Combined Box
+showMTBox = input.bool(true, "Show Combined MT Box", group=GRP_MT_COMBINED)
+mtBoxBorderColor = input.color(color.new(#E91E63, 30), "Border Color", group=GRP_MT_COMBINED)
+mtBoxBgColor = input.color(color.new(#E91E63, 85), "Background Color", group=GRP_MT_COMBINED)
+mtBoxShowFill = input.bool(true, "Show Fill", group=GRP_MT_COMBINED)
+mtBoxBorderWidth = input.int(1, "Border Width", minval=1, maxval=3, group=GRP_MT_COMBINED)
+showMT50Line = input.bool(true, "Show 50% Line", group=GRP_MT_COMBINED)
+mt50LineStyleInput = input.string("Dashed", "50% Line Style", options=["Solid", "Dashed", "Dotted"], group=GRP_MT_COMBINED)
+
+// Monday & Tuesday Individual Boxes
+showSubBoxes = input.bool(false, "Show Individual Day Boxes", group=GRP_SUB_BOX)
+monBoxBorderColor = input.color(color.new(#787B86, 30), "Monday Border Color", group=GRP_SUB_BOX)
+monBoxBgColor = input.color(color.new(#787B86, 85), "Monday Background Color", group=GRP_SUB_BOX)
+tueBoxBorderColor = input.color(color.new(#787B86, 30), "Tuesday Border Color", group=GRP_SUB_BOX)
+tueBoxBgColor = input.color(color.new(#787B86, 85), "Tuesday Background Color", group=GRP_SUB_BOX)
+subBoxShowFill = input.bool(true, "Show Fill", group=GRP_SUB_BOX)
+subBoxBorderWidth = input.int(1, "Border Width", minval=1, maxval=3, group=GRP_SUB_BOX)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Max historical lookback to avoid buffer overflow errors
+// Pine Script default buffer is 500 bars; use 490 for safety margin
+MAX_LOOKBACK = 490
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Convert style string to line.style constant
+getLineStyle(styleStr) =>
+    switch styleStr
+        "Dashed" => line.style_dashed
+        "Dotted" => line.style_dotted
+        => line.style_solid
+
+// Get day of week in specified timezone (1=Sunday, 2=Monday, ... 7=Saturday)
+getDayOfWeek(t, tz) =>
+    dayofweek(t, tz)
+
+// Get hour in specified timezone
+getHour(t, tz) =>
+    hour(t, tz)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STORAGE ARRAYS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Weekly open storage (most recent first)
+var array<float> weeklyOpens = array.new_float(0)
+var array<int> weeklyOpenBars = array.new_int(0)
+var array<int> weeklyEndBars = array.new_int(0)
+
+// Weekly box range storage (most recent first)
+var array<float> weeklyBoxHighs = array.new_float(0)
+var array<float> weeklyBoxLows = array.new_float(0)
+var array<int> weeklyBoxStarts = array.new_int(0)
+var array<int> weeklyBoxEnds = array.new_int(0)
+
+// Monday individual box storage
+var array<float> monHighs = array.new_float(0)
+var array<float> monLows = array.new_float(0)
+var array<int> monStarts = array.new_int(0)
+var array<int> monEnds = array.new_int(0)
+
+// Tuesday individual box storage
+var array<float> tueHighs = array.new_float(0)
+var array<float> tueLows = array.new_float(0)
+var array<int> tueStarts = array.new_int(0)
+var array<int> tueEnds = array.new_int(0)
+
+// Monday-Tuesday combined box storage
+var array<float> mtHighs = array.new_float(0)
+var array<float> mtLows = array.new_float(0)
+var array<int> mtStarts = array.new_int(0)
+var array<int> mtEnds = array.new_int(0)
+
+// Drawing objects
+var array<line> weeklyOpenLines = array.new_line(0)
+var array<label> weeklyOpenLabels = array.new_label(0)
+var array<box> weeklyBoxes = array.new_box(0)
+var array<box> mtBoxes = array.new_box(0)
+var array<line> mt50Lines = array.new_line(0)
+var array<box> monBoxes = array.new_box(0)
+var array<box> tueBoxes = array.new_box(0)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STATE VARIABLES
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Current week tracking
+var float currentWeeklyOpen = na
+var int currentWeeklyOpenBar = na
+var bool inCurrentWeek = false
+
+// Current Weekly box range tracking (entire week's high/low)
+var float currentWeeklyBoxHigh = na
+var float currentWeeklyBoxLow = na
+var int currentWeeklyBoxStart = na
+
+// Current Monday tracking
+var float currentMonHigh = na
+var float currentMonLow = na
+var int currentMonStart = na
+var int currentMonEnd = na
+var bool inMonday = false
+
+// Current Tuesday tracking
+var float currentTueHigh = na
+var float currentTueLow = na
+var int currentTueStart = na
+var int currentTueEnd = na
+var bool inTuesday = false
+
+// Current MT combined tracking
+var float currentMTHigh = na
+var float currentMTLow = na
+var int currentMTStart = na
+var int currentMTEnd = na
+var bool inMTRange = false
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DAY/TIME DETECTION
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Day and hour in configured timezone
+currentDay = getDayOfWeek(time, inputTimezone)
+currentHour = getHour(time, inputTimezone)
+prevDay = getDayOfWeek(time[1], inputTimezone)
+prevHour = getHour(time[1], inputTimezone)
+
+// Day flags
+isSunday = currentDay == 1
+wasSunday = prevDay == 1
+isMonday = currentDay == 2
+wasMonday = prevDay == 2
+isTuesday = currentDay == 3
+wasTuesday = prevDay == 3
+isFriday = currentDay == 6
+wasFriday = prevDay == 6
+
+// Sunday 6pm detection
+isSunday6pmOrLater = isSunday and currentHour >= 18
+wasBefore6pm = prevHour < 18
+
+// Transition detections
+newWeekStart = isSunday6pmOrLater and (not wasSunday or wasBefore6pm)
+fridayEnd = wasFriday and not isFriday
+mondayStart = isMonday and not wasMonday
+mondayEnd = wasMonday and not isMonday
+tuesdayStart = isTuesday and not wasTuesday
+tuesdayEnd = wasTuesday and not isTuesday
+
+// Tuesday 6PM detection (for MT combined box end)
+isTuesday6pm = isTuesday and currentHour >= 18 and prevHour < 18
+
+// Monday 6PM detection (for individual Monday box end)
+isMonday6pm = isMonday and currentHour >= 18 and prevHour < 18
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WEEKLY OPEN DETECTION
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Handle new week start
+if newWeekStart
+    // Save previous week if we have one
+    if not na(currentWeeklyOpen) and not na(currentWeeklyOpenBar)
+        array.unshift(weeklyOpens, currentWeeklyOpen)
+        array.unshift(weeklyOpenBars, currentWeeklyOpenBar)
+        array.unshift(weeklyEndBars, bar_index - 1)
+
+        // Trim to maxWeeks
+        if array.size(weeklyOpens) > maxWeeks
+            array.pop(weeklyOpens)
+            array.pop(weeklyOpenBars)
+            array.pop(weeklyEndBars)
+
+    // Start new week
+    currentWeeklyOpen := open
+    currentWeeklyOpenBar := bar_index
+    inCurrentWeek := true
+
+// Update end bar for current week on Friday close
+// Don't set false if newWeekStart is also true (both can be true on Sunday 6pm bar)
+if fridayEnd and inCurrentWeek and not newWeekStart
+    inCurrentWeek := false
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WEEKLY BOX RANGE TRACKING (entire week's high/low)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Handle new week start - save previous and start new weekly box
+if newWeekStart
+    // Save previous weekly box if we have one
+    if not na(currentWeeklyBoxHigh) and not na(currentWeeklyBoxLow) and not na(currentWeeklyBoxStart)
+        array.unshift(weeklyBoxHighs, currentWeeklyBoxHigh)
+        array.unshift(weeklyBoxLows, currentWeeklyBoxLow)
+        array.unshift(weeklyBoxStarts, currentWeeklyBoxStart)
+        array.unshift(weeklyBoxEnds, bar_index - 1)
+
+        // Trim to maxWeeks
+        if array.size(weeklyBoxHighs) > maxWeeks
+            array.pop(weeklyBoxHighs)
+            array.pop(weeklyBoxLows)
+            array.pop(weeklyBoxStarts)
+            array.pop(weeklyBoxEnds)
+
+    // Start new weekly box
+    currentWeeklyBoxHigh := high
+    currentWeeklyBoxLow := low
+    currentWeeklyBoxStart := bar_index
+
+// Update weekly box high/low throughout the week (from Sun 6pm onwards)
+if inCurrentWeek
+    currentWeeklyBoxHigh := math.max(currentWeeklyBoxHigh, high)
+    currentWeeklyBoxLow := math.min(currentWeeklyBoxLow, low)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MONDAY INDIVIDUAL BOX TRACKING
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Handle Monday start
+if mondayStart
+    // Save previous Monday if we have one (only if it has a valid end bar)
+    if not na(currentMonHigh) and not na(currentMonLow) and not na(currentMonStart) and not na(currentMonEnd)
+        array.unshift(monHighs, currentMonHigh)
+        array.unshift(monLows, currentMonLow)
+        array.unshift(monStarts, currentMonStart)
+        array.unshift(monEnds, currentMonEnd)
+
+        // Trim to maxWeeks
+        if array.size(monHighs) > maxWeeks
+            array.pop(monHighs)
+            array.pop(monLows)
+            array.pop(monStarts)
+            array.pop(monEnds)
+
+    // Start new Monday tracking
+    currentMonHigh := high
+    currentMonLow := low
+    currentMonStart := bar_index
+    currentMonEnd := na  // Reset end bar
+    inMonday := true
+
+// Update Monday range during Monday (until 6PM)
+if inMonday and isMonday and currentHour < 18
+    currentMonHigh := math.max(currentMonHigh, high)
+    currentMonLow := math.min(currentMonLow, low)
+
+// Handle Monday end at 6PM
+if isMonday6pm and inMonday
+    currentMonEnd := bar_index
+    inMonday := false
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TUESDAY INDIVIDUAL BOX TRACKING
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Handle Tuesday start
+if tuesdayStart
+    // Save previous Tuesday if we have one (only if it has a valid end bar)
+    if not na(currentTueHigh) and not na(currentTueLow) and not na(currentTueStart) and not na(currentTueEnd)
+        array.unshift(tueHighs, currentTueHigh)
+        array.unshift(tueLows, currentTueLow)
+        array.unshift(tueStarts, currentTueStart)
+        array.unshift(tueEnds, currentTueEnd)
+
+        // Trim to maxWeeks
+        if array.size(tueHighs) > maxWeeks
+            array.pop(tueHighs)
+            array.pop(tueLows)
+            array.pop(tueStarts)
+            array.pop(tueEnds)
+
+    // Start new Tuesday tracking
+    currentTueHigh := high
+    currentTueLow := low
+    currentTueStart := bar_index
+    currentTueEnd := na  // Reset end bar
+    inTuesday := true
+
+// Update Tuesday range during Tuesday (until 6PM)
+if inTuesday and isTuesday and currentHour < 18
+    currentTueHigh := math.max(currentTueHigh, high)
+    currentTueLow := math.min(currentTueLow, low)
+
+// Handle Tuesday end at 6PM
+if isTuesday6pm and inTuesday
+    currentTueEnd := bar_index
+    inTuesday := false
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MONDAY-TUESDAY COMBINED BOX TRACKING
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Start MT range on Weekly Open (Sunday 6PM)
+if newWeekStart
+    // Save previous MT box if we have one
+    if not na(currentMTHigh) and not na(currentMTLow) and not na(currentMTStart) and not na(currentMTEnd)
+        array.unshift(mtHighs, currentMTHigh)
+        array.unshift(mtLows, currentMTLow)
+        array.unshift(mtStarts, currentMTStart)
+        array.unshift(mtEnds, currentMTEnd)
+
+        if array.size(mtHighs) > maxWeeks
+            array.pop(mtHighs)
+            array.pop(mtLows)
+            array.pop(mtStarts)
+            array.pop(mtEnds)
+
+    // Start new MT tracking from Weekly Open
+    currentMTHigh := high
+    currentMTLow := low
+    currentMTStart := bar_index
+    currentMTEnd := na
+    inMTRange := true
+
+// Update MT range from Sunday 6PM through Tuesday 6PM
+if inMTRange and (isSunday6pmOrLater or isMonday or (isTuesday and currentHour < 18))
+    currentMTHigh := math.max(currentMTHigh, high)
+    currentMTLow := math.min(currentMTLow, low)
+
+// End MT range at Tuesday 6PM
+if isTuesday6pm and inMTRange
+    currentMTEnd := bar_index
+    inMTRange := false
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DRAWING LOGIC
+// ══════════════════════════════════════════════════════════════════════════════
+
+if barstate.islast
+    // Clean up old drawing objects
+    for ln in weeklyOpenLines
+        line.delete(ln)
+    for lbl in weeklyOpenLabels
+        label.delete(lbl)
+    for bx in weeklyBoxes
+        box.delete(bx)
+    for bx in mtBoxes
+        box.delete(bx)
+    for ln in mt50Lines
+        line.delete(ln)
+    for bx in monBoxes
+        box.delete(bx)
+    for bx in tueBoxes
+        box.delete(bx)
+    array.clear(weeklyOpenLines)
+    array.clear(weeklyOpenLabels)
+    array.clear(weeklyBoxes)
+    array.clear(mtBoxes)
+    array.clear(mt50Lines)
+    array.clear(monBoxes)
+    array.clear(tueBoxes)
+
+    // Get line style
+    lineStyle = getLineStyle(weeklyOpenStyleInput)
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Draw weekly open lines
+    // ══════════════════════════════════════════════════════════════════════════
+    if showWeeklyOpen
+        // Draw current week's open line
+        if not na(currentWeeklyOpen) and not na(currentWeeklyOpenBar) and bar_index - currentWeeklyOpenBar <= MAX_LOOKBACK
+            ln = line.new(currentWeeklyOpenBar, currentWeeklyOpen, bar_index, currentWeeklyOpen,
+                         color=weeklyOpenColor,
+                         width=weeklyOpenWidth,
+                         style=lineStyle)
+            array.push(weeklyOpenLines, ln)
+
+            // Add label for current week (right side of line)
+            if showWeeklyOpenLabel
+                lbl = label.new(bar_index, currentWeeklyOpen, "Wk-Open",
+                               xloc=xloc.bar_index,
+                               style=label.style_none,
+                               textcolor=color.black,
+                               size=size.small,
+                               textalign=text.align_left)
+                array.push(weeklyOpenLabels, lbl)
+
+        // Draw historical weeks
+        if array.size(weeklyOpens) > 0
+            for i = 0 to math.min(array.size(weeklyOpens) - 1, maxWeeks - 1)
+                startBar = array.get(weeklyOpenBars, i)
+                // Skip if too far back (would exceed historical buffer)
+                if bar_index - startBar > MAX_LOOKBACK
+                    continue
+                openPrice = array.get(weeklyOpens, i)
+                endBar = array.get(weeklyEndBars, i)
+
+                ln = line.new(startBar, openPrice, endBar, openPrice,
+                             color=weeklyOpenColor,
+                             width=weeklyOpenWidth,
+                             style=lineStyle)
+                array.push(weeklyOpenLines, ln)
+
+                // Add label for historical week (right side of line)
+                if showWeeklyOpenLabel
+                    lbl = label.new(endBar, openPrice, "Wk-Open",
+                                   xloc=xloc.bar_index,
+                                   style=label.style_none,
+                                   textcolor=color.black,
+                                   size=size.small,
+                                   textalign=text.align_left)
+                    array.push(weeklyOpenLabels, lbl)
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Draw Weekly boxes (entire week's range)
+    // ══════════════════════════════════════════════════════════════════════════
+    if showWeeklyBox
+        // Draw current weekly box
+        if not na(currentWeeklyBoxHigh) and not na(currentWeeklyBoxLow) and not na(currentWeeklyBoxStart) and bar_index - currentWeeklyBoxStart <= MAX_LOOKBACK
+            bgCol = weeklyBoxShowFill ? weeklyBoxBgColor : na
+            bx = box.new(currentWeeklyBoxStart, currentWeeklyBoxHigh, bar_index, currentWeeklyBoxLow,
+                        border_color=weeklyBoxBorderColor,
+                        bgcolor=bgCol,
+                        border_width=weeklyBoxBorderWidth)
+            array.push(weeklyBoxes, bx)
+
+        // Draw historical weekly boxes
+        if array.size(weeklyBoxHighs) > 0
+            for i = 0 to math.min(array.size(weeklyBoxHighs) - 1, maxWeeks - 1)
+                startBar = array.get(weeklyBoxStarts, i)
+                // Skip if too far back (would exceed historical buffer)
+                if bar_index - startBar > MAX_LOOKBACK
+                    continue
+                h = array.get(weeklyBoxHighs, i)
+                l = array.get(weeklyBoxLows, i)
+                endBar = array.get(weeklyBoxEnds, i)
+
+                bgCol = weeklyBoxShowFill ? weeklyBoxBgColor : na
+                bx = box.new(startBar, h, endBar, l,
+                            border_color=weeklyBoxBorderColor,
+                            bgcolor=bgCol,
+                            border_width=weeklyBoxBorderWidth)
+                array.push(weeklyBoxes, bx)
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Draw Monday-Tuesday Combined boxes
+    // ══════════════════════════════════════════════════════════════════════════
+    if showMTBox
+        // Draw current MT box
+        if not na(currentMTHigh) and not na(currentMTLow) and not na(currentMTStart) and bar_index - currentMTStart <= MAX_LOOKBACK
+            bgCol = mtBoxShowFill ? mtBoxBgColor : na
+            // If still in MT range, extend to current bar; otherwise use stored end
+            mtEndBar = inMTRange ? bar_index : (not na(currentMTEnd) ? currentMTEnd : bar_index)
+            bx = box.new(currentMTStart, currentMTHigh, mtEndBar, currentMTLow,
+                        border_color=mtBoxBorderColor,
+                        bgcolor=bgCol,
+                        border_width=mtBoxBorderWidth)
+            array.push(mtBoxes, bx)
+
+        // Draw historical MT boxes
+        if array.size(mtHighs) > 0
+            for i = 0 to math.min(array.size(mtHighs) - 1, maxWeeks - 1)
+                startBar = array.get(mtStarts, i)
+                if bar_index - startBar > MAX_LOOKBACK
+                    continue
+                h = array.get(mtHighs, i)
+                l = array.get(mtLows, i)
+                endBar = array.get(mtEnds, i)
+
+                bgCol = mtBoxShowFill ? mtBoxBgColor : na
+                bx = box.new(startBar, h, endBar, l,
+                            border_color=mtBoxBorderColor,
+                            bgcolor=bgCol,
+                            border_width=mtBoxBorderWidth)
+                array.push(mtBoxes, bx)
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Draw MT 50% lines
+    // ══════════════════════════════════════════════════════════════════════════
+    if showMTBox and showMT50Line
+        mt50LineStyle = getLineStyle(mt50LineStyleInput)
+
+        // Draw current MT 50% line
+        if not na(currentMTHigh) and not na(currentMTLow) and not na(currentMTStart) and bar_index - currentMTStart <= MAX_LOOKBACK
+            mt50Price = (currentMTHigh + currentMTLow) / 2
+            mtEndBar = inMTRange ? bar_index : (not na(currentMTEnd) ? currentMTEnd : bar_index)
+            ln = line.new(currentMTStart, mt50Price, mtEndBar, mt50Price,
+                         color=mtBoxBorderColor,
+                         width=1,
+                         style=mt50LineStyle)
+            array.push(mt50Lines, ln)
+
+        // Draw historical MT 50% lines
+        if array.size(mtHighs) > 0
+            for i = 0 to math.min(array.size(mtHighs) - 1, maxWeeks - 1)
+                startBar = array.get(mtStarts, i)
+                if bar_index - startBar > MAX_LOOKBACK
+                    continue
+                h = array.get(mtHighs, i)
+                l = array.get(mtLows, i)
+                endBar = array.get(mtEnds, i)
+                mt50Price = (h + l) / 2
+
+                ln = line.new(startBar, mt50Price, endBar, mt50Price,
+                             color=mtBoxBorderColor,
+                             width=1,
+                             style=mt50LineStyle)
+                array.push(mt50Lines, ln)
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Draw Monday individual boxes
+    // ══════════════════════════════════════════════════════════════════════════
+    if showSubBoxes
+        // Draw current Monday box (if Monday is complete or in progress)
+        if not na(currentMonHigh) and not na(currentMonLow) and not na(currentMonStart) and bar_index - currentMonStart <= MAX_LOOKBACK
+            bgCol = subBoxShowFill ? monBoxBgColor : na
+            // If still Monday, extend to current bar; otherwise use stored end bar
+            monEndBar = inMonday ? bar_index : (not na(currentMonEnd) ? currentMonEnd : bar_index)
+            bx = box.new(currentMonStart, currentMonHigh, monEndBar, currentMonLow,
+                        border_color=monBoxBorderColor,
+                        bgcolor=bgCol,
+                        border_width=subBoxBorderWidth)
+            array.push(monBoxes, bx)
+
+        // Draw historical Monday boxes
+        if array.size(monHighs) > 0
+            for i = 0 to math.min(array.size(monHighs) - 1, maxWeeks - 1)
+                startBar = array.get(monStarts, i)
+                // Skip if too far back (would exceed historical buffer)
+                if bar_index - startBar > MAX_LOOKBACK
+                    continue
+                h = array.get(monHighs, i)
+                l = array.get(monLows, i)
+                endBar = array.get(monEnds, i)
+
+                bgCol = subBoxShowFill ? monBoxBgColor : na
+                bx = box.new(startBar, h, endBar, l,
+                            border_color=monBoxBorderColor,
+                            bgcolor=bgCol,
+                            border_width=subBoxBorderWidth)
+                array.push(monBoxes, bx)
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Draw Tuesday individual boxes
+    // ══════════════════════════════════════════════════════════════════════════
+    if showSubBoxes
+        // Draw current Tuesday box (if Tuesday is complete or in progress)
+        if not na(currentTueHigh) and not na(currentTueLow) and not na(currentTueStart) and bar_index - currentTueStart <= MAX_LOOKBACK
+            bgCol = subBoxShowFill ? tueBoxBgColor : na
+            // If still Tuesday, extend to current bar; otherwise use stored end bar
+            tueEndBar = inTuesday ? bar_index : (not na(currentTueEnd) ? currentTueEnd : bar_index)
+            bx = box.new(currentTueStart, currentTueHigh, tueEndBar, currentTueLow,
+                        border_color=tueBoxBorderColor,
+                        bgcolor=bgCol,
+                        border_width=subBoxBorderWidth)
+            array.push(tueBoxes, bx)
+
+        // Draw historical Tuesday boxes
+        if array.size(tueHighs) > 0
+            for i = 0 to math.min(array.size(tueHighs) - 1, maxWeeks - 1)
+                startBar = array.get(tueStarts, i)
+                // Skip if too far back (would exceed historical buffer)
+                if bar_index - startBar > MAX_LOOKBACK
+                    continue
+                h = array.get(tueHighs, i)
+                l = array.get(tueLows, i)
+                endBar = array.get(tueEnds, i)
+
+                bgCol = subBoxShowFill ? tueBoxBgColor : na
+                bx = box.new(startBar, h, endBar, l,
+                            border_color=tueBoxBorderColor,
+                            bgcolor=bgCol,
+                            border_width=subBoxBorderWidth)
+                array.push(tueBoxes, bx)

@@ -1,0 +1,83 @@
+---
+session: builder-block-C
+date: 2026-01-14
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Create TCM context quick-loader and extract Order Fulfillment Tips video
+now: Use /load-context tcm to instantly load all 12 TCM skills in new sessions
+
+test: python scripts/load_context.py --strategy tcm
+
+done_this_session:
+  - task: Created context loader script for instant strategy data access
+    files: [scripts/load_context.py]
+  - task: Created /load-context Claude skill
+    files: [.claude/skills/load-context/SKILL.md]
+  - task: Processed Order-Fufilment-Tips.mp4 (81m video)
+    files: [data/local-videos/Order-Fufilment-Tips_a89df5aa/manifest.json]
+  - task: Wrote comprehensive notes from video
+    files: [data/architectures/2026-01-14-tcm-order-fulfillment-tips.md]
+  - task: Added 6 new TCM skills to database (IDs 109-114)
+    files: [data/builder.db]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - context_loader_pattern: General-purpose script supporting any strategy pattern (tcm, ttrades, lumi)
+  - markdown_default_output: Markdown format optimized for Claude consumption, JSON available with -f flag
+  - skill_categorization: New skills follow existing TCM naming convention with (TCM) suffix
+
+findings:
+  - book_building_process: The "book" is the overlap between SR and matching window - bag of marbles metaphor
+  - close_confirmation_rule: Must see CLOSE above/below swept level before reversal trade
+  - deviation_from_gap: Copy SR box to calculate 1-2 STD targets when matching doesn't overlap
+  - dlp_book_building: Institutions build books over time, not same-day closes
+
+worked:
+  - Whisper base model for 81m video transcription (1070 segments, 48K chars)
+  - sys.stdout.reconfigure for Windows UTF-8 encoding fix
+  - SQLite row_factory for dict-style access
+
+failed:
+  - Initial print() without UTF-8 encoding on Windows (charmap codec error)
+
+next:
+  - Test /load-context skill in new Claude session
+  - Consider adding embeddings to new skills 109-114
+  - Extend TCM-OF.pine with Book Building visualization
+
+files:
+  created:
+    - scripts/load_context.py
+    - .claude/skills/load-context/SKILL.md
+    - data/architectures/2026-01-14-tcm-order-fulfillment-tips.md
+    - data/local-videos/Order-Fufilment-Tips_a89df5aa/manifest.json
+    - data/local-videos/Order-Fufilment-Tips_a89df5aa/transcript.txt
+  modified:
+    - data/builder.db (added skills 109-114, updated processed_local_videos)
+
+new_skills:
+  - id: 109
+    name: Book Building Process (TCM)
+    category: Market Structure
+  - id: 110
+    name: Matched Order Levels (TCM)
+    category: Market Structure
+  - id: 111
+    name: Unmatched Order Gaps (TCM)
+    category: Market Structure
+  - id: 112
+    name: Close Confirmation Rule (TCM)
+    category: Entry Patterns
+  - id: 113
+    name: Deviation from Gap (TCM)
+    category: Risk Management
+  - id: 114
+    name: DLP Book Building (TCM)
+    category: Market Structure
+
+tcm_skill_count: 12

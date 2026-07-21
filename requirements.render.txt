@@ -1,0 +1,8 @@
+# Python runtime dependencies used by the TCM processing/search pipeline.
+numpy>=1.26,<3
+faiss-cpu>=1.8,<2
+faster-whisper>=1.1,<2
+sentence-transformers>=3.0,<4
+elevenlabs>=1.8,<2
+yt-dlp>=2025.1
+

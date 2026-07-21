@@ -1,0 +1,718 @@
+{
+  "video_id": "9AL41xON3hA",
+  "video_url": "https://www.youtube.com/watch?v=9AL41xON3hA",
+  "video_title": "The Only Trading Strategy You Need For 2026 - TTrades Fractal Model",
+  "sad_path": "data\\architectures\\2026-01-03-ttrades-fractal-model.md",
+  "created_at": "2026-01-04T18:55:06.714922",
+  "frame_count": 29,
+  "frames": [
+    {
+      "filename": "frame_001.jpg",
+      "timestamp_sec": 0,
+      "timestamp_str": "0:00",
+      "frame_type": "general",
+      "sad_section": "Overview",
+      "categories": [],
+      "is_contradiction_relevant": false,
+      "transcript_segment": "How's it going everyone? This video is  going to be over one system or trading  strategy that you can follow in 2026.  Too many people bounce around from model  to model and then cannot find  consistency simply due to the fact that  they cannot follow a single system.  Let's go ahead and learn my fractal  model. Now, this model is built off the  fact that price cannot reverse without a  swing point. If price is going to go",
+      "frame_index": 0
+    },
+    {
+      "filename": "frame_002.jpg",
+      "timestamp_sec": 60,
+      "timestamp_str": "1:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": [
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "swing point. If price is going to go  from a bearish trend to a bullish trend,  it's going to form a bullish swing  point. If it's going from a bullish  trend to a bearish trend, it's going to  form a bearish swing point. Now, if we  look for these swing points to form at a  point of interest and look for certain  candle closures, we can anticipate  expansion candles that follow. Now, the  first thing we need to do before we get  into the lower time frames is come into  the day with a daily bias",
+      "frame_index": 1,
+      "pattern_mappings": {
+        "swing_point_concept": {
+          "is_reference": true,
+          "visual_elements": ["swing point labels", "trend reversal points"],
+          "code_insight": "Swing points are identified by local extremes - bullish = lower lows followed by higher high close"
+        }
+      }
+    },
+    {
+      "filename": "frame_003.jpg",
+      "timestamp_sec": 120,
+      "timestamp_str": "2:00",
+      "frame_type": "exit",
+      "sad_section": "Risk Management",
+      "categories": [
+        "exit",
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "closed back below that level, and then I  can be looking for a continuation that  following day. So once I have a daily  bias, then I'm going to look for  structure and a swing point formation.  So how do I go about this? Well, here  you can see we have a bullish daily bias  through previous day high as price has  closed over its previous candle's high.  So looking for that, I'm going to be  looking for a point of interest for  price to react out of. So I'm going to  look for that in the previou",
+      "frame_index": 2,
+      "pattern_mappings": {
+        "daily_bias": {
+          "is_reference": true,
+          "visual_elements": ["previous day high marked", "daily candle close"],
+          "code_insight": "Bullish bias = close > previous candle high; check PDH/PDL for direction"
+        }
+      }
+    },
+    {
+      "filename": "frame_004.jpg",
+      "timestamp_sec": 180,
+      "timestamp_str": "3:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": [
+        "entry"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "high. So with this, I would want to go  down to the lower time frames, and then  I'd look for a fractal model. Now, very  simply, we're going to go down to the  lower time frames using our time frame  alignment. So, for instance, if that  swing point was on the hourly, I'd be  using the 5minut. If it's on the 30  minute, I'd be using the 3minut. Now,  we're going to check to make sure we  have a change in the state of delivery,  which confirms the swing point, but  we're not going to enter on th",
+      "frame_index": 3,
+      "pattern_mappings": {
+        "timeframe_alignment": {
+          "is_reference": true,
+          "visual_elements": ["multiple timeframe chart", "hourly to 5min pairing"],
+          "code_insight": "TF pairing: Hourly→5min, 30min→3min; use IDX_BIAS, IDX_CONFIRMATION, IDX_ENTRY"
+        },
+        "cisd_pattern": {
+          "is_reference": false,
+          "visual_elements": ["CISD mentioned in transcript"],
+          "code_insight": "CISD (change in state of delivery) confirms swing point before entry"
+        }
+      }
+    },
+    {
+      "filename": "frame_005.jpg",
+      "timestamp_sec": 240,
+      "timestamp_str": "4:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": [
+        "entry"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "4hour or even the 30 minute. And then  from there when we form a candle 2 or a  candle three closure in that point of  interest, I'll go down to the lower time  frame using the time frame pairing and  then look for a continuation order block  and look for 2R. So now that you  understand this system, let's go through  a few examples of this. So here we are  in our first example and you can see we  have taken out all the highs over here  to our left and then we have a bunch of  failure swings and ",
+      "frame_index": 4,
+      "pattern_mappings": {
+        "c1c2_confirmation": {
+          "is_reference": true,
+          "visual_elements": ["candle 2/candle 3 labels", "POI zone"],
+          "code_insight": "C1/C2 = 2-3 candle closures WITHIN the POI zone; cumulative counting, no reset on non-touch"
+        },
+        "order_block_entry": {
+          "is_reference": true,
+          "visual_elements": ["continuation order block"],
+          "code_insight": "Entry on continuation OB after C1/C2; target 2R"
+        }
+      },
+      "poi_rules_shown": {
+        "fvg": "C1/C2 must print within POI zone (wick outside OK)"
+      }
+    },
+    {
+      "filename": "frame_006.jpg",
+      "timestamp_sec": 300,
+      "timestamp_str": "5:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": [
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "next day, we'd want to look at the lower  half of this previous day's range and  look for price to form its wick. So we'  be looking for a candle 2 closure or a  candle 3 closure in here to try to get  on side if I want to catch the wick or  wait for a continuation. So let's see if  we can find either of those. So here you  can see we do have a reversal closure  but it's not very bearish, right? It's  more of a dogee. But we can go down to  the 5minut time frame and see what this  looks like. No",
+      "frame_index": 5,
+      "pattern_mappings": {
+        "c1c2_in_range": {
+          "is_reference": true,
+          "visual_elements": ["previous day range", "C2/C3 closure zone"],
+          "code_insight": "Look for C2/C3 in lower half of previous day range; doji is weak confirmation"
+        }
+      }
+    },
+    {
+      "filename": "frame_007.jpg",
+      "timestamp_sec": 360,
+      "timestamp_str": "6:00",
+      "frame_type": "exit",
+      "sad_section": "Risk Management",
+      "categories": [
+        "exit"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "So here you can see price has traded  rather high. So it's very hard for me to  trust this reversal so close to this  high. I would want to see if price can  form a nice V-shaped reversal and then  look for a continuation. Otherwise, many  times I see this just fail and then run  out the swing point. Let's get some more  information.  And here you see we start to get that  displacement down or that V-shaped  reversal. Now, that is very aggressive.  And you can see this is a new  continuation or ",
+      "frame_index": 6,
+      "pattern_mappings": {
+        "v_reversal": {
+          "is_reference": true,
+          "visual_elements": ["V-shaped reversal pattern", "displacement candles"],
+          "code_insight": "Wait for V-shaped reversal before entry when price is near swing high; avoid weak reversals"
+        }
+      }
+    },
+    {
+      "filename": "frame_008.jpg",
+      "timestamp_sec": 420,
+      "timestamp_str": "7:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": [
+        "entry",
+        "risk",
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "with a move towards previous day low and  into that daily fair value gap. Let's  drop down to the 5minut time frame as  that aligns with the hourly. So, here we  are down on the 5minut time frame. And  let's take a look. Do we have a point of  interest here? We do. We have a fair  value gap. But what else are we doing?  We're taking out this short-term low  here. So, this is where we sometimes  will run out a protected swing or a new  high to then go lower. Let's give this  another candle or two",
+      "frame_index": 7,
+      "pattern_mappings": {
+        "cisd_pattern": {
+          "is_reference": true,
+          "visual_elements": ["FVG zone", "5min chart", "sweep of short-term low", "CISD confirmation"],
+          "code_insight": "OB = last opposing candle (index [1]), NOT reversal candle (index [0]); stop at full structure (m5OBLow/High)"
+        },
+        "fvg_poi": {
+          "is_reference": true,
+          "visual_elements": ["teal/gray FVG zone", "price reacting in zone"],
+          "code_insight": "FVG detection: gap between candle[2].high and candle[0].low; C1/C2 must be WITHIN zone"
+        },
+        "sweep_detection": {
+          "is_reference": true,
+          "visual_elements": ["short-term low sweep", "protected swing"],
+          "code_insight": "Sweep of protected swing before continuation; wait for candle close after sweep"
+        }
+      },
+      "poi_rules_shown": {
+        "fvg": "C1/C2 must print within FVG zone (wick slightly outside OK)",
+        "ob": null
+      }
+    },
+    {
+      "filename": "frame_009.jpg",
+      "timestamp_sec": 480,
+      "timestamp_str": "8:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": [
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "be looking for two R. So just to review,  we have a daily bias that is bearish. We  have an hourly continuation out of a  fair value gap. So we have formed the  high of the day is what I'm anticipating  and then a continuation in this hourly  fair value gap right here. And then we  have a continuation on the lower time  frames. So what are we doing? We are  aligning all of our time frames in one  direction. The daily is bearish, the  hourly is bearish, and the 5m minute is  bearish. This is when",
+      "frame_index": 8,
+      "pattern_mappings": {
+        "timeframe_alignment": {
+          "is_reference": true,
+          "visual_elements": ["daily/hourly/5min aligned bearish"],
+          "code_insight": "Multi-TF alignment: all timeframes must point same direction before entry"
+        },
+        "fvg_continuation": {
+          "is_reference": true,
+          "visual_elements": ["hourly FVG marked", "continuation structure"],
+          "code_insight": "HTF FVG (H1) provides direction; LTF (M5) provides entry after confirmation"
+        }
+      }
+    },
+    {
+      "filename": "frame_010.jpg",
+      "timestamp_sec": 540,
+      "timestamp_str": "9:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": [
+        "entry",
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "change in the state of delivery which  confirms that daily bearish swing point  and then we are looking for the wick  high to form in this daily candle. Now I  can look to trade it on the candle  closure and actually get in on the wick  or I can let that in candle change in  the state of delivery form or that  continuation on the structure time frame  and then seek a continuation. Here price  traded too high so we let a V-shaped  reversal form then looked to get a  retracement and then get on si",
+      "frame_index": 9,
+      "pattern_mappings": {
+        "cisd_confirmation": {
+          "is_reference": true,
+          "visual_elements": ["CISD label", "swing point confirmation"],
+          "code_insight": "CISD confirms swing point; trade on close-through of opposing candle series"
+        },
+        "entry_options": {
+          "is_reference": true,
+          "visual_elements": ["candle closure entry vs continuation entry"],
+          "code_insight": "Two entry styles: (1) on candle closure in POI, (2) wait for LTF CISD continuation"
+        }
+      }
+    },
+    {
+      "filename": "frame_011.jpg",
+      "timestamp_sec": 600,
+      "timestamp_str": "10:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": [
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "example. We are on USD JPY on the daily  and monthly time frame. Here you can see  we've had a candle to closure on the  monthly, which gives us a bullish bias  for this month or this October. Now,  we're getting into the end of October. I  don't want to fade that month,  especially with these equal highs  resting above. So, with equal highs,  what do we have? We have a candle to  closure on this time frame. So, what  would we want to do here? Well, we'd  want to refine that down and confirm it.",
+      "frame_index": 10,
+      "pattern_mappings": {
+        "equal_highs_target": {
+          "is_reference": true,
+          "visual_elements": ["equal highs marked", "monthly C2 closure"],
+          "code_insight": "Equal highs = liquidity target; bullish bias aims for EQH sweep"
+        }
+      }
+    },
+    {
+      "filename": "frame_012.jpg",
+      "timestamp_sec": 660,
+      "timestamp_str": "11:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": [
+        "entry",
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "prefer to not refine it down too much.  But let's see here. What do we want to  see? We want to see price open and then  form a continuation, right? We're  looking for a continuation order block.  Now, if we look in this structure here,  I already have one, but I don't want to  see price trade below this level, right?  And that also lines up with the EQ.  Let's look for another continuation to  form in here.  Now, we do have a fair value gap here,  right? We reach into a fair value gap.  Do we c",
+      "frame_index": 11,
+      "pattern_mappings": {
+        "continuation_ob": {
+          "is_reference": true,
+          "visual_elements": ["continuation order block", "FVG zone"],
+          "code_insight": "Continuation OB = last candle before impulsive move; entry when price returns to OB body"
+        }
+      }
+    },
+    {
+      "filename": "frame_013.jpg",
+      "timestamp_sec": 720,
+      "timestamp_str": "12:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": [
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "are nice and fullbodied candles. And  then look for 2 R. Let's see how this  works out.  And there we hit 2R. You can see this is  an example of the monthly to daily to  hourly framework, right? Just aligning  multiple time frames in one direction.  Now, if I wanted to refine this down  further, I could look to refine this  down in here as price takes out this  high and then we have a retracement. So,  if we're going to continue higher, I'd  expect a low to form in here to trade  higher, which y",
+      "frame_index": 12,
+      "pattern_mappings": {
+        "2r_target": {
+          "is_reference": true,
+          "visual_elements": ["2R target hit", "monthly/daily/hourly alignment"],
+          "code_insight": "Fixed 2R target; calculate from entry to stop distance * 2"
+        }
+      }
+    },
+    {
+      "filename": "frame_014.jpg",
+      "timestamp_sec": 780,
+      "timestamp_str": "13:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": [
+        "entry",
+        "exit",
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "great, but let's see if we can find  something. You can see we'd want to see  this area respected and price just  immediately trades higher.  Now you can see we do sweep out this  little low but even with that do we form  a continuation? No, we do not. We have  not closed below this level  and we fail to do so. So now what is  this becoming?  When we fail to form a continuation  multiple times, this is a consolidation.  So, how do we approach consolidations",
+      "frame_index": 13,
+      "pattern_mappings": {
+        "failed_continuation": {
+          "is_reference": true,
+          "visual_elements": ["sweep without close-through", "ranging structure"],
+          "code_insight": "Failed CISD = no close through level after sweep; becomes consolidation/range"
+        },
+        "consolidation_detection": {
+          "is_reference": true,
+          "visual_elements": ["multiple failed breakout attempts"],
+          "code_insight": "Multiple failed continuations = consolidation; avoid trading until range breaks"
+        }
+      }
+    },
+    {
+      "filename": "frame_015.jpg",
+      "timestamp_sec": 840,
+      "timestamp_str": "14:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": [
+        "entry",
+        "exit",
+        "context"
+      ],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "and then I want to avoid it until one  side of the range is taken. If I do want  to trade something like this, this is  trading a reversal day, which is a bit  more complex. But that is how I would  approach it. Now, let's say I did want  to get on side here. Well, I can still  look to trade a continuation. So, if I  go down to the 15-minute time frame  here, you can see we have that sweep and  the close through and we form another  continuation or this breakdown here,  which I could trade the b",
+      "frame_index": 14,
+      "pattern_mappings": {
+        "range_breakout": {
+          "is_reference": true,
+          "visual_elements": ["range boundaries", "sweep and close-through"],
+          "code_insight": "Avoid trading consolidation until one side of range is taken with close-through"
+        }
+      }
+    },
+    {
+      "filename": "frame_016.jpg",
+      "timestamp_sec": 900,
+      "timestamp_str": "15:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": ["entry", "context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 15,
+      "visual_interpretation": {
+        "asset": "ES (GC1)",
+        "timeframe": "5m",
+        "annotation_labels": ["C2"],
+        "zones_shown": ["FVG (teal)", "Gray highlight zone"],
+        "description": "5-minute ES chart showing C2 closure label, FVG zones marked in teal, continuation setup after sweep"
+      },
+      "pattern_mappings": {
+        "c2_closure_example": {
+          "is_reference": true,
+          "visual_elements": ["C2 label at swing", "FVG zone with price reaction"],
+          "code_insight": "C2 closure in FVG zone triggers LTF entry search; zone boundaries define POI"
+        }
+      }
+    },
+    {
+      "filename": "frame_017.jpg",
+      "timestamp_sec": 960,
+      "timestamp_str": "16:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": ["entry", "context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 16,
+      "visual_interpretation": {
+        "asset": "ES (GC1)",
+        "timeframe": "5m",
+        "annotation_labels": ["XC2"],
+        "zones_shown": ["FVG (teal)", "Gray zone at top"],
+        "description": "5m ES showing XC2 (extended C2) label, bearish continuation with FVG zones"
+      },
+      "pattern_mappings": {
+        "xc2_extended_confirmation": {
+          "is_reference": true,
+          "visual_elements": ["XC2 label", "multiple FVG zones"],
+          "code_insight": "XC2 = extended confirmation (>2 candles closing in zone); stronger signal"
+        }
+      }
+    },
+    {
+      "filename": "frame_018.jpg",
+      "timestamp_sec": 1020,
+      "timestamp_str": "17:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 17,
+      "visual_interpretation": {
+        "asset": "ES (GC1)",
+        "timeframe": "1h",
+        "annotation_labels": ["C2"],
+        "zones_shown": ["Gray structure zone", "FVG zones"],
+        "description": "1h ES chart showing C2 at swing high, zoomed out view of multi-TF structure"
+      },
+      "pattern_mappings": {
+        "htf_c2_structure": {
+          "is_reference": true,
+          "visual_elements": ["C2 at swing high", "larger structure visible"],
+          "code_insight": "HTF C2 provides directional bias; LTF confirms with CISD continuation"
+        }
+      }
+    },
+    {
+      "filename": "frame_019.jpg",
+      "timestamp_sec": 1080,
+      "timestamp_str": "18:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 18,
+      "visual_interpretation": {
+        "asset": "ES",
+        "timeframe": "1h-1D",
+        "annotation_labels": [],
+        "zones_shown": ["Structure zones"],
+        "description": "Higher timeframe ES analysis showing market structure context"
+      },
+      "pattern_mappings": {
+        "market_structure": {
+          "is_reference": true,
+          "visual_elements": ["swing structure", "trend identification"],
+          "code_insight": "Identify HTF structure before looking for LTF entries"
+        }
+      }
+    },
+    {
+      "filename": "frame_020.jpg",
+      "timestamp_sec": 1140,
+      "timestamp_str": "19:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 19,
+      "visual_interpretation": {
+        "asset": "USDJPY",
+        "timeframe": "1D",
+        "annotation_labels": [],
+        "zones_shown": ["FVG (blue rectangle)", "Daily structure"],
+        "description": "USDJPY daily showing 1D-1M model with FVG zone - monthly to daily alignment example"
+      },
+      "pattern_mappings": {
+        "monthly_daily_alignment": {
+          "is_reference": true,
+          "visual_elements": ["daily FVG zone", "monthly structure"],
+          "code_insight": "1D-1M Model: Monthly bias → Daily structure → Hourly entry"
+        }
+      }
+    },
+    {
+      "filename": "frame_021.jpg",
+      "timestamp_sec": 1200,
+      "timestamp_str": "20:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 20,
+      "visual_interpretation": {
+        "asset": "USDJPY",
+        "timeframe": "1D",
+        "annotation_labels": [],
+        "zones_shown": ["FVG zones", "Structure zones"],
+        "description": "USDJPY daily continuation of previous example"
+      },
+      "pattern_mappings": {
+        "daily_structure_analysis": {
+          "is_reference": true,
+          "visual_elements": ["daily candle patterns", "FVG zones"],
+          "code_insight": "Daily structure provides context for intraday entries"
+        }
+      }
+    },
+    {
+      "filename": "frame_022.jpg",
+      "timestamp_sec": 1260,
+      "timestamp_str": "21:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": ["entry", "context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 21,
+      "visual_interpretation": {
+        "asset": "USDJPY",
+        "timeframe": "1h",
+        "annotation_labels": ["C2", "XC4", "DXY", "C2"],
+        "zones_shown": ["Yellow FVG zone", "Horizontal levels"],
+        "description": "USDJPY 1h showing nested C1/C2/XC4 patterns with DXY correlation label"
+      },
+      "pattern_mappings": {
+        "nested_confirmation": {
+          "is_reference": true,
+          "visual_elements": ["C2 at top", "XC4 mid-structure", "C2 at bottom", "DXY label"],
+          "code_insight": "XC4 = 4+ candles closing in zone; nested C1/C2 across timeframes strengthens signal"
+        },
+        "correlation_trading": {
+          "is_reference": true,
+          "visual_elements": ["DXY label", "USDJPY chart"],
+          "code_insight": "DXY (dollar index) correlation useful for JPY pairs confirmation"
+        }
+      }
+    },
+    {
+      "filename": "frame_023.jpg",
+      "timestamp_sec": 1320,
+      "timestamp_str": "22:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 22,
+      "visual_interpretation": {
+        "asset": "Various",
+        "timeframe": "Multi",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "Multi-asset/timeframe comparison example"
+      },
+      "pattern_mappings": {
+        "multi_asset_analysis": {
+          "is_reference": true,
+          "visual_elements": ["multiple charts"],
+          "code_insight": "Compare structure across correlated assets for confluence"
+        }
+      }
+    },
+    {
+      "filename": "frame_024.jpg",
+      "timestamp_sec": 1380,
+      "timestamp_str": "23:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 23,
+      "visual_interpretation": {
+        "asset": "CL (Crude Oil)",
+        "timeframe": "1h",
+        "annotation_labels": [],
+        "zones_shown": ["FVG zones"],
+        "description": "CL 1h chart example showing fractal model application"
+      },
+      "pattern_mappings": {
+        "commodity_application": {
+          "is_reference": true,
+          "visual_elements": ["CL chart", "FVG zones"],
+          "code_insight": "Fractal model works on commodities (CL); same POI/CISD rules apply"
+        }
+      }
+    },
+    {
+      "filename": "frame_025.jpg",
+      "timestamp_sec": 1440,
+      "timestamp_str": "24:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": ["entry"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 24,
+      "visual_interpretation": {
+        "asset": "CL (Crude Oil)",
+        "timeframe": "1h",
+        "annotation_labels": ["C4"],
+        "zones_shown": ["Green FVG zone"],
+        "drawing_template_menu": ["c3", "dotted", "line", "mss", "ob", "red", "SMT (high)", "SMT (low)", "text"],
+        "description": "CL 1h showing C4 label with drawing template menu visible - reveals annotation vocabulary"
+      },
+      "pattern_mappings": {
+        "annotation_vocabulary": {
+          "is_reference": true,
+          "visual_elements": ["drawing template menu", "c3/ob/mss/SMT labels"],
+          "code_insight": "Key pattern labels: c3=C3 closure, ob=order block, mss=market structure shift, SMT=Smart Money Technique divergence"
+        },
+        "c4_closure": {
+          "is_reference": true,
+          "visual_elements": ["C4 label", "FVG zone"],
+          "code_insight": "C4 = 4th candle closure in zone; stronger confirmation than C2/C3"
+        }
+      }
+    },
+    {
+      "filename": "frame_026.jpg",
+      "timestamp_sec": 1500,
+      "timestamp_str": "25:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 25,
+      "visual_interpretation": {
+        "asset": "CL",
+        "timeframe": "1h",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "CL continuation example"
+      },
+      "pattern_mappings": {
+        "continuation_example": {
+          "is_reference": true,
+          "visual_elements": [],
+          "code_insight": "Additional CL example showing model execution"
+        }
+      }
+    },
+    {
+      "filename": "frame_027.jpg",
+      "timestamp_sec": 1560,
+      "timestamp_str": "26:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 26,
+      "visual_interpretation": {
+        "asset": "CL",
+        "timeframe": "1h",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "CL continuation example"
+      },
+      "pattern_mappings": {
+        "continuation_example": {
+          "is_reference": true,
+          "visual_elements": [],
+          "code_insight": "Additional CL example showing model execution"
+        }
+      }
+    },
+    {
+      "filename": "frame_028.jpg",
+      "timestamp_sec": 1620,
+      "timestamp_str": "27:00",
+      "frame_type": "context",
+      "sad_section": "Market Context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 27,
+      "visual_interpretation": {
+        "asset": "CL",
+        "timeframe": "1h-1D",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "CL multi-timeframe analysis"
+      },
+      "pattern_mappings": {
+        "multi_tf_example": {
+          "is_reference": true,
+          "visual_elements": [],
+          "code_insight": "Multi-TF alignment example on commodities"
+        }
+      }
+    },
+    {
+      "filename": "frame_029.jpg",
+      "timestamp_sec": 1680,
+      "timestamp_str": "28:00",
+      "frame_type": "entry",
+      "sad_section": "Entry Scenarios",
+      "categories": ["entry", "context"],
+      "is_contradiction_relevant": true,
+      "transcript_segment": "[SILENT VISUAL DEMO]",
+      "frame_index": 28,
+      "visual_interpretation": {
+        "asset": "CL (Crude Oil)",
+        "timeframe": "1h",
+        "annotation_labels": ["HOT1", "XC2"],
+        "zones_shown": ["Horizontal levels", "Structure zones"],
+        "description": "CL 1h showing HOT1 (High Of Trade) and XC2 labels marking swing structure"
+      },
+      "pattern_mappings": {
+        "hot_annotation": {
+          "is_reference": true,
+          "visual_elements": ["HOT1 label at swing high", "XC2 confirmation"],
+          "code_insight": "HOT = High Of Trade (session/range high); used as target or reference level"
+        },
+        "swing_labeling": {
+          "is_reference": true,
+          "visual_elements": ["swing high marked", "XC2 at structure"],
+          "code_insight": "Label key swings with HOT/LOT for clarity; XC2 confirms swing validity"
+        }
+      }
+    }
+  ]
+}

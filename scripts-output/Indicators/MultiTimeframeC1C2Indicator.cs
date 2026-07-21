@@ -956,59 +956,16 @@ namespace NinjaTrader.NinjaScript.Indicators
     }
 }
 
-#region NinjaScript generated code. Neither change nor remove.
-
-namespace NinjaTrader.NinjaScript.Indicators
-{
-	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
-	{
-		private MultiTimeframeC1C2Indicator[] cacheMultiTimeframeC1C2Indicator;
-		public MultiTimeframeC1C2Indicator MultiTimeframeC1C2Indicator(bool useDailyBias, bool showH4Markers, bool showM15Signals, double riskRewardTarget, int stopBufferTicks, bool enableDebug, Brush bullishColor, Brush bearishColor, Brush entryZoneColor)
-		{
-			return MultiTimeframeC1C2Indicator(Input, useDailyBias, showH4Markers, showM15Signals, riskRewardTarget, stopBufferTicks, enableDebug, bullishColor, bearishColor, entryZoneColor);
-		}
-
-		public MultiTimeframeC1C2Indicator MultiTimeframeC1C2Indicator(ISeries<double> input, bool useDailyBias, bool showH4Markers, bool showM15Signals, double riskRewardTarget, int stopBufferTicks, bool enableDebug, Brush bullishColor, Brush bearishColor, Brush entryZoneColor)
-		{
-			if (cacheMultiTimeframeC1C2Indicator != null)
-				for (int idx = 0; idx < cacheMultiTimeframeC1C2Indicator.Length; idx++)
-					if (cacheMultiTimeframeC1C2Indicator[idx] != null && cacheMultiTimeframeC1C2Indicator[idx].UseDailyBias == useDailyBias && cacheMultiTimeframeC1C2Indicator[idx].ShowH4Markers == showH4Markers && cacheMultiTimeframeC1C2Indicator[idx].ShowM15Signals == showM15Signals && cacheMultiTimeframeC1C2Indicator[idx].RiskRewardTarget == riskRewardTarget && cacheMultiTimeframeC1C2Indicator[idx].StopBufferTicks == stopBufferTicks && cacheMultiTimeframeC1C2Indicator[idx].EnableDebug == enableDebug && cacheMultiTimeframeC1C2Indicator[idx].BullishColor == bullishColor && cacheMultiTimeframeC1C2Indicator[idx].BearishColor == bearishColor && cacheMultiTimeframeC1C2Indicator[idx].EntryZoneColor == entryZoneColor && cacheMultiTimeframeC1C2Indicator[idx].EqualsInput(input))
-						return cacheMultiTimeframeC1C2Indicator[idx];
-			return CacheIndicator<MultiTimeframeC1C2Indicator>(new MultiTimeframeC1C2Indicator(){ UseDailyBias = useDailyBias, ShowH4Markers = showH4Markers, ShowM15Signals = showM15Signals, RiskRewardTarget = riskRewardTarget, StopBufferTicks = stopBufferTicks, EnableDebug = enableDebug, BullishColor = bullishColor, BearishColor = bearishColor, EntryZoneColor = entryZoneColor }, input, ref cacheMultiTimeframeC1C2Indicator);
-		}
-	}
-}
-
-namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
-{
-	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
-	{
-		public Indicators.MultiTimeframeC1C2Indicator MultiTimeframeC1C2Indicator(bool useDailyBias, bool showH4Markers, bool showM15Signals, double riskRewardTarget, int stopBufferTicks, bool enableDebug, Brush bullishColor, Brush bearishColor, Brush entryZoneColor)
-		{
-			return indicator.MultiTimeframeC1C2Indicator(Input, useDailyBias, showH4Markers, showM15Signals, riskRewardTarget, stopBufferTicks, enableDebug, bullishColor, bearishColor, entryZoneColor);
-		}
-
-		public Indicators.MultiTimeframeC1C2Indicator MultiTimeframeC1C2Indicator(ISeries<double> input, bool useDailyBias, bool showH4Markers, bool showM15Signals, double riskRewardTarget, int stopBufferTicks, bool enableDebug, Brush bullishColor, Brush bearishColor, Brush entryZoneColor)
-		{
-			return indicator.MultiTimeframeC1C2Indicator(input, useDailyBias, showH4Markers, showM15Signals, riskRewardTarget, stopBufferTicks, enableDebug, bullishColor, bearishColor, entryZoneColor);
-		}
-	}
-}
-
-namespace NinjaTrader.NinjaScript.Strategies
-{
-	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
-	{
-		public Indicators.MultiTimeframeC1C2Indicator MultiTimeframeC1C2Indicator(bool useDailyBias, bool showH4Markers, bool showM15Signals, double riskRewardTarget, int stopBufferTicks, bool enableDebug, Brush bullishColor, Brush bearishColor, Brush entryZoneColor)
-		{
-			return indicator.MultiTimeframeC1C2Indicator(Input, useDailyBias, showH4Markers, showM15Signals, riskRewardTarget, stopBufferTicks, enableDebug, bullishColor, bearishColor, entryZoneColor);
-		}
-
-		public Indicators.MultiTimeframeC1C2Indicator MultiTimeframeC1C2Indicator(ISeries<double> input, bool useDailyBias, bool showH4Markers, bool showM15Signals, double riskRewardTarget, int stopBufferTicks, bool enableDebug, Brush bullishColor, Brush bearishColor, Brush entryZoneColor)
-		{
-			return indicator.MultiTimeframeC1C2Indicator(input, useDailyBias, showH4Markers, showM15Signals, riskRewardTarget, stopBufferTicks, enableDebug, bullishColor, bearishColor, entryZoneColor);
-		}
-	}
-}
-
-#endregion
+// =============================================================================
+// IMPORTANT: Recompile this indicator in NinjaTrader 8 to regenerate the
+// caching code below. The previous auto-generated code was missing parameters:
+// - UseRetracement, RetracementMinPercent, RetracementMaxPercent
+// - RetracementTimeoutBars, MaxOpposingCandles, CooldownBarsAfterEntry
+//
+// Steps to fix:
+// 1. Open NinjaTrader 8
+// 2. Go to Tools > Edit NinjaScript > Indicator
+// 3. Select MultiTimeframeC1C2Indicator
+// 4. Press F5 or click Compile
+// 5. NinjaTrader will regenerate the #region below with ALL [NinjaScriptProperty] params
+// =============================================================================

@@ -1,0 +1,60 @@
+{
+  "video_id": "Nlw-PZhoViQ",
+  "video_url": "https://www.youtube.com/watch?v=Nlw-PZhoViQ",
+  "video_title": "Live Analysis - The Market Lens",
+  "video_type": "skills_library",
+  "created_at": "2026-01-07T14:30:00.000000",
+  "frame_count": 21,
+  "skills_covered": [
+    "live_analysis",
+    "invalidation_marking",
+    "fvg_identification"
+  ],
+  "frames": [
+    {
+      "filename": "frame_0001.jpg",
+      "timestamp_sec": 0,
+      "frame_type": "context",
+      "categories": ["context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 0,
+      "visual_interpretation": {
+        "asset": "EURUSD",
+        "timeframe": "1D",
+        "annotation_labels": [],
+        "zones_shown": [],
+        "description": "EURUSD daily showing bearish structure - The Market Lens branding"
+      },
+      "pattern_mappings": {}
+    },
+    {
+      "filename": "frame_0010.jpg",
+      "timestamp_sec": 405,
+      "frame_type": "entry",
+      "categories": ["entry", "context"],
+      "is_contradiction_relevant": true,
+      "frame_index": 9,
+      "visual_interpretation": {
+        "asset": "EURUSD",
+        "timeframe": "1h",
+        "annotation_labels": ["Red X marks (invalidation)"],
+        "zones_shown": ["Gray FVG zones", "Blue horizontal levels"],
+        "description": "EURUSD 1h with invalidation X marks showing failed setups, live trading interface visible"
+      },
+      "pattern_mappings": {
+        "invalidation_marking": {
+          "is_reference": true,
+          "visual_elements": ["Red X at swing high", "X at failed level"],
+          "code_insight": "Mark invalidated levels with X to avoid re-trading; level fails when broken with close"
+        }
+      }
+    }
+  ],
+  "pipeline_notes": {
+    "data_quality": "partial",
+    "transcript_coverage": "NONE - no transcript available",
+    "silent_sections": true,
+    "inefficiency": "Frame-only analysis required - no audio context",
+    "branding_note": "The Market Lens branding - may be different content source"
+  }
+}

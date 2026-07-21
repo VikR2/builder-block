@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getAllJournalEntries } from "@/lib/db";
 import { formatDateTime } from "@/lib/utils";
 
+export const dynamic = 'force-dynamic';
+
 export default function JournalPage() {
   const entries = getAllJournalEntries();
 

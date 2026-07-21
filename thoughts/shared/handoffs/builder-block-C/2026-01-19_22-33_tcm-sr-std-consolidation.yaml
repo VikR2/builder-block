@@ -1,0 +1,49 @@
+---
+session: builder-block-C
+date: 2026-01-19
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Consolidate TCM SR STD indicator days settings and fix STD lines + Book overlay
+now: Test indicator in TradingView to verify Book overlay visibility and unified days control
+
+test: Load TCM-SR-STD.pine in TradingView and verify Book overlay shows as visible shaded box
+
+done_this_session:
+  - task: Consolidated 5 separate "days" settings into single maxDays parameter
+    files: [scripts-output/TradingView/TCM-SR-STD.pine]
+  - task: Fixed STD lines to only show for most recent SR session (not historical days)
+    files: [scripts-output/TradingView/TCM-SR-STD.pine]
+  - task: Simplified Book overlay pairing logic (removed "same index" optimization)
+    files: [scripts-output/TradingView/TCM-SR-STD.pine]
+  - task: Fixed Book overlay visibility - replaced lines+linefill with proper box.new()
+    files: [scripts-output/TradingView/TCM-SR-STD.pine]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - unified_maxDays: Single "Days to Display" setting controls all visual elements (SR, session boxes, overlays, opens) for simpler UX
+  - std_lines_current_only: STD deviation lines (T1, T2, 0.5, 2.0) only show for most recent SR to reduce chart clutter
+  - book_box_opacity_60: Book overlay uses 60% transparency (40% visible) for medium visibility per user preference
+
+findings:
+  - linefill_too_transparent: Original Book overlay used 85%+ transparency making it nearly invisible
+  - same_index_pairing_fragile: The "same index" optimization for SR-to-Matching pairing may fail for historical days due to array ordering
+
+worked:
+  - Using box.new() instead of lines+linefill for cleaner, more visible Book overlay
+  - Wrapping STD lines in isCurrentDay check preserves SR range/EQ/box for all days
+
+failed: []
+
+next:
+  - Test indicator in TradingView with multiple days setting
+  - Verify Book overlay appears correctly for historical SR sessions
+  - Consider adding Book opacity as user-configurable input
+
+files:
+  created: []
+  modified: [scripts-output/TradingView/TCM-SR-STD.pine]

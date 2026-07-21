@@ -1,0 +1,51 @@
+---
+session: builder-block-C
+date: 2026-01-18
+status: complete
+outcome: PARTIAL_PLUS
+---
+
+goal: Implement proactive browser debugging rule and fix membership system, add dev auto-login
+now: Test other membership pages (pricing, account) or continue with feature development
+
+test: curl -s http://localhost:3000/api/dev/login -X POST && echo "Dev login endpoint works"
+
+done_this_session:
+  - task: Created browser debugging rule for Playwright MCP
+    files: [~/.claude/rules/browser-debugging.md]
+  - task: Fixed Resend email initialization error (500 on /api/auth/me)
+    files: [ui/lib/auth/email.ts]
+  - task: Created dev auto-login feature for testing
+    files: [ui/app/api/dev/login/route.ts, ui/app/(auth)/login/page.tsx]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - lazy_resend_init: Resend client was initializing at module load time causing 500 errors when API key missing. Changed to lazy initialization via getResend() function.
+  - dev_user_premium: Dev auto-login creates user with manual_premium=true so premium features can be tested without Stripe.
+
+findings:
+  - proactive_debugging_works: Using browser_console_messages + browser_network_requests in parallel immediately found the Resend initialization error - didn't need to ask user "what do you see?"
+  - barrel_export_side_effects: Next.js barrel exports (index.ts re-exports) cause all modules to initialize even when only some exports are used. Email module loaded when only session functions needed.
+
+worked:
+  - Parallel console + network checks before asking user about issues
+  - Lazy initialization pattern for external service clients
+  - Auth context refresh() after dev login to update UI immediately
+
+failed: []
+
+next:
+  - Test account and subscription pages with dev login
+  - Add RESEND_API_KEY to .env when ready to test email features
+  - Consider adding admin role to dev user for admin panel testing
+
+files:
+  created:
+    - ~/.claude/rules/browser-debugging.md
+    - ui/app/api/dev/login/route.ts
+  modified:
+    - ui/lib/auth/email.ts
+    - ui/app/(auth)/login/page.tsx

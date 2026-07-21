@@ -1,0 +1,1882 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © thecurrencymerchant
+
+//@version=5
+indicator(title='Thisisit', shorttitle='M3', overlay=true, max_lines_count = 500, max_boxes_count = 500, max_labels_count = 500)
+
+ticker = syminfo.ticker
+
+// timezone = "America/New_York"
+timezone = input.string('GMT-5', title='Timezone', options=['GMT-11', 'GMT-10', 'GMT-9', 'GMT-8', 'GMT-7', 'GMT-6', 'GMT-5', 'GMT-4', 'GMT-3', 'GMT-2', 'GMT-1', 'GMT', 'GMT+1', 'GMT+2', 'GMT+3', 'GMT+4', 'GMT+5', 'GMT+6', 'GMT+7', 'GMT+8', 'GMT+9', 'GMT+10', 'GMT+11', 'GMT+12'], tooltip='e.g. \'America/New_York\', \'Asia/Tokyo\', \'GMT-4\', \'GMT+9\'...') //, group='General')
+
+// =============================================================================
+// ALERT SETTINGS
+// =============================================================================
+GRP_ALERTS = "Alert Settings"
+alertSRLevelsEnabled = input.bool(true, "Alert SR Levels at 7:00 AM", group=GRP_ALERTS)
+alertTargetHitEnabled = input.bool(true, "Alert When Target Hit", group=GRP_ALERTS)
+alertSummaryEnabled = input.bool(true, "Alert Summary After 9:20", group=GRP_ALERTS)
+target1STDMultiplier = input.float(1.0, "Target 1 STD Multiplier", step=0.1, group=GRP_ALERTS)
+target2STDMultiplier = input.float(1.5, "Target 2 STD Multiplier", step=0.1, group=GRP_ALERTS)
+biasThreshold = input.float(title="Bias Threshold", defval=0, step=0.001, group=GRP_ALERTS, tooltip="Same as TCM-Bias threshold")
+
+// =============================================================================
+// TEST MODE - Manual triggers (disable after testing)
+// =============================================================================
+GRP_TEST = "Test Mode"
+testSendLevels = input.bool(false, "📤 TEST: Send SR Levels Now", group=GRP_TEST, tooltip="Enable to send SR levels alert now. Disable after sending.")
+testSendSummary = input.bool(false, "📤 TEST: Send Summary Now", group=GRP_TEST, tooltip="Enable to send target status summary now. Disable after sending.")
+testSimple = input.bool(false, "🔔 TEST: Simple Ping", group=GRP_TEST, tooltip="Enable to send a simple test alert. Use this to verify alerts are working.")
+testForce = input.bool(false, "🔴 FORCE TEST (instant)", group=GRP_TEST, tooltip="Fires EVERY tick while enabled. Turn off immediately after testing!")
+testForceLevels = input.bool(false, "🔴 FORCE: 7AM SR Levels (instant)", group=GRP_TEST, tooltip="Sends 7 AM SR Levels report INSTANTLY. Turn off immediately!")
+testForceSummary = input.bool(false, "🔴 FORCE: 9:20 Summary (instant)", group=GRP_TEST, tooltip="Sends 9:20 AM Summary report INSTANTLY. Turn off immediately!")
+
+// Test alert - matches TCM-Bias.pine pattern exactly
+triggerOnBar = barstate.isconfirmed
+if (testSimple and triggerOnBar)
+    alert('{"content": "TCM TEST PING - Alerts are working!"}', alert.freq_once_per_bar)
+
+// Force test - fires immediately on every tick (turn off quickly!)
+if testForce
+    alert('{"content": "FORCE TEST - Discord webhook is working!"}', alert.freq_all)
+
+// =============================================================================
+// BIAS CALCULATION (from TCM-Bias.pine)
+// =============================================================================
+getBiasDiff() =>
+    yesterday = request.security(syminfo.tickerid, 'D', close[1], lookahead=barmerge.lookahead_on)
+    today = request.security(syminfo.tickerid, 'D', close, lookahead=barmerge.lookahead_on)
+    delta = today - yesterday
+    percentage = delta / yesterday
+    percentage
+
+biasDiff = getBiasDiff()
+
+var bool buying = na
+buying := biasDiff > biasThreshold ? true : biasDiff < -biasThreshold ? false : buying
+
+gapTime = "1140-1240"
+
+hideGap = input.bool(false, "Hide the Gap")
+
+
+// InSession() returns 'true' when the current bar happens inside
+// the specified session, corrected for the given time zone (optional).
+// Returns 'false' when the bar doesn't happen in that time period,
+// or when the chart's time frame is 1 day or higher. 
+InSession(sessionTime, sessionTimeZone=syminfo.timezone, exact=false) =>
+    if exact
+        not na(time("1", sessionTime, sessionTimeZone))
+    else
+        not na(time(timeframe.period, sessionTime, sessionTimeZone))
+
+
+duringGap = InSession(gapTime, timezone)
+
+// plotcandle(open, high, low, close, title='Hidden bar color', color=duringGap and hideGap ? color.new(#131722, 0) : na, wickcolor = duringGap and hideGap ? color.new(#131722, 0) : na, bordercolor=duringGap and hideGap ? color.new(#131722,0) : na, display = display.all)
+plotcandle(open, high, low, close, title='Hidden bar color', color=duringGap and hideGap ? chart.bg_color : na, wickcolor = duringGap and hideGap ?  chart.bg_color : na, bordercolor=duringGap and hideGap ? chart.bg_color : na, display = display.all)
+
+// Overnight session
+
+// STEP 1:
+// Define custom session trading times with inputs
+// ONsessionTime = input.session("0400-0815", title="Session time")
+showONSession = input.bool(true, "Plot Daily Liquidity Range")
+
+ONsessionTime = "1240-1520"
+ONsessionZone = timezone
+
+// Other inputs for the boxes' visual appearance
+ONSessionBorderSize   = input.int(1, title="Accumulation border size", minval=0)
+ONSessionBgColor      = input.color(color.new(color.rgb(248,248,242), 85), title="Accumulation Background Color")
+ONSessionBorderColor   = input.color(color.rgb(10, 10, 0), title="Accumulation border Color")
+ONSessionAvgLineColor  = input.color(color.rgb(15, 15, 0), title="Liquidity range Avg Price Color")
+// Create variables
+var ONsessionHighPrice = 0.0
+var ONsessionLowPrice  = 0.0
+var ONsessionOpenPrice = 0.0
+var ONSessionAvgPrice  = 0.0
+var ONSessionPipCount  = 0
+var box ONsessionBox = na
+var line ONSessionAvgLine = na
+var label ONSessionAvgLabel = na
+var label ONSessionLabel = na
+// var table testtable = na
+
+// =============================================================================
+// PREVIOUS DAY SR LEVELS (for alerts - built 12:40-3:20 PM yesterday)
+// =============================================================================
+var float prevDaySRHigh = 0.0
+var float prevDaySRLow = 0.0
+var int prevDaySRRange = 0
+
+// =============================================================================
+// TARGET HIT TRACKING
+// =============================================================================
+var bool longT1Hit = false
+var bool longT2Hit = false
+var bool shortT1Hit = false
+var bool shortT2Hit = false
+
+// Alert tracking
+var bool alertedSRLevels = false
+var bool alertedSummary = false
+
+// Reset target tracking on new day
+if ta.change(time("D")) != 0
+    longT1Hit := false
+    longT2Hit := false
+    shortT1Hit := false
+    shortT2Hit := false
+    alertedSRLevels := false
+    alertedSummary := false
+
+// STEP 2:
+// See if the session is currently active and just started
+inONSession    = InSession(ONsessionTime, ONsessionZone) and timeframe.isintraday
+ONsessionStart = inONSession and not inONSession[1]
+
+// STEP 3:
+// When a new session starts, set the session high and low to the data
+// of the bar in the session.
+if ONsessionStart
+    ONsessionHighPrice := high
+    ONsessionLowPrice  := low
+    ONsessionOpenPrice := open
+    ONSessionAvgPrice  := (ONsessionHighPrice + ONsessionLowPrice) / 2
+    ONSessionPipCount  := int(math.abs((ONsessionHighPrice - ONsessionLowPrice) / syminfo.mintick))
+
+// Else, during the session, track the highest high and lowest low
+else if inONSession
+    ONsessionHighPrice := math.max(ONsessionHighPrice, high)
+    ONsessionLowPrice  := math.min(ONsessionLowPrice, low)
+    ONSessionAvgPrice  := (ONsessionHighPrice + ONsessionLowPrice) / 2
+    ONSessionPipCount  := int(math.abs((ONsessionHighPrice - ONsessionLowPrice) / syminfo.mintick))
+
+// Save SR levels when session ends (for use as "previous day" levels)
+ONsessionEnd = not inONSession and inONSession[1]
+if ONsessionEnd and ONsessionHighPrice > 0
+    prevDaySRHigh := ONsessionHighPrice
+    prevDaySRLow := ONsessionLowPrice
+    prevDaySRRange := ONSessionPipCount
+
+// =============================================================================
+// FORCE SR LEVELS REPORT - Fires instantly with current data
+// =============================================================================
+if testForceLevels
+    // Use previous day SR if available, otherwise use current session
+    forceSRHigh = prevDaySRHigh > 0 ? prevDaySRHigh : ONsessionHighPrice
+    forceSRLow = prevDaySRLow > 0 ? prevDaySRLow : ONsessionLowPrice
+    forceSRRange = prevDaySRRange > 0 ? prevDaySRRange : ONSessionPipCount
+
+    if forceSRHigh > 0
+        // Calculate targets
+        forceLongT1 = forceSRHigh + ((forceSRHigh - forceSRLow) * target1STDMultiplier)
+        forceLongT2 = forceSRHigh + ((forceSRHigh - forceSRLow) * target2STDMultiplier)
+        forceShortT1 = forceSRLow - ((forceSRHigh - forceSRLow) * target1STDMultiplier)
+        forceShortT2 = forceSRLow - ((forceSRHigh - forceSRLow) * target2STDMultiplier)
+
+        // Emojis for Discord
+        fBiasIcon = buying ? "🟢" : "🔴"
+        fBiasArrow = buying ? "▲" : "▼"
+        fBiasText = buying ? "BULLISH" : "BEARISH"
+        fSrSource = (prevDaySRHigh > 0) ? "" : " (using current SR)"
+
+        fMsg = "🔴 [INSTANT] " + fBiasIcon + " " + ticker + " " + fBiasArrow + " " + fBiasText + fSrSource + "\\n"
+        fMsg += "━━━━━━━━━━━━━━━━━━━━\\n"
+        fMsg += "◾ **SR LEVELS**\\n"
+        fMsg += "High: " + str.tostring(forceSRHigh, "#.##") + "\\n"
+        fMsg += "Low: " + str.tostring(forceSRLow, "#.##") + "\\n"
+        fMsg += "Range: " + str.tostring(forceSRRange) + " pts\\n"
+        fMsg += "━━━━━━━━━━━━━━━━━━━━\\n"
+
+        if buying
+            fMsg += "◾ **TARGETS (LONG)**\\n"
+            fMsg += "T1 (" + str.tostring(target1STDMultiplier) + " STD): " + str.tostring(forceLongT1, "#.##") + "\\n"
+            fMsg += "T2 (" + str.tostring(target2STDMultiplier) + " STD): " + str.tostring(forceLongT2, "#.##") + "\\n"
+            fMsg += "━━━━━━━━━━━━━━━━━━━━\\n"
+            fMsg += "◾ **REVERSAL ZONE**\\n"
+            fMsg += "MAX Low (" + str.tostring(target1STDMultiplier) + " STD): " + str.tostring(forceShortT1, "#.##") + "\\n"
+            fMsg += "MAX Low (" + str.tostring(target2STDMultiplier) + " STD): " + str.tostring(forceShortT2, "#.##") + " → SCALP LONG"
+        else
+            fMsg += "◾ **TARGETS (SHORT)**\\n"
+            fMsg += "T1 (" + str.tostring(target1STDMultiplier) + " STD): " + str.tostring(forceShortT1, "#.##") + "\\n"
+            fMsg += "T2 (" + str.tostring(target2STDMultiplier) + " STD): " + str.tostring(forceShortT2, "#.##") + "\\n"
+            fMsg += "━━━━━━━━━━━━━━━━━━━━\\n"
+            fMsg += "◾ **REVERSAL ZONE**\\n"
+            fMsg += "MAX High (" + str.tostring(target1STDMultiplier) + " STD): " + str.tostring(forceLongT1, "#.##") + "\\n"
+            fMsg += "MAX High (" + str.tostring(target2STDMultiplier) + " STD): " + str.tostring(forceLongT2, "#.##") + " → SCALP SHORT"
+
+        alert('{"content": "' + fMsg + '"}', alert.freq_once_per_bar)
+
+// =============================================================================
+// FORCE 9:20 SUMMARY REPORT - Fires instantly with current target status
+// =============================================================================
+if testForceSummary
+    // Use previous day SR if available, otherwise use current session
+    fsSRHigh = prevDaySRHigh > 0 ? prevDaySRHigh : ONsessionHighPrice
+    fsSRLow = prevDaySRLow > 0 ? prevDaySRLow : ONsessionLowPrice
+
+    if fsSRHigh > 0
+        // Calculate targets for display
+        fsLongT1 = fsSRHigh + ((fsSRHigh - fsSRLow) * target1STDMultiplier)
+        fsLongT2 = fsSRHigh + ((fsSRHigh - fsSRLow) * target2STDMultiplier)
+        fsShortT1 = fsSRLow - ((fsSRHigh - fsSRLow) * target1STDMultiplier)
+        fsShortT2 = fsSRLow - ((fsSRHigh - fsSRLow) * target2STDMultiplier)
+
+        // Emojis for Discord
+        fsBiasIcon = buying ? "🟢" : "🔴"
+        fsBiasArrow = buying ? "▲" : "▼"
+        fsBiasText = buying ? "BULLISH" : "BEARISH"
+
+        fsMsg = "🔴 [INSTANT] " + fsBiasIcon + " " + ticker + " " + fsBiasArrow + " " + fsBiasText + "\\n"
+        fsMsg += "━━━━━━━━━━━━━━━━━━━━\\n"
+        fsMsg += "◾ **9:20 AM SUMMARY**\\n"
+
+        // Show status based on bias direction
+        if buying
+            fsLongT1Status = longT1Hit ? "✅ HIT" : "⬜ NOT HIT"
+            fsLongT2Status = longT2Hit ? "✅ HIT" : "⬜ NOT HIT"
+            fsShortT1Status = shortT1Hit ? "✅ HIT" : "⬜ NOT HIT"
+            fsShortT2Status = shortT2Hit ? "✅ HIT" : "⬜ NOT HIT"
+
+            fsMsg += "**Primary Targets (Long)**\\n"
+            fsMsg += "T1 (" + str.tostring(target1STDMultiplier) + " STD) @ " + str.tostring(fsLongT1, "#.##") + ": " + fsLongT1Status + "\\n"
+            fsMsg += "T2 (" + str.tostring(target2STDMultiplier) + " STD) @ " + str.tostring(fsLongT2, "#.##") + ": " + fsLongT2Status
+            if longT2Hit
+                fsMsg += " → SCALP SHORT"
+            fsMsg += "\\n"
+            fsMsg += "━━━━━━━━━━━━━━━━━━━━\\n"
+            fsMsg += "**Reversal Zone**\\n"
+            fsMsg += "MAX Low (" + str.tostring(target1STDMultiplier) + " STD) @ " + str.tostring(fsShortT1, "#.##") + ": " + fsShortT1Status + "\\n"
+            fsMsg += "MAX Low (" + str.tostring(target2STDMultiplier) + " STD) @ " + str.tostring(fsShortT2, "#.##") + ": " + fsShortT2Status
+            if shortT2Hit
+                fsMsg += "\\n→ 🎯 SCALP LONG opportunity"
+        else
+            fsShortT1Status = shortT1Hit ? "✅ HIT" : "⬜ NOT HIT"
+            fsShortT2Status = shortT2Hit ? "✅ HIT" : "⬜ NOT HIT"
+            fsLongT1Status = longT1Hit ? "✅ HIT" : "⬜ NOT HIT"
+            fsLongT2Status = longT2Hit ? "✅ HIT" : "⬜ NOT HIT"
+
+            fsMsg += "**Primary Targets (Short)**\\n"
+            fsMsg += "T1 (" + str.tostring(target1STDMultiplier) + " STD) @ " + str.tostring(fsShortT1, "#.##") + ": " + fsShortT1Status + "\\n"
+            fsMsg += "T2 (" + str.tostring(target2STDMultiplier) + " STD) @ " + str.tostring(fsShortT2, "#.##") + ": " + fsShortT2Status
+            if shortT2Hit
+                fsMsg += " → SCALP LONG"
+            fsMsg += "\\n"
+            fsMsg += "━━━━━━━━━━━━━━━━━━━━\\n"
+            fsMsg += "**Reversal Zone**\\n"
+            fsMsg += "MAX High (" + str.tostring(target1STDMultiplier) + " STD) @ " + str.tostring(fsLongT1, "#.##") + ": " + fsLongT1Status + "\\n"
+            fsMsg += "MAX High (" + str.tostring(target2STDMultiplier) + " STD) @ " + str.tostring(fsLongT2, "#.##") + ": " + fsLongT2Status
+            if longT2Hit
+                fsMsg += "\\n→ 🎯 SCALP SHORT opportunity"
+
+        alert('{"content": "' + fsMsg + '"}', alert.freq_once_per_bar)
+
+// STEP 4:
+// When a session begins, make a new box for that session
+if ONsessionStart and showONSession
+    ONsessionBox := box.new(left=bar_index, top=na, right=na, bottom=na,
+         border_width=ONSessionBorderSize)
+    // ONSessionAvgLine := line.new(bar_index, ONSessionAvgPrice, bar_index + 1, ONSessionAvgPrice, color = color.navy, width = 3)
+    tsStart = timestamp(timezone,year(time), month(time), dayofmonth(time), 12,40 )
+    tsEnd   = timestamp(timezone,year(time), month(time), dayofmonth(time), 39,20 )
+    ONSessionAvgLine := line.new(tsStart, ONSessionAvgPrice, tsEnd, ONSessionAvgPrice, color = ONSessionAvgLineColor, width = 2, xloc = xloc.bar_time, style = line.style_solid)
+    ONSessionAvgLabel := label.new(tsEnd-3000000, ONSessionAvgPrice*0.99998, "", xloc = xloc.bar_time, style = label.style_none, textcolor = ONSessionAvgLineColor, size = size.small, textalign = text.align_left)
+    ONSessionLabel    := label.new(tsStart+1000000, ONsessionHighPrice, str.tostring(ONSessionPipCount) + " pts", xloc = xloc.bar_time, style = label.style_none, textcolor = ONSessionBorderColor, size = size.small, textalign = text.align_right)
+    // line.set_color()
+    // testtable := table.new(position.bottom_right,1,1)
+    // table.cell(testtable, 1,1, "aaa")
+
+
+
+// STEP 5:
+// During the session, update that session's existing box
+if inONSession and showONSession
+    box.set_top(ONsessionBox, ONsessionHighPrice)
+    box.set_bottom(ONsessionBox, ONsessionLowPrice)
+
+    box.set_right(ONsessionBox, bar_index + 1)
+
+    line.set_y1(ONSessionAvgLine, ONSessionAvgPrice)
+    line.set_y2(ONSessionAvgLine, ONSessionAvgPrice)
+    label.set_y(ONSessionAvgLabel,ONSessionAvgPrice)
+    label.set_y(ONSessionLabel, ONsessionHighPrice)
+
+    label.set_text(ONSessionLabel,str.tostring(ONSessionPipCount) + " pts")// " + str.tostring(syminfo.mintick))
+    // label.set_y(ONSessionLabel,ONsessionHighPrice)
+    // line.set_xy1(ONSessionAvgLine, bar_index + 1, ONSessionAvgPrice)
+    // line.set_y2(ONSessionAvgLine, ONSessionAvgPrice)
+    // l = label.new(bar_index, close, str.tostring(ONSessionAvgPrice))
+
+    // See if bar closed higher than session open. When it did, make
+    // box green (and use red otherwise).
+    box.set_bgcolor(ONsessionBox, ONSessionBgColor)
+    box.set_border_color(ONsessionBox, ONSessionBorderColor)
+    // if close > ONsessionOpenPrice
+    //     box.set_bgcolor(ONsessionBox, upBoxColor)
+    //     box.set_border_color(ONsessionBox, upBorderColor)
+    // else
+    //     box.set_bgcolor(ONsessionBox, downBoxColor)
+    //     box.set_border_color(ONsessionBox, downBorderColor)
+    // avgPrice = math.abs(ONsessionHighPrice - ONsessionLowPrice) / 2
+
+// =============================================================================
+// STD TARGET CALCULATIONS (using PREVIOUS DAY's SR levels)
+// =============================================================================
+// Use previous day's SR levels for targets (built 12:40-3:20 PM yesterday)
+srHigh = prevDaySRHigh
+srLow = prevDaySRLow
+srRange = srHigh - srLow
+
+// Calculate 1STD and 1.5STD targets
+longT1Price = srHigh + (srRange * target1STDMultiplier)
+longT2Price = srHigh + (srRange * target2STDMultiplier)
+shortT1Price = srLow - (srRange * target1STDMultiplier)
+shortT2Price = srLow - (srRange * target2STDMultiplier)
+
+// ONLiqHunt
+
+ONLiqHuntTime = "0920-1140"
+showONLiqHuntTime = input.bool(true, "Monday Time")
+
+
+ONLiqHuntBorderSize   = input.int(1, title="Monday border size", minval=0)
+ONLiqHuntBgColor      = input.color(color.new(color.rgb(189,147,249), 85), title="Monday Background Color")
+ONLiqHuntBorderColor   = input.color(color.rgb(24, 18, 32), title="Monday border Color")
+
+// Create variables
+var ONLiqHuntHighPrice = 0.0
+var ONLiqHuntLowPrice  = 0.0
+var ONLiqHuntOpenPrice = 0.0
+var box ONLiqHuntBox = na
+// var label ONLiqLabel = na
+
+inONLiqHunt    = InSession(ONLiqHuntTime, timezone) and timeframe.isintraday
+ONLiqHuntStart = inONLiqHunt and not inONLiqHunt[1]
+
+// When a new session starts, set the session high and low to the data
+// of the bar in the session.
+if ONLiqHuntStart
+    ONLiqHuntHighPrice := high
+    ONLiqHuntLowPrice  := low
+    ONLiqHuntOpenPrice := open
+// Else, during the session, track the highest high and lowest low
+else if inONLiqHunt
+    ONLiqHuntHighPrice := math.max(ONLiqHuntHighPrice, high)
+    ONLiqHuntLowPrice  := math.min(ONLiqHuntLowPrice, low)
+
+// When a session begins, make a new box for that session
+if ONLiqHuntStart and showONLiqHuntTime
+    ONLiqHuntBox := box.new(left=bar_index, top=na, right=na, bottom=na,
+         border_width=ONLiqHuntBorderSize)
+    tsStart = timestamp(timezone,year(time), month(time), dayofmonth(time), 15,20 )
+    // ONLiqLabel    := label.new(tsStart+300000, ONLiqHuntHighPrice, "Liquidity Hunt", xloc = xloc.bar_time, style = label.style_none, textcolor = ONLiqHuntBorderColor, size = size.small, textalign = text.align_right)
+
+// During the session, update that session's existing box
+if inONLiqHunt and showONLiqHuntTime
+    box.set_top(ONLiqHuntBox, ONLiqHuntHighPrice)
+    box.set_bottom(ONLiqHuntBox, ONLiqHuntLowPrice)
+
+    box.set_right(ONLiqHuntBox, bar_index + 1)
+
+    box.set_bgcolor(ONLiqHuntBox, ONLiqHuntBgColor)
+    box.set_border_color(ONLiqHuntBox, ONLiqHuntBorderColor)
+    // label.set_y(ONLiqLabel,ONLiqHuntHighPrice)
+
+
+// offset time
+
+// STEP 1:
+// Define custom session trading times with inputs
+showOffsetTime = input.bool(true, "Tuesday Time")
+
+OffsetTime = "1640-2340"
+
+// Other inputs for the boxes' visual appearance
+OffsetBorderSize   = input.int(1, title="Tuesday border size", minval=0)
+OffsetBgColor      = input.color(color.new(#2F4F4F, 85), title="Tuesday Background Color")
+OffsetBorderColor   = input.color(#2F4F4F, title="Tuesday border Color")
+
+// Create variables
+var OffsetHighPrice = 0.0
+var OffsetLowPrice  = 0.0
+var OffsetOpenPrice = 0.0
+var box OffsetBox = na
+
+// STEP 2:
+// See if the session is currently active and just started
+inOffset    = InSession(OffsetTime, timezone) and timeframe.isintraday
+OffsetStart = inOffset and not inOffset[1]
+
+// STEP 3:
+// When a new session starts, set the session high and low to the data
+// of the bar in the session.
+if OffsetStart
+    OffsetHighPrice := high
+    OffsetLowPrice  := low
+    OffsetOpenPrice := open
+// Else, during the session, track the highest high and lowest low
+else if inOffset
+    OffsetHighPrice := math.max(OffsetHighPrice, high)
+    OffsetLowPrice  := math.min(OffsetLowPrice, low)
+
+// STEP 4:
+// When a session begins, make a new box for that session
+if OffsetStart and showOffsetTime
+    OffsetBox := box.new(left=bar_index, top=na, right=na, bottom=na,
+         border_width=OffsetBorderSize)
+
+// STEP 5:
+// During the session, update that session's existing box
+if inOffset and showOffsetTime
+    box.set_top(OffsetBox, OffsetHighPrice)
+    box.set_bottom(OffsetBox, OffsetLowPrice)
+
+    box.set_right(OffsetBox, bar_index + 1)
+
+    box.set_bgcolor(OffsetBox, OffsetBgColor)
+    box.set_border_color(OffsetBox, OffsetBorderColor)
+
+// rebalance
+
+RebalanceTime = "0200-0440"
+showRebalanceTime = input.bool(true, "Wednesday Time")
+
+
+RebalanceBorderSize   = input.int(1, title="Wednesday border size", minval=0)
+RebalanceBgColor      = input.color(color.new(color.rgb(0,91,91), 85), title="Wednesday Background Color")
+RebalanceBorderColor   = input.color(color.rgb(0,91,91), title="Wednesday border Color")
+
+// Create variables
+var RebalanceHighPrice = 0.0
+var RebalanceLowPrice  = 0.0
+var RebalanceOpenPrice = 0.0
+var box RebalanceBox = na
+
+inRebalance    = InSession(RebalanceTime, timezone) and timeframe.isintraday
+RebalanceStart = inRebalance and not inRebalance[1]
+
+// When a new session starts, set the session high and low to the data
+// of the bar in the session.
+if RebalanceStart
+    RebalanceHighPrice := high
+    RebalanceLowPrice  := low
+    RebalanceOpenPrice := open
+// Else, during the session, track the highest high and lowest low
+else if inRebalance
+    RebalanceHighPrice := math.max(RebalanceHighPrice, high)
+    RebalanceLowPrice  := math.min(RebalanceLowPrice, low)
+
+// When a session begins, make a new box for that session
+if RebalanceStart and showRebalanceTime
+    RebalanceBox := box.new(left=bar_index, top=na, right=na, bottom=na,
+         border_width=RebalanceBorderSize)
+
+// During the session, update that session's existing box
+if inRebalance and showRebalanceTime
+    box.set_top(RebalanceBox, RebalanceHighPrice)
+    box.set_bottom(RebalanceBox, RebalanceLowPrice)
+
+    box.set_right(RebalanceBox, bar_index + 1)
+
+    box.set_bgcolor(RebalanceBox, RebalanceBgColor)
+    box.set_border_color(RebalanceBox, RebalanceBorderColor)
+
+// Open Price 6pm
+
+var dayinms = 86400000
+
+var tsEnd   = 0
+
+
+show4pmPrice = input.bool(true, "Show 11:40 am price")
+fourPMPriceColor = input.color(#020202, "11:40 am price color")
+if show4pmPrice
+    fourPM2fourPM = "1140-3920"
+
+    var fourPM2fourPMOpeningPrice = 0.0
+    // var fourPM2fourPMtime = 0
+    // var box fourPM2fourPMBox = na
+    var line fourPM2fourPMLine = na
+
+    infourPM2fourPM    = InSession(fourPM2fourPM, timezone) and timeframe.isintraday
+    fourPM2fourPMStart = infourPM2fourPM and not infourPM2fourPM[1]
+
+    // tsStart = timestamp(timezone, year(time),month(time),dayofmonth(time),16,00)
+    // tsSince = timestamp(timezone, year(time),month(time),dayofmonth(time - 1 * dayinms),00,00)
+    
+    if fourPM2fourPMStart
+        fourPM2fourPMOpeningPrice := open
+        // fourPM2fourPMtime := time
+        tsStart = timestamp(timezone, year(time),month(time),dayofmonth(time),11,40)
+        if dayofweek(time, timezone) == dayofweek.friday
+            tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time + 3 * dayinms),11,40)
+        else
+            tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time + dayinms),11,40)
+        fourPM2fourPMLine := line.new(tsStart,fourPM2fourPMOpeningPrice,tsEnd,fourPM2fourPMOpeningPrice, xloc = xloc.bar_time)
+        line.set_color(fourPM2fourPMLine, fourPMPriceColor)
+        label.new(tsEnd-3000000, fourPM2fourPMOpeningPrice*0.99998, "Daily CYCLE OPEN", xloc = xloc.bar_time, style = label.style_none, textcolor = fourPMPriceColor, size = size.small, textalign = text.align_left)
+    //     // l = label.new(bar_index, close, str.tostring(time[bar_index]))
+
+    // l = label.new(bar_index, close, str.tostring(bar_index))
+
+    // if(bar_index < 5000)
+    // if(time[bar_index] >= tsSince)
+    //     tsStart = timestamp(timezone, year(time[bar_index]),month(time[bar_index]),dayofmonth(time[bar_index]),16,00)
+    
+    //     tsEnd := timestamp(timezone, year(time[bar_index]),month(time[bar_index]),dayofmonth(time[bar_index] + dayinms),16,00)
+    //     // if dayofweek(time[bar_index], timezone) == dayofweek.friday
+    //     //     tsEnd := timestamp(timezone, year(time[bar_index]),month(time[bar_index]),dayofmonth(time[bar_index] + 3 * dayinms),16,00)
+    //     // else
+    //     //     tsEnd := timestamp(timezone, year(time[bar_index]),month(time[bar_index]),dayofmonth(time[bar_index] + dayinms),16,00)
+    //     // l = label.new(bar_index, close, str.tostring(time[bar_index]))
+
+
+
+    //     if fourPM2fourPMStart
+    //         // fourPM2fourPMLine := line.new(bar_index,fourPM2fourPMOpeningPrice,bar_index+1,fourPM2fourPMOpeningPrice)
+    //         fourPM2fourPMLine := line.new(tsStart,fourPM2fourPMOpeningPrice,tsEnd,fourPM2fourPMOpeningPrice, xloc = xloc.bar_time)
+    //         line.set_color(fourPM2fourPMLine, fourPMPriceColor)
+
+    // if infourPM2fourPM
+    //     line.set_x2(fourPM2fourPMLine, bar_index + 1)
+
+
+
+// Open Price 4 am
+
+show4amPrice = input.bool(true, "Show 1:40 am price")
+fourAMPriceColor = input.color(color.rgb(237, 12, 12), "1:40 am price color")
+
+if show4amPrice
+    fourAM2fourPM = "0200-1440"
+
+    var fourAM2fourPMOpeningPrice = 0.0
+    var box fourAM2fourPMBox = na
+    var line fourAM2fourPMLine = na
+
+    infourAM2fourPM    = InSession(fourAM2fourPM, timezone) and timeframe.isintraday
+    fourAM2fourPMStart = infourAM2fourPM and not infourAM2fourPM[1]
+
+    tsStart = timestamp(timezone, year(time),month(time),dayofmonth(time),02,00)
+
+    if fourAM2fourPMStart
+        fourAM2fourPMOpeningPrice := open
+        tsStart := timestamp(timezone, year(time),month(time),dayofmonth(time),02,00)
+        // if dayofweek(time, timezone) == dayofweek.friday
+        //     tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time + 3 * dayinms),16,00)
+        // else
+        tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time),14,40)
+        fourAM2fourPMLine := line.new(tsStart,fourAM2fourPMOpeningPrice,tsEnd,fourAM2fourPMOpeningPrice, xloc = xloc.bar_time)
+        line.set_color(fourAM2fourPMLine, fourAMPriceColor)
+        label.new(tsEnd-3000000, fourAM2fourPMOpeningPrice*0.99998, "AM Open", xloc = xloc.bar_time, style = label.style_none, textcolor = fourAMPriceColor, size = size.small, textalign = text.align_left)
+        
+//     if fourAM2fourPMStart
+//         // fourAM2fourPMLine := line.new(bar_index,fourAM2fourPMOpeningPrice,bar_index+1,fourAM2fourPMOpeningPrice)
+//         fourAM2fourPMLine := line.new(tsStart,fourAM2fourPMOpeningPrice,tsEnd,fourAM2fourPMOpeningPrice, xloc = xloc.bar_time)
+//         line.set_color(fourAM2fourPMLine, fourAMPriceColor)
+
+    // if infourAM2fourPM
+    //     line.set_x2(fourAM2fourPMLine, bar_index + 1)
+
+// getOpenPriceLTF(string tkrid, string tf) => request.security_lower_tf(tkrid, tf, open) // change back to 1
+// getOpeningTimesLFT(string tkrid, string tf) => request.security_lower_tf(tkrid, tf, minute(time))
+
+// getOpenPriceSec(string tkrid) => request.security(tkrid, "1", open)
+// getOpeningTimesSec(string tkrid) => request.security(tkrid, "1", minute(time))
+
+
+
+// var array<float> open1 = na
+// var array<int> time1 = na
+
+open1 = request.security_lower_tf(syminfo.tickerid, "1", open) 
+time1 = request.security_lower_tf(syminfo.tickerid, "1", minute(time))
+
+// openT = not(timeframe.isseconds) ? request.security_lower_tf(syminfo.tickerid, "1", open, true) : na
+// var  open1 = array.new_float(0)
+// var  time1 = array.new_int(0)
+// if barstate.isnew
+    // open1 := request.security_lower_tf(syminfo.tickerid, "1", open, ignore_invalid_symbol =  true) 
+    // time1 := request.security_lower_tf(syminfo.tickerid, "1", time, ignore_invalid_symbol = true) 
+
+    // if timeframe.isseconds
+    //     open1 := array.new_float(0)
+    //     time1 := array.new_int(0)
+    //     // array.push(open1, getOpenPriceSec())
+    //     // array.push(time1, getOpeningTimesSec())
+    //     array.push(open1, open)
+    //     array.push(time1, time)
+    //     // l = label.new(bar_index, close, str.tostring(timeframe.isseconds))
+    // if not (timeframe.isseconds)
+    //     // open1 := getOpenPriceLTF(syminfo.tickerid, "1")
+    //     // time1 := getOpeningTimesLFT(syminfo.tickerid, "1")
+    //     // if bar_index == last_bar_index
+    //     // l = label.new(bar_index, close, str.tostring(timeframe.isseconds))
+    //     open1 := array.new_float(0)
+    //     time1 := array.new_int(0)
+    //     array.push(open1, open)
+    //     array.push(time1, time)
+
+
+// if bar_index == last_bar_index
+//     l = label.new(bar_index, close, str.tostring(openT))
+// if timeframe.isseconds
+//     if bar_index == last_bar_index
+//         l = label.new(bar_index, close, str.tostring(timeframe.isseconds))
+// if timeframe.in_seconds() > timeframe.in_seconds("60s")
+    // open1 := request.security_lower_tf(syminfo.tickerid, "1", open)
+    // time1 := request.security_lower_tf(syminfo.tickerid, "1", minute(time))
+    // open1 := getOpenPriceLTF()
+    // time1 := getOpeningTimesLFT()
+// else
+    // array.fill(open1, request.security(syminfo.tickerid,"1",open))
+    // array.fill(time1, request.security(syminfo.tickerid, "1", minute(time)))
+    // open1 := getOpenPriceSec()
+    // open1 := array.new_float(0)
+    // time1 := array.new_int(0)
+    // array.push(open1, getOpenPriceSec())
+    // array.push(time1, getOpeningTimesSec())
+    // time1 := getOpeningTimesSec()
+
+// if bar_index == last_bar_index
+//     l = label.new(bar_index, close, str.tostring(open1))
+
+// Open Price 815
+
+show815amPrice = input.bool(true, "Show 9:40 pm price")
+eight15AMPriceColor = input.color(#e615e6, "9:40 am price color")
+
+if show815amPrice
+    eight15AM2930 = "0440-1500" 
+
+    var eight15AM2930OpeningPrice = 0.0
+    var box eight15AM2930Box = na
+    var line eight15AM2930Line = na
+
+    ineight15AM2930    = InSession(eight15AM2930, timezone) and timeframe.isintraday
+    eight15AM2930Start = ineight15AM2930 and not ineight15AM2930[1]
+
+
+    var lastopentime = 0
+    var lastOpen1 = array.new_float(0)
+    var lastTime1 = array.new_int(0)
+
+    isInBefore = 0
+
+    if eight15AM2930Start 
+        if array.size(lastOpen1) > 0
+            for i = 0 to array.size(lastOpen1) - 1  
+                // count += 1
+                if (array.get(lastTime1,i) == 40)
+                    // fullcount := count
+                    eight15AM2930OpeningPrice := array.get(lastOpen1,i)
+                    isInBefore := 1
+        if array.size(open1) > 0 and isInBefore == 0
+            for i = 0 to array.size(open1) - 1
+                if (array.get(time1,i) == 40)
+                    eight15AM2930OpeningPrice := array.get(open1,i)
+            
+
+    if lastopentime < time
+        lastopentime := time
+        lastOpen1 := open1
+        lastTime1 := time1
+
+    if eight15AM2930Start
+        // l = label.new(bar_index, close, str.tostring(eight15AM2930OpeningPrice))
+        // eight15AM2930Line := line.new(bar_index - isInBefore,eight15AM2930OpeningPrice,bar_index+1,eight15AM2930OpeningPrice)
+        tsStart = timestamp(timezone, year(lastopentime),month(lastopentime),dayofmonth(lastopentime),04,40)
+        tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time),15,00)
+        eight15AM2930Line := line.new(tsStart,eight15AM2930OpeningPrice,tsEnd,eight15AM2930OpeningPrice, xloc = xloc.bar_time)
+        
+        line.set_color(eight15AM2930Line, eight15AMPriceColor)
+        label.new(tsEnd-3000000, eight15AM2930OpeningPrice*0.99998, "4:40 am", xloc = xloc.bar_time, style = label.style_none, textcolor = eight15AMPriceColor, size = size.small, textalign = text.align_left)
+
+
+// Open Price 720
+
+show720amPrice = input.bool(true, "Show 7:00 am price")
+seven20AMPriceColor = input.color(#474873, "7:00 am price color")
+
+
+// open1 = request.security_lower_tf(syminfo.tickerid, "1", open)
+// time1 = request.security_lower_tf(syminfo.tickerid, "1", minute(time))
+
+if show720amPrice
+    seven20AM2fourPM = "0700-1400"
+
+    var seven20AM2fourPMOpeningPrice = 0.0
+    var box seven20AM2fourPMBox = na
+    var line seven20AM2fourPMLine = na
+
+    inseven20AM2fourPM    = InSession(seven20AM2fourPM, timezone) and timeframe.isintraday
+    seven20AM2fourPMStart = inseven20AM2fourPM and not inseven20AM2fourPM[1]
+
+
+    var lastopentime = 0
+    // var float[] lastOpen1 = na
+    // var int[] lastTime1 = na
+
+    var lastOpen1 = array.new_float(0)
+    var lastTime1 = array.new_int(0)
+
+    isInBefore = 0
+
+
+    if seven20AM2fourPMStart 
+    
+        // if bar_index == last_bar_index
+            // l = label.new(bar_index, close, str.tostring(lastOpen1) + "," + str.tostring(lastTime1))
+
+        if array.size(lastOpen1) > 0 and array.size(lastTime1) > 0
+            for i = 0 to array.size(lastOpen1) - 1  
+                if (array.get(lastTime1,i) == 00)
+                    seven20AM2fourPMOpeningPrice := array.get(lastOpen1,i)
+                    isInBefore := 1
+        if array.size(open1) > 0 and isInBefore == 0 and array.size(time1) > 0 
+            for i = 0 to array.size(open1) - 1
+                if (array.get(time1,i) == 00)
+                    seven20AM2fourPMOpeningPrice := array.get(open1,i)
+            
+
+    if lastopentime < time 
+        lastopentime := time
+        lastOpen1 := open1
+        lastTime1 := time1
+
+    if seven20AM2fourPMStart and seven20AM2fourPMOpeningPrice != 0
+        // l = label.new(bar_index, close, str.tostring(seven20AM2fourPMOpeningPrice))
+        // seven20AM2fourPMLine := line.new(bar_index - isInBefore,seven20AM2fourPMOpeningPrice,bar_index+1,seven20AM2fourPMOpeningPrice)
+        tsStart = timestamp(timezone, year(lastopentime),month(lastopentime),dayofmonth(lastopentime),07,00)
+        tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time),14,00)
+        // tsEnd   = timestamp(timezone, year(lastopentime),month(lastopentime),dayofmonth(lastopentime),16,00)
+        seven20AM2fourPMLine := line.new(tsStart,seven20AM2fourPMOpeningPrice,tsEnd,seven20AM2fourPMOpeningPrice, xloc = xloc.bar_time)
+        
+        line.set_color(seven20AM2fourPMLine, seven20AMPriceColor)
+        label.new(tsEnd-3000000, seven20AM2fourPMOpeningPrice*0.99998, "7:00 am", xloc = xloc.bar_time, style = label.style_none, textcolor = seven20AMPriceColor, size = size.small, textalign = text.align_left)
+
+    // if inseven20AM2fourPM
+    //     line.set_x2(seven20AM2fourPMLine, bar_index + 1)
+        
+
+
+// tsStart = timestamp(timezone, year(time),month(time),dayofmonth(13),14,45)
+// tsStart = timestamp(timezone, 2022,12,13,14,45)
+
+
+// 14:45
+// showfourteen45 = input.bool(true, "Mark 14h45")
+// fourteen45Color = input.color(color.lime, "14h45 color")
+// var showedfourteen45Today = false
+
+// if showfourteen45
+//     fourteen45Time = "1430-1500"
+
+//     infourteen45    = InSession(fourteen45Time, timezone) and timeframe.isintraday
+//     fourteen45Start = infourteen45 and not infourteen45[1]
+
+//     tsStart = timestamp(timezone, year(time),month(time),dayofmonth(time),14,45)
+    
+//     if not showedfourteen45Today and timenow < tsStart
+//         tsStartNow = timestamp(timezone, year(timenow),month(timenow),dayofmonth(timenow),14,45) 
+//         fourteen45linetoday = line.new(tsStartNow, close, tsStartNow, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = fourteen45Color, style = line.style_dotted, width = 1)
+//         showedfourteen45Today := true
+    
+//     else if fourteen45Start
+//         fourteen45line = line.new(tsStart, close, tsStart, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = fourteen45Color, style = line.style_dotted, width = 1)
+
+f_strMid(_str, _from, _to) =>
+    // string _str : source string.
+    // int    _from: left character position. The first character's position is 0.
+    // int    _to  : right character position.
+    string[] _chars = str.split(_str, "")
+    int _len = array.size(_chars)
+    int _beg = math.min(_len - 1, math.max(0, _from))
+    int _end = math.min(_len, math.max(0, _to + 1))
+    string[] _substr = array.new_string(0)
+    if _beg <= _end
+        _substr := array.slice(_chars, _beg, _end)
+    string _return = array.join(_substr, "")
+
+f_strLeft(_str, _n) =>
+    // string _str: source string.
+    // int    _n  : number of leftmost characters to return.
+    string[] _chars = str.split(_str, "")
+    int _len = array.size(_chars)
+    int _end = math.min(_len, math.max(0, _n))
+    string[] _substr = array.new_string(0)
+    if _end <= _len
+        _substr := array.slice(_chars, 0, _end)
+    string _return = array.join(_substr, "")
+
+// Custom Opening Price
+
+// CustomOpeningPriceA
+showCustomOpeningPriceA = input.bool(true, "Show Custom Opening Price A")
+
+customOpeningPriceA = input.session(defval="0920-1140", title="customOpeningPriceA")
+customOpeningPriceAColor = input.color(#801922, "Custom Opening Price A color")
+
+
+if showCustomOpeningPriceA
+
+    var customOpeningPriceAOpeningPrice = 0.0
+    var line customOpeningPriceAOpeningLine = na
+
+    inCustomOpeningPriceA    = InSession(customOpeningPriceA, timezone) and timeframe.isintraday
+    customOpeningPriceAStarts = inCustomOpeningPriceA and not inCustomOpeningPriceA[1]
+    
+
+    var lastopentime = 0
+    var lastOpen1 = array.new_float(0)
+    var lastTime1 = array.new_int(0)
+
+    isInBefore = 0
+
+    customHr1  = str.tonumber(f_strMid(customOpeningPriceA, 0, 1))
+    customMin1 = str.tonumber(f_strMid(customOpeningPriceA, 2, 3))
+    customHr2  = str.tonumber(f_strMid(customOpeningPriceA, 5, 6))
+    customMin2 = str.tonumber(f_strMid(customOpeningPriceA, 7, 8))
+
+
+    // if bar_index == last_bar_index
+    //     l = label.new(bar_index, close, f_strMid(customOpeningPriceA, 7, 8))
+
+    if customOpeningPriceAStarts 
+        if array.size(lastOpen1) > 0
+            for i = 0 to array.size(lastOpen1) - 1  
+                if (array.get(lastTime1,i) == customMin1)
+                    customOpeningPriceAOpeningPrice := array.get(lastOpen1,i)
+                    isInBefore := 1
+        if array.size(open1) > 0 and isInBefore == 0
+            for i = 0 to array.size(open1) - 1
+                if (array.get(time1,i) == customMin1)
+                    customOpeningPriceAOpeningPrice := array.get(open1,i)
+        
+        tsStart = timestamp(timezone, year(lastopentime),month(lastopentime),dayofmonth(lastopentime),int(customHr1),int(customMin1))
+        tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time),int(customHr2),int(customMin2))
+        customOpeningPriceAOpeningLine := line.new(tsStart,customOpeningPriceAOpeningPrice,tsEnd,customOpeningPriceAOpeningPrice, xloc = xloc.bar_time)
+        
+        line.set_color(customOpeningPriceAOpeningLine, customOpeningPriceAColor)
+        label.new(tsEnd-3000000, customOpeningPriceAOpeningPrice*0.99998, f_strMid(customOpeningPriceA, 0, 1) + ":" + f_strMid(customOpeningPriceA, 2, 3) , xloc = xloc.bar_time, style = label.style_none, textcolor = customOpeningPriceAColor, size = size.small, textalign = text.align_left)
+            
+
+    if lastopentime < time
+        lastopentime := time
+        lastOpen1 := open1
+        lastTime1 := time1
+
+
+// CustomOpeningPriceB
+
+showCustomOpeningPriceB = input.bool(false, "Show Custom Opening Price B")
+
+CustomOpeningPriceB = input.session(defval="1054-1140", title="CustomOpeningPriceB")
+CustomOpeningPriceBColor = input.color(#801922, "Custom Opening Price B color")
+
+
+if showCustomOpeningPriceB
+
+    var CustomOpeningPriceBOpeningPrice = 0.0
+    var line CustomOpeningPriceBOpeningLine = na
+
+    inCustomOpeningPriceB    = InSession(CustomOpeningPriceB, timezone) and timeframe.isintraday
+    CustomOpeningPriceBStarts = inCustomOpeningPriceB and not inCustomOpeningPriceB[1]
+    
+
+    var lastopentime = 0
+    var lastOpen1 = array.new_float(0)
+    var lastTime1 = array.new_int(0)
+
+
+    isInBefore = 0
+
+    customHr1  = str.tonumber(f_strMid(CustomOpeningPriceB, 0, 1))
+    customMin1 = str.tonumber(f_strMid(CustomOpeningPriceB, 2, 3))
+    customHr2  = str.tonumber(f_strMid(CustomOpeningPriceB, 5, 6))
+    customMin2 = str.tonumber(f_strMid(CustomOpeningPriceB, 7, 8))
+
+
+    // if bar_index == last_bar_index
+    //     l = label.new(bar_index, close, f_strMid(CustomOpeningPriceB, 7, 8))
+
+    if CustomOpeningPriceBStarts 
+        if array.size(lastOpen1) > 0
+            for i = 0 to array.size(lastOpen1) - 1  
+                if (array.get(lastTime1,i) == customMin1)
+                    CustomOpeningPriceBOpeningPrice := array.get(lastOpen1,i)
+                    isInBefore := 1
+        if array.size(open1) > 0 and isInBefore == 0
+            for i = 0 to array.size(open1) - 1
+                if (array.get(time1,i) == customMin1)
+                    CustomOpeningPriceBOpeningPrice := array.get(open1,i)
+        
+        tsStart = timestamp(timezone, year(lastopentime),month(lastopentime),dayofmonth(lastopentime),int(customHr1),int(customMin1))
+        tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time),int(customHr2),int(customMin2))
+        CustomOpeningPriceBOpeningLine := line.new(tsStart,CustomOpeningPriceBOpeningPrice,tsEnd,CustomOpeningPriceBOpeningPrice, xloc = xloc.bar_time)
+        
+        line.set_color(CustomOpeningPriceBOpeningLine, CustomOpeningPriceBColor)
+        label.new(tsEnd-3000000, CustomOpeningPriceBOpeningPrice*0.99998, f_strMid(CustomOpeningPriceB, 0, 1) + ":" + f_strMid(CustomOpeningPriceB, 2, 3) , xloc = xloc.bar_time, style = label.style_none, textcolor = CustomOpeningPriceBColor, size = size.small, textalign = text.align_left)
+            
+
+    if lastopentime < time
+        lastopentime := time
+        lastOpen1 := open1
+        lastTime1 := time1
+
+// CusttomOpeningPriceC
+
+showCustomOpeningPriceC = input.bool(false, "Show Custom Opening PriceC")
+
+CustomOpeningPriceC = input.session(defval="2040-2340", title="CustomOpeningPriceC")
+CustomOpeningPriceCColor = input.color(#f30a1e, "Custom Opening PriceC color")
+
+
+if showCustomOpeningPriceC
+
+    var CustomOpeningPriceCOpeningPrice = 0.0
+    var line CustomOpeningPriceCOpeningLine = na
+
+    inCustomOpeningPriceC    = InSession(CustomOpeningPriceC, timezone) and timeframe.isintraday
+    CustomOpeningPriceCStarts = inCustomOpeningPriceC and not inCustomOpeningPriceC[1]
+    
+
+    var lastopentime = 0
+    var lastOpen1 = array.new_float(0)
+    var lastTime1 = array.new_int(0)
+
+    isInBefore = 0
+
+    customHr1  = str.tonumber(f_strMid(CustomOpeningPriceC, 0, 1))
+    customMin1 = str.tonumber(f_strMid(CustomOpeningPriceC, 2, 3))
+    customHr2  = str.tonumber(f_strMid(CustomOpeningPriceC, 5, 6))
+    customMin2 = str.tonumber(f_strMid(CustomOpeningPriceC, 7, 8))
+
+
+    // if bar_index == last_bar_index
+    //     l = label.new(bar_index, close, f_strMid(CustomOpeningPriceC, 7, 8))
+
+    if CustomOpeningPriceCStarts 
+        if array.size(lastOpen1) > 0
+            for i = 0 to array.size(lastOpen1) - 1  
+                if (array.get(lastTime1,i) == customMin1)
+                    CustomOpeningPriceCOpeningPrice := array.get(lastOpen1,i)
+                    isInBefore := 1
+        if array.size(open1) > 0 and isInBefore == 0
+            for i = 0 to array.size(open1) - 1
+                if (array.get(time1,i) == customMin1)
+                    CustomOpeningPriceCOpeningPrice := array.get(open1,i)
+        
+        tsStart = timestamp(timezone, year(lastopentime),month(lastopentime),dayofmonth(lastopentime),int(customHr1),int(customMin1))
+        tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time),int(customHr2),int(customMin2))
+        CustomOpeningPriceCOpeningLine := line.new(tsStart,CustomOpeningPriceCOpeningPrice,tsEnd,CustomOpeningPriceCOpeningPrice, xloc = xloc.bar_time)
+        
+        line.set_color(CustomOpeningPriceCOpeningLine, CustomOpeningPriceCColor)
+        label.new(tsEnd-3000000, CustomOpeningPriceCOpeningPrice*0.99998, f_strMid(CustomOpeningPriceC, 0, 1) + ":" + f_strMid(CustomOpeningPriceC, 2, 3) , xloc = xloc.bar_time, style = label.style_none, textcolor = CustomOpeningPriceCColor, size = size.small, textalign = text.align_left)
+            
+
+    if lastopentime < time
+        lastopentime := time
+        lastOpen1 := open1
+        lastTime1 := time1
+
+
+// CusttomOpeningPriceD
+
+showCustomOpeningPriceD = input.bool(false, "Show Custom Opening PriceD")
+
+CustomOpeningPriceD = input.session(defval="0940-1500", title="CustomOpeningPriceD")
+CustomOpeningPriceDColor = input.color(#801922, "Custom Opening PriceD color")
+
+
+if showCustomOpeningPriceD
+
+    var CustomOpeningPriceDOpeningPrice = 0.0
+    var line CustomOpeningPriceDOpeningLine = na
+
+    inCustomOpeningPriceD    = InSession(CustomOpeningPriceD, timezone) and timeframe.isintraday
+    CustomOpeningPriceDStarts = inCustomOpeningPriceD and not inCustomOpeningPriceD[1]
+    
+
+    var lastopentime = 0
+    var lastOpen1 = array.new_float(0)
+    var lastTime1 = array.new_int(0)
+
+    isInBefore = 0
+
+    customHr1  = str.tonumber(f_strMid(CustomOpeningPriceD, 0, 1))
+    customMin1 = str.tonumber(f_strMid(CustomOpeningPriceD, 2, 3))
+    customHr2  = str.tonumber(f_strMid(CustomOpeningPriceD, 5, 6))
+    customMin2 = str.tonumber(f_strMid(CustomOpeningPriceD, 7, 8))
+
+
+    // if bar_index == last_bar_index
+    //     l = label.new(bar_index, close, f_strMid(CustomOpeningPriceD, 7, 8))
+
+    if CustomOpeningPriceDStarts 
+        if array.size(lastOpen1) > 0
+            for i = 0 to array.size(lastOpen1) - 1  
+                if (array.get(lastTime1,i) == customMin1)
+                    CustomOpeningPriceDOpeningPrice := array.get(lastOpen1,i)
+                    isInBefore := 1
+        if array.size(open1) > 0 and isInBefore == 0
+            for i = 0 to array.size(open1) - 1
+                if (array.get(time1,i) == customMin1)
+                    CustomOpeningPriceDOpeningPrice := array.get(open1,i)
+        
+        tsStart = timestamp(timezone, year(lastopentime),month(lastopentime),dayofmonth(lastopentime),int(customHr1),int(customMin1))
+        tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time),int(customHr2),int(customMin2))
+        CustomOpeningPriceDOpeningLine := line.new(tsStart,CustomOpeningPriceDOpeningPrice,tsEnd,CustomOpeningPriceDOpeningPrice, xloc = xloc.bar_time)
+        
+        line.set_color(CustomOpeningPriceDOpeningLine, CustomOpeningPriceDColor)
+        label.new(tsEnd-3000000, CustomOpeningPriceDOpeningPrice*0.99998, f_strMid(CustomOpeningPriceD, 0, 1) + ":" + f_strMid(CustomOpeningPriceD, 2, 3) , xloc = xloc.bar_time, style = label.style_none, textcolor = CustomOpeningPriceDColor, size = size.small, textalign = text.align_left)
+            
+
+    if lastopentime < time
+        lastopentime := time
+        lastOpen1 := open1
+        lastTime1 := time1
+
+
+// CusttomOpeningPriceE
+
+showCustomOpeningPriceE = input.bool(false, "Show Custom Opening PriceE")
+
+CustomOpeningPriceE = input.session(defval="1220-1400", title="CustomOpeningPriceE")
+CustomOpeningPriceEColor = input.color(#801922, "Custom Opening PriceE color")
+
+
+if showCustomOpeningPriceE
+
+    var CustomOpeningPriceEOpeningPrice = 0.0
+    var line CustomOpeningPriceEOpeningLine = na
+
+    inCustomOpeningPriceE    = InSession(CustomOpeningPriceE, timezone) and timeframe.isintraday
+    CustomOpeningPriceEStarts = inCustomOpeningPriceE and not inCustomOpeningPriceE[1]
+    
+
+    var lastopentime = 0
+    var lastOpen1 = array.new_float(0)
+    var lastTime1 = array.new_int(0)
+
+
+    isInBefore = 0
+
+    customHr1  = str.tonumber(f_strMid(CustomOpeningPriceE, 0, 1))
+    customMin1 = str.tonumber(f_strMid(CustomOpeningPriceE, 2, 3))
+    customHr2  = str.tonumber(f_strMid(CustomOpeningPriceE, 5, 6))
+    customMin2 = str.tonumber(f_strMid(CustomOpeningPriceE, 7, 8))
+
+
+    // if bar_index == last_bar_index
+    //     l = label.new(bar_index, close, f_strMid(CustomOpeningPriceE, 7, 8))
+
+    if CustomOpeningPriceEStarts 
+        if array.size(lastOpen1) > 0
+            for i = 0 to array.size(lastOpen1) - 1  
+                if (array.get(lastTime1,i) == customMin1)
+                    CustomOpeningPriceEOpeningPrice := array.get(lastOpen1,i)
+                    isInBefore := 1
+        if array.size(open1) > 0 and isInBefore == 0
+            for i = 0 to array.size(open1) - 1
+                if (array.get(time1,i) == customMin1)
+                    CustomOpeningPriceEOpeningPrice := array.get(open1,i)
+        
+        tsStart = timestamp(timezone, year(lastopentime),month(lastopentime),dayofmonth(lastopentime),int(customHr1),int(customMin1))
+        tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time),int(customHr2),int(customMin2))
+        CustomOpeningPriceEOpeningLine := line.new(tsStart,CustomOpeningPriceEOpeningPrice,tsEnd,CustomOpeningPriceEOpeningPrice, xloc = xloc.bar_time)
+        
+        line.set_color(CustomOpeningPriceEOpeningLine, CustomOpeningPriceEColor)
+        label.new(tsEnd-3000000, CustomOpeningPriceEOpeningPrice*0.99998, f_strMid(CustomOpeningPriceE, 0, 1) + ":" + f_strMid(CustomOpeningPriceE, 2, 3) , xloc = xloc.bar_time, style = label.style_none, textcolor = CustomOpeningPriceEColor, size = size.small, textalign = text.align_left)
+            
+
+    if lastopentime < time
+        lastopentime := time
+        lastOpen1 := open1
+        lastTime1 := time1
+
+// CustomOpeningPriceF
+
+showCustomOpeningPriceF = input.bool(false, "Show Custom Opening PriceF")
+
+CustomOpeningPriceF = input.session(defval="1150-1400", title="CustomOpeningPriceF")
+CustomOpeningPriceFColor = input.color(#801922, "Custom Opening PriceF color")
+
+
+if showCustomOpeningPriceF
+
+    var CustomOpeningPriceFOpeningPrice = 0.0
+    var line CustomOpeningPriceFOpeningLine = na
+
+    inCustomOpeningPriceF    = InSession(CustomOpeningPriceF, timezone) and timeframe.isintraday
+    CustomOpeningPriceFStarts = inCustomOpeningPriceF and not inCustomOpeningPriceF[1]
+    
+
+    var lastopentime = 0
+    var lastOpen1 = array.new_float(0)
+    var lastTime1 = array.new_int(0)
+
+    isInBefore = 0
+
+    customHr1  = str.tonumber(f_strMid(CustomOpeningPriceF, 0, 1))
+    customMin1 = str.tonumber(f_strMid(CustomOpeningPriceF, 2, 3))
+    customHr2  = str.tonumber(f_strMid(CustomOpeningPriceF, 5, 6))
+    customMin2 = str.tonumber(f_strMid(CustomOpeningPriceF, 7, 8))
+
+
+    // if bar_index == last_bar_index
+    //     l = label.new(bar_index, close, f_strMid(CustomOpeningPriceF, 7, 8))
+
+    if CustomOpeningPriceFStarts 
+        if array.size(lastOpen1) > 0
+            for i = 0 to array.size(lastOpen1) - 1  
+                if (array.get(lastTime1,i) == customMin1)
+                    CustomOpeningPriceFOpeningPrice := array.get(lastOpen1,i)
+                    isInBefore := 1
+        if array.size(open1) > 0 and isInBefore == 0
+            for i = 0 to array.size(open1) - 1
+                if (array.get(time1,i) == customMin1)
+                    CustomOpeningPriceFOpeningPrice := array.get(open1,i)
+        
+        tsStart = timestamp(timezone, year(lastopentime),month(lastopentime),dayofmonth(lastopentime),int(customHr1),int(customMin1))
+        tsEnd := timestamp(timezone, year(time),month(time),dayofmonth(time),int(customHr2),int(customMin2))
+        CustomOpeningPriceFOpeningLine := line.new(tsStart,CustomOpeningPriceFOpeningPrice,tsEnd,CustomOpeningPriceFOpeningPrice, xloc = xloc.bar_time)
+        
+        line.set_color(CustomOpeningPriceFOpeningLine, CustomOpeningPriceFColor)
+        label.new(tsEnd-3000000, CustomOpeningPriceFOpeningPrice*0.99998, f_strMid(CustomOpeningPriceF, 0, 1) + ":" + f_strMid(CustomOpeningPriceF, 2, 3) , xloc = xloc.bar_time, style = label.style_none, textcolor = CustomOpeningPriceFColor, size = size.small, textalign = text.align_left)
+            
+
+    if lastopentime < time
+        lastopentime := time
+        lastOpen1 := open1
+        lastTime1 := time1
+
+// CustomTime 1
+
+
+showCustomTime1 = input.bool(false, "Mark custom Time 1 with vertical Line")
+CustomTime1 = input.session(defval="1117-1120", title="CustomTime1")
+CustomTime1Color = input.color(color.rgb(0, 5, 3), "Custom time 1 color")
+
+var showedCustomTime1Today = false
+
+if showCustomTime1
+    inCustomTime1    = InSession(CustomTime1, timezone) and timeframe.isintraday
+    CustomTime1Start = inCustomTime1 and not inCustomTime1[1]
+
+	
+    customHr1  = int(str.tonumber(f_strMid(CustomTime1, 0, 1)))
+    customMin1 = int(str.tonumber(f_strMid(CustomTime1, 2, 3)))
+
+    tsStart = timestamp(timezone, year(time),month(time),dayofmonth(time),customHr1,customMin1)
+    
+    if not showedCustomTime1Today and timenow < tsStart
+        tsStartNow = timestamp(timezone, year(timenow),month(timenow),dayofmonth(timenow),customHr1,customMin1) 
+        CustomTime1linetoday = line.new(tsStartNow, close, tsStartNow, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime1Color, style = line.style_dotted, width = 1)
+        showedCustomTime1Today := true
+    
+    else if CustomTime1Start
+        CustomTime1line = line.new(tsStart, close, tsStart, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime1Color, style = line.style_dotted, width = 1)
+
+// CustomTime 2
+
+
+showCustomTime2 = input.bool(true, "Mark custom Time 2 with vertical Line")
+CustomTime2 = input.session(defval="1300-1305", title="CustomTime2")
+CustomTime2Color = input.color(color.rgb(199, 5, 5), "Custom time 2 color")
+
+var showedCustomTime2Today = false
+
+if showCustomTime2
+    inCustomTime2    = InSession(CustomTime2, timezone) and timeframe.isintraday
+    CustomTime2Start = inCustomTime2 and not inCustomTime2[1]
+
+	
+    customHr1  = int(str.tonumber(f_strMid(CustomTime2, 0, 1)))
+    customMin1 = int(str.tonumber(f_strMid(CustomTime2, 2, 3)))
+
+    tsStart = timestamp(timezone, year(time),month(time),dayofmonth(time),customHr1,customMin1)
+    
+    if not showedCustomTime2Today and timenow < tsStart
+        tsStartNow = timestamp(timezone, year(timenow),month(timenow),dayofmonth(timenow),customHr1,customMin1) 
+        CustomTime2linetoday = line.new(tsStartNow, close, tsStartNow, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime2Color, style = line.style_dotted, width = 1)
+        showedCustomTime2Today := true
+    
+    else if CustomTime2Start
+        CustomTime2line = line.new(tsStart, close, tsStart, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime2Color, style = line.style_dotted, width = 1)
+
+// CustomTime3
+
+showCustomTime3 = input.bool(true, "Mark custom Time 3 with vertical Line")
+CustomTime3 = input.session(defval="1015-1020", title="CustomTime3")
+CustomTime3Color = input.color(color.rgb(81, 27, 143), "Custom time 3 color")
+
+var showedCustomTime3Today = false
+
+if showCustomTime3
+    inCustomTime3    = InSession(CustomTime3, timezone) and timeframe.isintraday
+    CustomTime3Start = inCustomTime3 and not inCustomTime3[1]
+
+	
+    customHr1  = int(str.tonumber(f_strMid(CustomTime3, 0, 1)))
+    customMin1 = int(str.tonumber(f_strMid(CustomTime3, 2, 3)))
+
+    tsStart = timestamp(timezone, year(time),month(time),dayofmonth(time),customHr1,customMin1)
+    
+    if not showedCustomTime3Today and timenow < tsStart
+        tsStartNow = timestamp(timezone, year(timenow),month(timenow),dayofmonth(timenow),customHr1,customMin1) 
+        CustomTime3linetoday = line.new(tsStartNow, close, tsStartNow, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime3Color, style = line.style_dotted, width = 1)
+        showedCustomTime3Today := true
+    
+    else if CustomTime3Start
+        CustomTime3line = line.new(tsStart, close, tsStart, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime3Color, style = line.style_dotted, width = 1)
+
+
+// CustomTime4
+
+showCustomTime4 = input.bool(true, "Mark custom Time 4 with vertical Line")
+CustomTime4 = input.session(defval="1540-1545", title="CustomTime4")
+CustomTime4Color = input.color(color.rgb(0, 5, 2), "Custom time 4 color")
+
+var showedCustomTime4Today = false
+
+if showCustomTime4
+    inCustomTime4    = InSession(CustomTime4, timezone) and timeframe.isintraday
+    CustomTime4Start = inCustomTime4 and not inCustomTime4[1]
+
+	
+    customHr1  = int(str.tonumber(f_strMid(CustomTime4, 0, 1)))
+    customMin1 = int(str.tonumber(f_strMid(CustomTime4, 2, 3)))
+
+    tsStart = timestamp(timezone, year(time),month(time),dayofmonth(time),customHr1,customMin1)
+    
+    if not showedCustomTime4Today and timenow < tsStart
+        tsStartNow = timestamp(timezone, year(timenow),month(timenow),dayofmonth(timenow),customHr1,customMin1) 
+        CustomTime4linetoday = line.new(tsStartNow, close, tsStartNow, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime4Color, style = line.style_dotted, width = 1)
+        showedCustomTime4Today := true
+    
+    else if CustomTime4Start
+        CustomTime4line = line.new(tsStart, close, tsStart, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime4Color, style = line.style_dotted, width = 1)
+
+
+// CustomTime5
+
+showCustomTime5 = input.bool(true, "Mark custom Time 5 with vertical Line")
+CustomTime5 = input.session(defval="1400-1404", title="CustomTime5")
+CustomTime5Color = input.color(color.rgb(1, 17, 9), "Custom time 5 color")
+
+var showedCustomTime5Today = false
+
+if showCustomTime5
+    inCustomTime5    = InSession(CustomTime5, timezone) and timeframe.isintraday
+    CustomTime5Start = inCustomTime5 and not inCustomTime5[1]
+
+	
+    customHr1  = int(str.tonumber(f_strMid(CustomTime5, 0, 1)))
+    customMin1 = int(str.tonumber(f_strMid(CustomTime5, 2, 3)))
+
+    tsStart = timestamp(timezone, year(time),month(time),dayofmonth(time),customHr1,customMin1)
+    
+    if not showedCustomTime5Today and timenow < tsStart
+        tsStartNow = timestamp(timezone, year(timenow),month(timenow),dayofmonth(timenow),customHr1,customMin1) 
+        CustomTime5linetoday = line.new(tsStartNow, close, tsStartNow, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime5Color, style = line.style_dotted, width = 1)
+        showedCustomTime5Today := true
+    
+    else if CustomTime5Start
+        CustomTime5line = line.new(tsStart, close, tsStart, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime5Color, style = line.style_dotted, width = 1)
+
+
+// CustomTime6
+
+showCustomTime6 = input.bool(true, "Mark custom Time 6 with vertical Line")
+CustomTime6 = input.session(defval="1150-1155", title="CustomTime6")
+CustomTime6Color = input.color(color.rgb(0, 2, 1), "Custom time 6 color")
+
+var showedCustomTime6Today = false
+
+if showCustomTime6
+    inCustomTime6    = InSession(CustomTime6, timezone) and timeframe.isintraday
+    CustomTime6Start = inCustomTime6 and not inCustomTime6[1]
+
+	
+    customHr1  = int(str.tonumber(f_strMid(CustomTime6, 0, 1)))
+    customMin1 = int(str.tonumber(f_strMid(CustomTime6, 2, 3)))
+
+    tsStart = timestamp(timezone, year(time),month(time),dayofmonth(time),customHr1,customMin1)
+    
+    if not showedCustomTime6Today and timenow < tsStart
+        tsStartNow = timestamp(timezone, year(timenow),month(timenow),dayofmonth(timenow),customHr1,customMin1) 
+        CustomTime6linetoday = line.new(tsStartNow, close, tsStartNow, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime6Color, style = line.style_dotted, width = 1)
+        showedCustomTime6Today := true
+    
+    else if CustomTime6Start
+        CustomTime6line = line.new(tsStart, close, tsStart, close * 1.01, xloc = xloc.bar_time, extend = extend.both, color = CustomTime6Color, style = line.style_dotted, width = 1)
+
+
+
+// Custom Session 1
+showCustomSession1 = input.bool(true, "Plot Liquidity Targets")
+
+CustomSession1Time = input.session("1640-1940", title="True daily Range")
+
+
+CustomSession1StdevNmbr = input.int(1, "Daily Range Number of Projections", minval = 1)
+showCustomSession1Midlvl = input.bool(true, "Show the mid-levels of the projections")
+
+CustomSession1BorderSize   = input.int(1, title="Custom Session 1 Box border size", minval=0)
+CustomSession1BgColor      = input.color(color.new(color.rgb(249, 147, 245), 85), title="Custom Session 1 Background Color")
+CustomSession1BorderColor   = input.color(color.rgb(9, 10, 1), title="Custom Session 1 border Color")
+
+// Create variables
+var CustomSession1HighPrice = 0.0
+var CustomSession1LowPrice  = 0.0
+var CustomSession1OpenPrice = 0.0
+var CustomSession1AvgPrice  = 0.0
+var stdv1                   = 0.0
+
+
+var firstIndex = 0
+
+var array<float> stdvCustomSession1stdvs = na
+var array<line> stdvCustomSession1stdvsLines = na
+
+var box CustomSession1Box = na
+
+inCustomSession1    = InSession(CustomSession1Time, timezone) and timeframe.isintraday
+CustomSession1Start = inCustomSession1 and not inCustomSession1[1]
+
+if CustomSession1Start
+    CustomSession1HighPrice := high
+    CustomSession1LowPrice  := low
+    CustomSession1OpenPrice := open
+    CustomSession1AvgPrice  := (high + low)/2
+    firstIndex := bar_index
+    stdvCustomSession1stdvs      := array.new_float(CustomSession1StdevNmbr * 4)
+    stdvCustomSession1stdvsLines := array.new_line(CustomSession1StdevNmbr * 4)  
+else if inCustomSession1
+    CustomSession1HighPrice := math.max(CustomSession1HighPrice, high)
+    CustomSession1LowPrice  := math.min(CustomSession1LowPrice, low)
+    stdv1                   := CustomSession1HighPrice - CustomSession1LowPrice
+    CustomSession1AvgPrice  := (CustomSession1HighPrice + CustomSession1LowPrice)/2
+
+    
+    i = 0
+    while i < CustomSession1StdevNmbr * 4
+        if i == 0
+            array.set(stdvCustomSession1stdvs, i, CustomSession1HighPrice + stdv1/2)
+            array.set(stdvCustomSession1stdvs, i + 1, CustomSession1HighPrice + stdv1)
+            array.set(stdvCustomSession1stdvs, i + 2, CustomSession1LowPrice - stdv1/2)
+            array.set(stdvCustomSession1stdvs, i + 3, CustomSession1LowPrice - stdv1)
+        else
+            array.set(stdvCustomSession1stdvs, i, array.get(stdvCustomSession1stdvs,i-4) + stdv1)
+            array.set(stdvCustomSession1stdvs, i + 1, array.get(stdvCustomSession1stdvs,i-3) + stdv1)
+            array.set(stdvCustomSession1stdvs, i + 2, array.get(stdvCustomSession1stdvs,i-2) - stdv1)
+            array.set(stdvCustomSession1stdvs, i + 3, array.get(stdvCustomSession1stdvs,i-1) - stdv1)
+        i += 4
+    // l = label.new(bar_index, close, str.tostring(stdvCustomSession1stdvs))
+
+if CustomSession1Start and showCustomSession1
+    CustomSession1Box := box.new(left=bar_index, top=na, right=na, bottom=na,border_width=CustomSession1BorderSize)
+
+    for i = 0 to array.size(stdvCustomSession1stdvsLines) - 1
+        array.set(stdvCustomSession1stdvsLines, i,line.new(bar_index,array.get(stdvCustomSession1stdvs,i),bar_index+1,array.get(stdvCustomSession1stdvs,i),color =  CustomSession1BorderColor))
+    
+
+
+if inCustomSession1 and showCustomSession1
+    box.set_top(CustomSession1Box, CustomSession1HighPrice)
+    box.set_bottom(CustomSession1Box, CustomSession1LowPrice)
+
+    box.set_right(CustomSession1Box, bar_index + 1)
+
+    box.set_bgcolor(CustomSession1Box, CustomSession1BgColor)
+    box.set_border_color(CustomSession1Box, CustomSession1BorderColor)
+
+    for i = 0 to array.size(stdvCustomSession1stdvsLines) - 1
+        if i % 2 == 0
+            if(showCustomSession1Midlvl)
+                line.set_xy1(array.get(stdvCustomSession1stdvsLines,i), (bar_index + firstIndex)  /2 - 1 ,  array.get(stdvCustomSession1stdvs,i))
+                line.set_xy2(array.get(stdvCustomSession1stdvsLines,i), (bar_index + firstIndex)  /2 + 1, array.get(stdvCustomSession1stdvs,i) )
+        else
+            line.set_y1(array.get(stdvCustomSession1stdvsLines,i),  array.get(stdvCustomSession1stdvs,i))
+            line.set_xy2(array.get(stdvCustomSession1stdvsLines,i), bar_index + 1, array.get(stdvCustomSession1stdvs,i) )
+
+
+// Custom Session 2
+showCustomSession2 = input.bool(true, "Plot AM Scalp target")
+
+CustomSession2Time = input.session("0200-0700", title="AM Scalping Target")
+
+
+CustomSession2StdevNmbr = input.int(2, "Number of Scalp targets", minval = 1)
+showCustomSession2Midlvl = input.bool(true, "Show the mid-levels of the projections")
+
+CustomSession2BorderSize   = input.int(1, title=" Border size", minval=0)
+CustomSession2BgColor      = input.color(color.new(#d30606, 85), title="Background Color")
+CustomSession2BorderColor   = input.color(color.rgb(153, 5, 5), title="Border Color")
+
+// Create variables
+var CustomSession2HighPrice = 0.0
+var CustomSession2LowPrice  = 0.0
+var CustomSession2OpenPrice = 0.0
+var CustomSession2AvgPrice  = 0.0
+// var stdv1                   = 0.0
+
+
+// var firstIndex = 0
+
+var array<float> stdvCustomSession2stdvs = na
+var array<line> stdvCustomSession2stdvsLines = na
+
+var box CustomSession2Box = na
+
+inCustomSession2    = InSession(CustomSession2Time, timezone) and timeframe.isintraday
+CustomSession2Start = inCustomSession2 and not inCustomSession2[1]
+
+if CustomSession2Start
+    CustomSession2HighPrice := high
+    CustomSession2LowPrice  := low
+    CustomSession2OpenPrice := open
+    CustomSession2AvgPrice  := (high + low)/2
+    firstIndex := bar_index
+    stdvCustomSession2stdvs      := array.new_float(CustomSession2StdevNmbr * 4)
+    stdvCustomSession2stdvsLines := array.new_line(CustomSession2StdevNmbr * 4)    
+else if inCustomSession2
+    CustomSession2HighPrice := math.max(CustomSession2HighPrice, high)
+    CustomSession2LowPrice  := math.min(CustomSession2LowPrice, low)
+    stdv1                   := CustomSession2HighPrice - CustomSession2LowPrice
+    CustomSession2AvgPrice  := (CustomSession2HighPrice + CustomSession2LowPrice)/2
+
+    
+    i = 0
+    while i < CustomSession2StdevNmbr * 4
+        if i == 0
+            array.set(stdvCustomSession2stdvs, i, CustomSession2HighPrice + stdv1/2)
+            array.set(stdvCustomSession2stdvs, i + 1, CustomSession2HighPrice + stdv1)
+            array.set(stdvCustomSession2stdvs, i + 2, CustomSession2LowPrice - stdv1/2)
+            array.set(stdvCustomSession2stdvs, i + 3, CustomSession2LowPrice - stdv1)
+        else
+            array.set(stdvCustomSession2stdvs, i, array.get(stdvCustomSession2stdvs,i-4) + stdv1)
+            array.set(stdvCustomSession2stdvs, i + 1, array.get(stdvCustomSession2stdvs,i-3) + stdv1)
+            array.set(stdvCustomSession2stdvs, i + 2, array.get(stdvCustomSession2stdvs,i-2) - stdv1)
+            array.set(stdvCustomSession2stdvs, i + 3, array.get(stdvCustomSession2stdvs,i-1) - stdv1)
+        i += 4
+
+if CustomSession2Start and showCustomSession2
+    CustomSession2Box := box.new(left=bar_index, top=na, right=na, bottom=na,border_width=CustomSession2BorderSize)
+
+    for i = 0 to array.size(stdvCustomSession2stdvsLines) - 1
+        array.set(stdvCustomSession2stdvsLines, i,line.new(bar_index,array.get(stdvCustomSession2stdvs,i),bar_index+1,array.get(stdvCustomSession2stdvs,i),color =  CustomSession2BorderColor))
+    
+
+if inCustomSession2 and showCustomSession2
+    box.set_top(CustomSession2Box, CustomSession2HighPrice)
+    box.set_bottom(CustomSession2Box, CustomSession2LowPrice)
+
+    box.set_right(CustomSession2Box, bar_index + 1)
+
+    box.set_bgcolor(CustomSession2Box, CustomSession2BgColor)
+    box.set_border_color(CustomSession2Box, CustomSession2BorderColor)
+
+    for i = 0 to array.size(stdvCustomSession2stdvsLines) - 1
+        if i % 2 == 0
+            if(showCustomSession2Midlvl)
+                line.set_xy1(array.get(stdvCustomSession2stdvsLines,i), (bar_index + firstIndex)  /2 - 1 ,  array.get(stdvCustomSession2stdvs,i))
+                line.set_xy2(array.get(stdvCustomSession2stdvsLines,i), (bar_index + firstIndex)  /2 + 1, array.get(stdvCustomSession2stdvs,i) )
+        else
+            line.set_y1(array.get(stdvCustomSession2stdvsLines,i),  array.get(stdvCustomSession2stdvs,i))
+            line.set_xy2(array.get(stdvCustomSession2stdvsLines,i), bar_index + 1, array.get(stdvCustomSession2stdvs,i) )
+
+
+// Custom Session 3
+showCustomSession3 = input.bool(true, "Plot PM Scalp target")
+CustomSession3Time = input.session("1240-1520", title="Custom Session 3 Time")
+
+session3CustomAnchored = input.bool(false, "Anchor Custom Session 3 @ custom Time")
+CustomSession3AchorTime = input.session("0815-1600", title="Custom Anchor time Session 3")
+
+CustomSession3StdevNmbr = input.int(2, "Custom Session 3 Number of Projections", minval = 1)
+showCustomSession3Midlvl = input.bool(true, "Show the mid-levels of the projections")
+
+CustomSession3BorderSize   = input.int(1, title="Custom Session 3 Box border size", minval=0)
+CustomSession3BgColor      = input.color(color.new(#f3f1f4, 85), title="Custom Session 3 Background Color")
+CustomSession3BorderColor   = input.color(color.rgb(6, 1, 18), title="Custom Session 3 border Color")
+
+// Create variables
+var CustomSession3HighPrice = 0.0
+var CustomSession3LowPrice  = 0.0
+var CustomSession3OpenPrice = 0.0
+var CustomSession3AvgPrice  = 0.0
+var CustomSession3AnchorOpenPrice = 0.0
+// var stdv1                   = 0.0
+
+
+// var firstIndex = 0
+
+var array<float> stdvCustomSession3stdvs = na
+var array<line> stdvCustomSession3stdvsLines = na
+
+var box CustomSession3Box = na
+
+inCustomSession3    = InSession(CustomSession3Time, timezone) and timeframe.isintraday
+CustomSession3Start = inCustomSession3 and not inCustomSession3[1]
+
+if CustomSession3Start
+    CustomSession3HighPrice := high
+    CustomSession3LowPrice  := low
+    CustomSession3OpenPrice := open
+    CustomSession3AvgPrice  := (high + low)/2
+    firstIndex := bar_index
+    stdvCustomSession3stdvs      := array.new_float(CustomSession3StdevNmbr * 4)
+    stdvCustomSession3stdvsLines := array.new_line(CustomSession3StdevNmbr * 4)    
+else if inCustomSession3
+    CustomSession3HighPrice := math.max(CustomSession3HighPrice, high)
+    CustomSession3LowPrice  := math.min(CustomSession3LowPrice, low)
+    if session3CustomAnchored
+        stdv1                   := (CustomSession3HighPrice - CustomSession3LowPrice)/2     
+    else
+        stdv1                   := CustomSession3HighPrice - CustomSession3LowPrice
+    CustomSession3AvgPrice  := (CustomSession3HighPrice + CustomSession3LowPrice)/2
+
+    if not session3CustomAnchored
+        i = 0
+        while i < CustomSession3StdevNmbr * 4
+            if i == 0
+                array.set(stdvCustomSession3stdvs, i, CustomSession3HighPrice + stdv1/2)
+                array.set(stdvCustomSession3stdvs, i + 1, CustomSession3HighPrice + stdv1)
+                array.set(stdvCustomSession3stdvs, i + 2, CustomSession3LowPrice - stdv1/2)
+                array.set(stdvCustomSession3stdvs, i + 3, CustomSession3LowPrice - stdv1)
+            else
+                array.set(stdvCustomSession3stdvs, i, array.get(stdvCustomSession3stdvs,i-4) + stdv1)
+                array.set(stdvCustomSession3stdvs, i + 1, array.get(stdvCustomSession3stdvs,i-3) + stdv1)
+                array.set(stdvCustomSession3stdvs, i + 2, array.get(stdvCustomSession3stdvs,i-2) - stdv1)
+                array.set(stdvCustomSession3stdvs, i + 3, array.get(stdvCustomSession3stdvs,i-1) - stdv1)
+            i += 4
+
+if CustomSession3Start and showCustomSession3
+    CustomSession3Box := box.new(left=bar_index, top=na, right=na, bottom=na,border_width=CustomSession3BorderSize)
+   
+    if not session3CustomAnchored
+        for i = 0 to array.size(stdvCustomSession3stdvsLines) - 1
+            array.set(stdvCustomSession3stdvsLines, i,line.new(bar_index,array.get(stdvCustomSession3stdvs,i),bar_index+1,array.get(stdvCustomSession3stdvs,i),color =  CustomSession3BorderColor))
+    
+
+if inCustomSession3 and showCustomSession3 
+    box.set_top(CustomSession3Box, CustomSession3HighPrice)
+    box.set_bottom(CustomSession3Box, CustomSession3LowPrice)
+
+    box.set_right(CustomSession3Box, bar_index + 1)
+
+    box.set_bgcolor(CustomSession3Box, CustomSession3BgColor)
+    box.set_border_color(CustomSession3Box, CustomSession3BorderColor)
+
+    if not session3CustomAnchored
+        for i = 0 to array.size(stdvCustomSession3stdvsLines) - 1
+            if i % 2 == 0
+                if(showCustomSession3Midlvl)
+                    line.set_xy1(array.get(stdvCustomSession3stdvsLines,i), (bar_index + firstIndex)  /2 - 1 ,  array.get(stdvCustomSession3stdvs,i))
+                    line.set_xy2(array.get(stdvCustomSession3stdvsLines,i), (bar_index + firstIndex)  /2 + 1, array.get(stdvCustomSession3stdvs,i) )
+            else
+                line.set_y1(array.get(stdvCustomSession3stdvsLines,i),  array.get(stdvCustomSession3stdvs,i))
+                line.set_xy2(array.get(stdvCustomSession3stdvsLines,i), bar_index + 1, array.get(stdvCustomSession3stdvs,i) )
+
+
+inCustomSession3Anchor    = InSession(CustomSession3AchorTime, timezone) and timeframe.isintraday
+CustomSession3AnchorStart = inCustomSession3Anchor and not inCustomSession3Anchor[1]
+
+if CustomSession3AnchorStart and session3CustomAnchored
+    CustomSession3AnchorOpenPrice := open
+    firstIndex := bar_index
+    for i = 0 to array.size(stdvCustomSession3stdvsLines) - 1
+        array.set(stdvCustomSession3stdvsLines, i,line.new(bar_index,array.get(stdvCustomSession3stdvs,i),bar_index+1,array.get(stdvCustomSession3stdvs,i),color =  CustomSession3BorderColor))
+
+
+if inCustomSession3Anchor and session3CustomAnchored and showCustomSession3
+    i = 0
+    while i < CustomSession3StdevNmbr * 4
+        if i == 0
+            array.set(stdvCustomSession3stdvs, i, CustomSession3AnchorOpenPrice + stdv1/2)
+            array.set(stdvCustomSession3stdvs, i + 1, CustomSession3AnchorOpenPrice + stdv1)
+            array.set(stdvCustomSession3stdvs, i + 2, CustomSession3AnchorOpenPrice - stdv1/2)
+            array.set(stdvCustomSession3stdvs, i + 3, CustomSession3AnchorOpenPrice - stdv1)
+        else
+            array.set(stdvCustomSession3stdvs, i, array.get(stdvCustomSession3stdvs,i-4) + stdv1)
+            array.set(stdvCustomSession3stdvs, i + 1, array.get(stdvCustomSession3stdvs,i-3) + stdv1)
+            array.set(stdvCustomSession3stdvs, i + 2, array.get(stdvCustomSession3stdvs,i-2) - stdv1)
+            array.set(stdvCustomSession3stdvs, i + 3, array.get(stdvCustomSession3stdvs,i-1) - stdv1)
+        i += 4
+
+    for c = 0 to array.size(stdvCustomSession3stdvsLines) - 1
+        if c % 2 == 0
+            if(showCustomSession3Midlvl)
+                line.set_xy1(array.get(stdvCustomSession3stdvsLines,c), (bar_index + firstIndex)  /2 - 1 ,  array.get(stdvCustomSession3stdvs,c))
+                line.set_xy2(array.get(stdvCustomSession3stdvsLines,c), (bar_index + firstIndex)  /2 + 1, array.get(stdvCustomSession3stdvs,c) )
+        else
+            line.set_y1(array.get(stdvCustomSession3stdvsLines,c),  array.get(stdvCustomSession3stdvs,c))
+            line.set_xy2(array.get(stdvCustomSession3stdvsLines,c), bar_index + 1, array.get(stdvCustomSession3stdvs,c) )
+
+
+showRealGap            = input.bool(false,"Identify real FYB Gap")
+realGapBoxBorderSize   = input.int(1, title="Real Gap Box border size", minval=0)
+realGapBoxBgColor      = input.color(color.new(color.rgb(248,248,242), 85), title="Real Gap Box Background Color")
+realGapBoxBorderColor  = input.color(color.rgb(248,248,242), title="Real Gap Box border Color")
+
+if showRealGap
+    fourPM2fourPM = "1600-1630"
+    dailyTradingHrs = "0400-1559"
+    
+    // var fourPM2fourPMOpeningPrice = 0.0
+    var TradingHrsLow = 0.0
+    var TradingHrsHigh = 0.0
+    var TradingHrsOpeningPrice = 0.0
+    var box realGapBox = na
+    // var anchorTime  = 0
+    var TradingHrsTS = 0
+
+   
+
+    infourPM2fourPM    = InSession(fourPM2fourPM, timezone) and timeframe.isintraday
+    fourPM2fourPMStart = infourPM2fourPM and not infourPM2fourPM[1]
+
+    inTradingHours = InSession(dailyTradingHrs, timezone) and timeframe.isintraday
+    inTradingHoursStart = inTradingHours and not inTradingHours[1]
+       
+    if inTradingHoursStart
+        TradingHrsLow := low
+        TradingHrsHigh := high
+        TradingHrsOpeningPrice := open
+        TradingHrsTS := time
+
+    if inTradingHours
+        TradingHrsHigh := math.max(TradingHrsHigh, high)
+        TradingHrsLow  := math.min(TradingHrsLow, low)
+
+    if TradingHrsOpeningPrice < TradingHrsLow[1] or TradingHrsOpeningPrice > TradingHrsHigh[1] 
+        boxStartTS = timestamp(timezone, year(TradingHrsTS[1]),month(TradingHrsTS[1]),dayofmonth(TradingHrsTS[1]),16,00)
+        
+        realGapBox := box.new(left=boxStartTS,right = time, top=na, bottom=na, border_width=realGapBoxBorderSize, bgcolor = realGapBoxBgColor, border_color = realGapBoxBorderColor, xloc=xloc.bar_time)
+
+        // box.set_right(realGapBox, time)
+        // box.set_left(realGapBox,boxStartTS)
+
+    if TradingHrsOpeningPrice < TradingHrsLow[1]
+        box.set_top(realGapBox, TradingHrsLow[1])
+        box.set_bottom(realGapBox, TradingHrsOpeningPrice )
+    
+    if TradingHrsOpeningPrice > TradingHrsHigh[1]
+        box.set_top(realGapBox, TradingHrsOpeningPrice)
+        box.set_bottom(realGapBox, TradingHrsHigh[1] )
+
+// =============================================================================
+// TARGET HIT DETECTION AND ALERTS (CORRECTED LOGIC)
+// =============================================================================
+// BULLISH: Long targets = aim for them, Short T2 = buy the dip (SCALP LONG)
+// BEARISH: Short targets = aim for them, Long T2 = fade rally (SCALP SHORT)
+// After T2 target hit: mean reversion scalp opportunity in opposite direction
+
+// Track targets using previous day's SR levels (always available after first session)
+if prevDaySRHigh > 0
+
+    // Long T1 - only alert if bullish (target we're aiming for)
+    // DISABLED: Only firing alerts at T2 (1.5 STD or above)
+    if not longT1Hit and high >= longT1Price
+        longT1Hit := true
+        // if alertTargetHitEnabled and buying == true
+        //     alert('{"content": "TCM Long T1 (' + str.tostring(target1STDMultiplier) + 'STD) HIT @ ' + str.tostring(longT1Price, "#.##") + '"}', alert.freq_once_per_bar)
+
+    // Long T2 - BULLISH: target reached (can scalp short) | BEARISH: reversal zone (SCALP SHORT)
+    if not longT2Hit and high >= longT2Price
+        longT2Hit := true
+        if alertTargetHitEnabled
+            if buying == true
+                alert('{"content": "🟢 ' + syminfo.ticker + ' LONG T2 HIT (' + str.tostring(target2STDMultiplier) + ' STD) @ ' + str.tostring(longT2Price, "#.##") + ' → SCALP SHORT (mean reversion)"}', alert.freq_once_per_bar)
+            else if buying == false
+                alert('{"content": "🔴 ' + syminfo.ticker + ' MAX HIGH (' + str.tostring(target2STDMultiplier) + ' STD) @ ' + str.tostring(longT2Price, "#.##") + ' → LOOK FOR SHORT (fade rally)"}', alert.freq_once_per_bar)
+
+    // Short T1 - only alert if bearish (target we're aiming for)
+    // DISABLED: Only firing alerts at T2 (1.5 STD or above)
+    if not shortT1Hit and low <= shortT1Price
+        shortT1Hit := true
+        // if alertTargetHitEnabled and buying == false
+        //     alert('{"content": "TCM Short T1 (' + str.tostring(target1STDMultiplier) + 'STD) HIT @ ' + str.tostring(shortT1Price, "#.##") + '"}', alert.freq_once_per_bar)
+
+    // Short T2 - BEARISH: target reached (can scalp long) | BULLISH: reversal zone (SCALP LONG)
+    if not shortT2Hit and low <= shortT2Price
+        shortT2Hit := true
+        if alertTargetHitEnabled
+            if buying == false
+                alert('{"content": "🔴 ' + syminfo.ticker + ' SHORT T2 HIT (' + str.tostring(target2STDMultiplier) + ' STD) @ ' + str.tostring(shortT2Price, "#.##") + ' → SCALP LONG (mean reversion)"}', alert.freq_once_per_bar)
+            else if buying == true
+                alert('{"content": "🟢 ' + syminfo.ticker + ' MAX LOW (' + str.tostring(target2STDMultiplier) + ' STD) @ ' + str.tostring(shortT2Price, "#.##") + ' → LOOK FOR LONG (buy the dip)"}', alert.freq_once_per_bar)
+
+// =============================================================================
+// 7:00 AM SR LEVELS ALERT (or manual test)
+// =============================================================================
+sevenAMAlertTime = "0700-0705"
+inSevenAMAlert = InSession(sevenAMAlertTime, timezone) and timeframe.isintraday
+sevenAMAlertStart = inSevenAMAlert and not inSevenAMAlert[1]
+
+// Trigger on scheduled time OR manual test (on confirmed bar)
+triggerLevelsAlert = (sevenAMAlertStart and alertSRLevelsEnabled and not alertedSRLevels) or (testSendLevels and barstate.isconfirmed)
+
+// For testing: use current SR if previous day not available
+testSRHigh = prevDaySRHigh > 0 ? prevDaySRHigh : ONsessionHighPrice
+testSRLow = prevDaySRLow > 0 ? prevDaySRLow : ONsessionLowPrice
+testSRRange = prevDaySRRange > 0 ? prevDaySRRange : ONSessionPipCount
+hasSRData = testSRHigh > 0
+
+// Recalculate targets for test mode if using current SR
+testLongT1 = testSRHigh + ((testSRHigh - testSRLow) * target1STDMultiplier)
+testLongT2 = testSRHigh + ((testSRHigh - testSRLow) * target2STDMultiplier)
+testShortT1 = testSRLow - ((testSRHigh - testSRLow) * target1STDMultiplier)
+testShortT2 = testSRLow - ((testSRHigh - testSRLow) * target2STDMultiplier)
+
+if triggerLevelsAlert and hasSRData
+    if not testSendLevels
+        alertedSRLevels := true
+
+    // Emojis for Discord
+    biasIcon = buying ? "🟢" : "🔴"
+    biasArrow = buying ? "▲" : "▼"
+    biasText = buying ? "BULLISH" : "BEARISH"
+    testPrefix = testSendLevels ? "🧪 [TEST] " : ""
+    srSource = (prevDaySRHigh > 0) ? "" : " (using current SR)"
+
+    msg = testPrefix + biasIcon + " " + ticker + " " + biasArrow + " " + biasText + srSource + "\\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━\\n"
+    msg += "◾ **SR LEVELS**\\n"
+    msg += "High: " + str.tostring(testSRHigh, "#.##") + "\\n"
+    msg += "Low: " + str.tostring(testSRLow, "#.##") + "\\n"
+    msg += "Range: " + str.tostring(testSRRange) + " pts\\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━\\n"
+
+    // Show targets based on bias direction
+    if buying
+        msg += "◾ **TARGETS (LONG)**\\n"
+        msg += "T1 (" + str.tostring(target1STDMultiplier) + " STD): " + str.tostring(testLongT1, "#.##") + "\\n"
+        msg += "T2 (" + str.tostring(target2STDMultiplier) + " STD): " + str.tostring(testLongT2, "#.##") + "\\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\\n"
+        msg += "◾ **REVERSAL ZONE**\\n"
+        msg += "MAX Low (" + str.tostring(target1STDMultiplier) + " STD): " + str.tostring(testShortT1, "#.##") + "\\n"
+        msg += "MAX Low (" + str.tostring(target2STDMultiplier) + " STD): " + str.tostring(testShortT2, "#.##") + " → SCALP LONG"
+    else
+        msg += "◾ **TARGETS (SHORT)**\\n"
+        msg += "T1 (" + str.tostring(target1STDMultiplier) + " STD): " + str.tostring(testShortT1, "#.##") + "\\n"
+        msg += "T2 (" + str.tostring(target2STDMultiplier) + " STD): " + str.tostring(testShortT2, "#.##") + "\\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\\n"
+        msg += "◾ **REVERSAL ZONE**\\n"
+        msg += "MAX High (" + str.tostring(target1STDMultiplier) + " STD): " + str.tostring(testLongT1, "#.##") + "\\n"
+        msg += "MAX High (" + str.tostring(target2STDMultiplier) + " STD): " + str.tostring(testLongT2, "#.##") + " → SCALP SHORT"
+
+    // Wrap in Discord JSON format
+    jsonMsg = '{"content": "' + msg + '"}'
+    alert(jsonMsg, alert.freq_once_per_bar)
+
+// =============================================================================
+// 9:20 AM SUMMARY ALERT (or manual test)
+// =============================================================================
+summaryAlertTime = "0920-0925"
+inSummaryAlert = InSession(summaryAlertTime, timezone) and timeframe.isintraday
+summaryAlertStart = inSummaryAlert and not inSummaryAlert[1]
+
+// Trigger on scheduled time OR manual test (on confirmed bar)
+triggerSummaryAlert = (summaryAlertStart and alertSummaryEnabled and not alertedSummary) or (testSendSummary and barstate.isconfirmed)
+
+if triggerSummaryAlert and prevDaySRHigh > 0
+    if not testSendSummary
+        alertedSummary := true
+
+    // Emojis for Discord
+    biasIcon2 = buying ? "🟢" : "🔴"
+    biasArrow2 = buying ? "▲" : "▼"
+    biasText2 = buying ? "BULLISH" : "BEARISH"
+    testPrefix2 = testSendSummary ? "🧪 [TEST] " : ""
+
+    msg2 = testPrefix2 + biasIcon2 + " " + ticker + " " + biasArrow2 + " " + biasText2 + "\\n"
+    msg2 += "━━━━━━━━━━━━━━━━━━━━\\n"
+    msg2 += "◾ **9:20 AM SUMMARY**\\n"
+
+    // Show status based on bias direction
+    if buying
+        longT1Status = longT1Hit ? "✅ HIT" : "⬜ NOT HIT"
+        longT2Status = longT2Hit ? "✅ HIT" : "⬜ NOT HIT"
+        shortT1Status = shortT1Hit ? "✅ HIT" : "⬜ NOT HIT"
+        shortT2Status = shortT2Hit ? "✅ HIT" : "⬜ NOT HIT"
+
+        msg2 += "**Primary Targets (Long)**\\n"
+        msg2 += "T1 (" + str.tostring(target1STDMultiplier) + " STD): " + longT1Status + "\\n"
+        msg2 += "T2 (" + str.tostring(target2STDMultiplier) + " STD): " + longT2Status
+        if longT2Hit
+            msg2 += " → SCALP SHORT"
+        msg2 += "\\n"
+        msg2 += "━━━━━━━━━━━━━━━━━━━━\\n"
+        msg2 += "**Reversal Zone**\\n"
+        msg2 += "MAX Low (" + str.tostring(target1STDMultiplier) + " STD): " + shortT1Status + "\\n"
+        msg2 += "MAX Low (" + str.tostring(target2STDMultiplier) + " STD): " + shortT2Status
+        if shortT2Hit
+            msg2 += "\\n→ 🎯 SCALP LONG @ " + str.tostring(shortT2Price, "#.##")
+    else
+        shortT1Status = shortT1Hit ? "✅ HIT" : "⬜ NOT HIT"
+        shortT2Status = shortT2Hit ? "✅ HIT" : "⬜ NOT HIT"
+        longT1Status = longT1Hit ? "✅ HIT" : "⬜ NOT HIT"
+        longT2Status = longT2Hit ? "✅ HIT" : "⬜ NOT HIT"
+
+        msg2 += "**Primary Targets (Short)**\\n"
+        msg2 += "T1 (" + str.tostring(target1STDMultiplier) + " STD): " + shortT1Status + "\\n"
+        msg2 += "T2 (" + str.tostring(target2STDMultiplier) + " STD): " + shortT2Status
+        if shortT2Hit
+            msg2 += " → SCALP LONG"
+        msg2 += "\\n"
+        msg2 += "━━━━━━━━━━━━━━━━━━━━\\n"
+        msg2 += "**Reversal Zone**\\n"
+        msg2 += "MAX High (" + str.tostring(target1STDMultiplier) + " STD): " + longT1Status + "\\n"
+        msg2 += "MAX High (" + str.tostring(target2STDMultiplier) + " STD): " + longT2Status
+        if longT2Hit
+            msg2 += "\\n→ 🎯 SCALP SHORT @ " + str.tostring(longT2Price, "#.##")
+
+    // Wrap in Discord JSON format
+    jsonMsg2 = '{"content": "' + msg2 + '"}'
+    alert(jsonMsg2, alert.freq_once_per_bar)
+
+// =============================================================================
+// ALERT CONDITIONS (for right-click Add Alert menu)
+// =============================================================================
+
+// ALWAYS TRUE - This condition is true on EVERY bar, guaranteed to work
+// Use this to test if alerts work at all
+alertcondition(true, title="ALWAYS TRUE TEST", message='{"content": "ALWAYS TRUE - alerts working!"}')
+
+// FORCE TEST - fires on EVERY bar while toggle is enabled (no conditions)
+testForceCond = testForce
+alertcondition(testForceCond, title="FORCE TEST (every bar)", message='{"content": "FORCE TEST - alerts working!"}')
+
+// Test triggers (wait for bar close)
+testSimpleCond = testSimple and barstate.isconfirmed
+testLevelsCond = testSendLevels and barstate.isconfirmed
+testSummaryCond = testSendSummary and barstate.isconfirmed
+alertcondition(testSimpleCond, title="TEST Simple Ping", message='{"content": "TCM TEST PING"}')
+alertcondition(testLevelsCond, title="TEST SR Levels", message='{"content": "Test SR Levels"}')
+alertcondition(testSummaryCond, title="TEST Summary", message='{"content": "Test Summary"}')
+
+// Scheduled alerts (use previous day SR)
+amLevelsCond = sevenAMAlertStart and prevDaySRHigh > 0
+amSummaryCond = summaryAlertStart and prevDaySRHigh > 0
+alertcondition(amLevelsCond, title="7AM SR Levels", message="7AM Levels")
+alertcondition(amSummaryCond, title="920 Summary", message="920 Summary")
+
+// Target hit alerts
+longT1Cond = longT1Hit and not longT1Hit[1]
+longT2Cond = longT2Hit and not longT2Hit[1]
+shortT1Cond = shortT1Hit and not shortT1Hit[1]
+shortT2Cond = shortT2Hit and not shortT2Hit[1]
+alertcondition(longT1Cond, title="Long T1 Hit", message="Long T1")
+alertcondition(longT2Cond, title="Long T2 Hit", message="Long T2")
+alertcondition(shortT1Cond, title="Short T1 Hit", message="Short T1")
+alertcondition(shortT2Cond, title="Short T2 Hit", message="Short T2")
+
+// Any alert
+anyAlert = testLevelsCond or testSummaryCond or amLevelsCond or amSummaryCond
+anyTarget = longT1Cond or longT2Cond or shortT1Cond or shortT2Cond
+alertcondition(anyAlert or anyTarget, title="Any TCM Alert", message="TCM Alert")
