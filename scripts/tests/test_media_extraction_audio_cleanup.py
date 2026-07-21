@@ -14,6 +14,26 @@ SPEC.loader.exec_module(media)
 
 
 class TranscribeVideoAudioCleanupTests(unittest.TestCase):
+    def test_effective_frame_interval_expands_to_cover_long_video(self) -> None:
+        self.assertEqual(
+            media.effective_frame_interval(
+                duration_seconds=2787,
+                requested_interval=45,
+                max_frames=30,
+            ),
+            92,
+        )
+
+    def test_effective_frame_interval_keeps_requested_interval_below_cap(self) -> None:
+        self.assertEqual(
+            media.effective_frame_interval(
+                duration_seconds=600,
+                requested_interval=45,
+                max_frames=30,
+            ),
+            45,
+        )
+
     def test_isolate_audio_with_elevenlabs_converts_mpeg_output_to_wav(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)

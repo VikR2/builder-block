@@ -96,6 +96,46 @@ class GenerateVideoLessonTests(unittest.TestCase):
         self.assertIn("section_title_fragment", quality["flags"])
         self.assertIn("section_summary_quote_like", quality["flags"])
 
+    def test_validate_lesson_payload_rejects_duplicate_section_titles(self) -> None:
+        payload = {
+            "summary": (
+                "This lesson maps the active range, confirms direction from liquidity, and turns the evidence into "
+                "a repeatable execution process."
+            ),
+            "keyTakeaways": [
+                "Define the active range before reading lower-timeframe movement.",
+                "Use candle closes to confirm whether liquidity is a target or rejection point.",
+                "Tie execution and invalidation to the same structural evidence.",
+            ],
+            "suggestedQuestions": [
+                "Where does the active range begin?",
+                "Which liquidity is price currently targeting?",
+                "What candle close confirms the directional read?",
+                "What evidence invalidates the setup?",
+            ],
+            "sections": [
+                {
+                    "title": "Range Formation and Reference Levels",
+                    "summary": "The range open, high, and low establish the reference structure.",
+                    "transcriptExcerpt": "First mark the open and the initial high and low of the range.",
+                },
+                {
+                    "title": "Range Formation and Reference Levels",
+                    "summary": "The same range levels are used to frame the next directional scenario.",
+                    "transcriptExcerpt": "Return to the range levels before deciding on direction.",
+                },
+                {
+                    "title": "Candle Confirmation and Order Flow",
+                    "summary": "The candle close confirms whether order flow is continuing or failing.",
+                    "transcriptExcerpt": "Wait for the candle to close before treating the move as confirmed.",
+                },
+            ],
+        }
+
+        quality = lesson.validate_lesson_payload(payload)
+
+        self.assertIn("duplicate_section_titles", quality["flags"])
+
     def test_build_deterministic_lesson_generates_tutor_pack_and_questions(self) -> None:
         seeds = [
             {
@@ -207,6 +247,100 @@ class GenerateVideoLessonTests(unittest.TestCase):
         self.assertEqual(len(windows), 2)
         self.assertEqual(windows[0]["timestampLabel"], "0:00")
         self.assertIn("Fear creates confusion", windows[0]["text"])
+        self.assertEqual(windows[-1]["endTime"], 180)
+
+    def test_build_windows_uses_full_transcript_when_manifest_frame_coverage_is_incomplete(self) -> None:
+        manifest = {
+            "video_duration_sec": 600,
+            "frame_interval_sec": 45,
+            "frames": [
+                {"timestamp_sec": 0},
+                {"timestamp_sec": 45},
+                {"timestamp_sec": 90},
+            ],
+        }
+        transcript_segments = [
+            {
+                "start": 0,
+                "end": 50,
+                "text": "The weekly range provides the higher timeframe context.",
+            },
+            {
+                "start": 520,
+                "end": 580,
+                "text": "Mechanical session rules define when execution should stop.",
+            },
+        ]
+
+        windows = lesson.build_windows(manifest, transcript_segments)
+
+        self.assertEqual(windows[0]["startTime"], 0)
+        self.assertGreaterEqual(windows[-1]["startTime"], 450)
+        self.assertIn("Mechanical session rules", windows[-1]["text"])
+
+    def test_build_windows_discards_frame_timestamps_past_video_duration(self) -> None:
+        manifest = {
+            "video_duration_sec": 170,
+            "frame_interval_sec": 90,
+            "frames": [
+                {"timestamp_sec": 0},
+                {"timestamp_sec": 90},
+                {"timestamp_sec": 180},
+            ],
+        }
+        transcript_segments = [
+            {
+                "start": 0,
+                "end": 169,
+                "text": "The range forms first, then candle confirmation defines the directional execution.",
+            },
+        ]
+
+        windows = lesson.build_windows(manifest, transcript_segments)
+
+        self.assertEqual([window["startTime"] for window in windows], [0, 90])
+        self.assertEqual(windows[-1]["endTime"], 170)
+
+    def test_build_seed_sections_spreads_unique_concepts_across_timeline(self) -> None:
+        concept_windows = [
+            ({"weekly", "daily", "profile", "range", "high", "low"}, "higher timeframe range"),
+            ({"weekly", "daily", "profile", "range", "high", "low"}, "weekly profile context"),
+            ({"range", "open", "start", "initial", "high", "low"}, "range reference levels"),
+            ({"range", "open", "start", "initial", "high", "low"}, "initial range levels"),
+            ({"liquidity", "above", "bullish", "bias"}, "liquidity and direction"),
+            ({"liquidity", "below", "bearish", "bias"}, "directional liquidity"),
+            ({"candle", "close", "order", "flow"}, "candle confirmation"),
+            ({"candles", "closing", "order", "flow"}, "order flow confirmation"),
+            ({"efficient", "rebalance", "bodies", "wicks"}, "range efficiency"),
+            ({"inefficient", "rebalance", "bodies", "wicks"}, "rebalancing"),
+            ({"session", "morning", "mechanical", "rules"}, "session rules"),
+            ({"session", "night", "mechanical", "rules"}, "mechanical execution"),
+        ]
+        windows = []
+        for index, (keywords, text) in enumerate(concept_windows):
+            windows.append({
+                "id": index,
+                "startTime": float(index * 100),
+                "endTime": float((index + 1) * 100),
+                "timestampLabel": lesson.format_timestamp(index * 100),
+                "text": text,
+                "keywords": keywords,
+                "domainHits": len(keywords),
+                "score": float(len(keywords) + index % 2),
+            })
+
+        seeds = lesson.build_seed_sections(
+            "Read and Interpret Volume",
+            windows,
+            study_sections=[],
+        )
+
+        titles = [seed["title"] for seed in seeds]
+        self.assertEqual(len(titles), 6)
+        self.assertEqual(len(titles), len(set(titles)))
+        self.assertEqual(seeds[0]["startTime"], 100.0)
+        self.assertEqual(seeds[-1]["startTime"], 1100.0)
+        self.assertEqual(seeds[-1]["endTime"], 1200.0)
 
 
 if __name__ == "__main__":

@@ -103,9 +103,20 @@ DOMAIN_KEYWORDS = {
     "volume", "profile", "value", "acceptance", "rejection", "participation",
     "expansion", "compression", "fractal", "consolidation", "breakout", "structure",
     "execution", "entry", "entries", "setup", "setups", "confirmation", "invalidation",
+    "weekly", "daily", "open", "high", "low", "initial", "above", "below", "bullish",
+    "bearish", "candle", "candles", "close", "closing", "flow", "csd", "efficient",
+    "efficiency", "inefficient", "rebalance", "bodies", "wicks", "manipulation",
+    "session", "morning", "night", "mechanical", "rules",
 }
 
 FALLBACK_SECTION_LABELS = [
+    ("Higher-Timeframe Range Context", {"weekly", "daily", "profile", "range", "high", "low"}),
+    ("Range Formation and Reference Levels", {"range", "open", "high", "low", "start", "initial"}),
+    ("Liquidity Location and Directional Bias", {"liquidity", "above", "below", "bullish", "bearish", "bias"}),
+    ("Candle Confirmation and Order Flow", {"candle", "candles", "close", "closing", "order", "flow", "csd"}),
+    ("Range Efficiency and Rebalancing", {"efficient", "efficiency", "inefficient", "rebalance", "bodies", "wicks"}),
+    ("Manipulation and Structural Clarity", {"manipulation", "structure", "price", "action"}),
+    ("Session Timing and Mechanical Execution", {"session", "morning", "night", "time", "mechanical", "rules"}),
     ("Fear, Clarity, and Decision Quality", {"fear", "clarity", "confusion", "hesitation"}),
     ("Trading Psychology and Emotional Control", {"psychology", "emotion", "emotional", "discipline"}),
     ("Patience and Execution Discipline", {"patient", "patience", "execution", "discipline"}),
@@ -190,6 +201,34 @@ CONCEPT_SUMMARY_TEMPLATES = {
     "Execution and Confirmation": (
         "Execution follows confirmation rather than anticipation alone. The entry, risk, and invalidation should all "
         "come from the same setup evidence."
+    ),
+    "Higher-Timeframe Range Context": (
+        "Start with the active weekly or daily range so each lower-timeframe observation has a clear structural "
+        "context and objective."
+    ),
+    "Range Formation and Reference Levels": (
+        "Define where the range begins, then mark its open, initial high, and initial low before projecting how "
+        "price may deliver around it."
+    ),
+    "Liquidity Location and Directional Bias": (
+        "The location of liquidity above or below the active range shapes the directional scenario, but price still "
+        "has to confirm whether that liquidity is a target or a rejection point."
+    ),
+    "Candle Confirmation and Order Flow": (
+        "A candle matters through its close and the order flow that follows it. Use that confirmation to distinguish "
+        "continuation from a failed directional attempt."
+    ),
+    "Range Efficiency and Rebalancing": (
+        "Compare candle bodies and wicks across the range to find inefficient delivery. Unbalanced areas remain "
+        "candidates for rebalancing until price trades through them efficiently."
+    ),
+    "Manipulation and Structural Clarity": (
+        "Remove incidental manipulation from the chart mentally and check whether the same structural read still "
+        "holds. A durable thesis should remain clear after that simplification."
+    ),
+    "Session Timing and Mechanical Execution": (
+        "Anchor execution to the session windows and rules used in the lesson so participation is deliberate rather "
+        "than driven by the urge to trade continuously."
     ),
     "Trading Decision Process": (
         "Move from observation to confirmation, execution, and invalidation in a fixed sequence. This prevents one "
@@ -566,32 +605,62 @@ def build_windows(
     frames = manifest.get("frames", [])
     duration_sec = float(manifest.get("video_duration_sec", 0))
     windows: list[dict[str, Any]] = []
+    frame_interval = float(manifest.get("frame_interval_sec", 0) or 0)
+    frame_coverage_end = (
+        float(frames[-1].get("timestamp_sec", 0)) + frame_interval
+        if frames
+        else 0.0
+    )
+    has_timeline_coverage = (
+        bool(frames)
+        and (
+            duration_sec <= 0
+            or frame_coverage_end >= duration_sec * 0.8
+        )
+    )
 
-    for index, frame in enumerate(frames):
-        start_time = float(frame.get("timestamp_sec", 0))
-        end_time = float(frames[index + 1]["timestamp_sec"]) if index + 1 < len(frames) else duration_sec
-        transcript_text = group_transcript_for_window(transcript_segments, start_time, end_time)
-        if not transcript_text:
-            continue
+    if has_timeline_coverage:
+        for index, frame in enumerate(frames):
+            start_time = float(frame.get("timestamp_sec", 0))
+            if duration_sec > 0 and start_time >= duration_sec:
+                continue
+            end_time = (
+                float(frames[index + 1]["timestamp_sec"])
+                if index + 1 < len(frames)
+                else (
+                    duration_sec
+                    if duration_sec >= start_time
+                    else start_time + frame_interval
+                )
+            )
+            if duration_sec > 0:
+                end_time = min(end_time, duration_sec)
+            transcript_text = group_transcript_for_window(
+                transcript_segments,
+                start_time,
+                end_time,
+            )
+            if not transcript_text:
+                continue
 
-        domain_hits = len(tokenize(transcript_text) & DOMAIN_KEYWORDS)
-        windows.append({
-            "id": index,
-            "startTime": start_time,
-            "endTime": end_time,
-            "timestampLabel": format_timestamp(start_time),
-            "text": transcript_text,
-            "keywords": tokenize(transcript_text),
-            "domainHits": domain_hits,
-            "score": domain_hits + max(len(transcript_text) / 220, 0),
-        })
+            domain_hits = len(tokenize(transcript_text) & DOMAIN_KEYWORDS)
+            windows.append({
+                "id": index,
+                "startTime": start_time,
+                "endTime": end_time,
+                "timestampLabel": format_timestamp(start_time),
+                "text": transcript_text,
+                "keywords": tokenize(transcript_text),
+                "domainHits": domain_hits,
+                "score": domain_hits + min(len(transcript_text) / 220, 3.0),
+            })
 
-    if not windows and transcript_segments:
+    if (not has_timeline_coverage or not windows) and transcript_segments:
         transcript_end = max(
             float(segment.get("end", segment.get("start", 0)))
             for segment in transcript_segments
         )
-        fallback_duration = max(duration_sec, transcript_end)
+        fallback_duration = duration_sec if duration_sec > 0 else transcript_end
         window_seconds = 90.0
         start_time = 0.0
         window_id = 0
@@ -613,7 +682,7 @@ def build_windows(
                     "text": transcript_text,
                     "keywords": tokenize(transcript_text),
                     "domainHits": domain_hits,
-                    "score": domain_hits + max(len(transcript_text) / 220, 0),
+                    "score": domain_hits + min(len(transcript_text) / 220, 3.0),
                 })
                 window_id += 1
             start_time = end_time
@@ -628,33 +697,121 @@ def score_window_for_section(window: dict[str, Any], section: dict[str, str]) ->
     return overlap * 2.5 + window["domainHits"] * 0.5 + phrase_bonus
 
 
-def fallback_label_for_window(window: dict[str, Any], source_title: str = "") -> str:
+def ranked_fallback_labels_for_window(window: dict[str, Any]) -> list[str]:
+    scored_labels: list[tuple[float, int, str]] = []
+
+    for index, (label, keywords) in enumerate(FALLBACK_SECTION_LABELS):
+        overlap = window["keywords"] & keywords
+        if len(overlap) < 2:
+            continue
+        specificity = len(overlap) / max(len(keywords), 1)
+        scored_labels.append((len(overlap) * 3 + specificity, -index, label))
+
+    for index, (label, keywords) in enumerate(SINGLE_KEYWORD_SECTION_LABELS):
+        overlap = window["keywords"] & keywords
+        if not overlap:
+            continue
+        scored_labels.append((1 + len(overlap), -index - 100, label))
+
+    ranked: list[str] = []
+    seen: set[str] = set()
+    for _, _, label in sorted(scored_labels, reverse=True):
+        lowered = label.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        ranked.append(label)
+
+    return ranked
+
+
+def source_fallback_label(source_title: str) -> str:
     source_tokens = tokenize(source_title)
     if "psychology" in source_tokens:
-        if window["keywords"] & {"fear", "clarity", "confusion", "hesitation"}:
-            return "Fear, Clarity, and Decision Quality"
         return "Trading Psychology and Emotional Control"
     if "patience" in source_tokens:
         return "Patience and Execution Discipline"
     if source_tokens & {"volume", "profile"}:
-        if window["keywords"] & {"acceptance", "rejection"}:
-            return "Acceptance and Rejection"
         return "Volume, Value, and Market Participation"
     if source_tokens & {"expansion", "expansions"}:
         return "Expansion, Compression, and Structure"
     if source_tokens & {"risk", "leverage"}:
         return "Risk, Leverage, and Position Sizing"
 
-    for label, keywords in FALLBACK_SECTION_LABELS:
-        overlap = len(window["keywords"] & keywords)
-        if overlap >= 2:
-            return label
-
-    for label, keywords in SINGLE_KEYWORD_SECTION_LABELS:
-        if window["keywords"] & keywords:
-            return label
-
     return "Trading Decision Process"
+
+
+def fallback_label_for_window(
+    window: dict[str, Any],
+    source_title: str = "",
+    used_titles: set[str] | None = None,
+) -> str:
+    used = used_titles or set()
+
+    for label in ranked_fallback_labels_for_window(window):
+        if label.lower() not in used:
+            return label
+
+    source_label = source_fallback_label(source_title)
+    if source_label.lower() not in used:
+        return source_label
+
+    return ""
+
+
+def representative_windows(
+    windows: list[dict[str, Any]],
+    max_sections: int,
+) -> list[dict[str, Any]]:
+    if len(windows) <= max_sections:
+        return sorted(windows, key=lambda item: item["startTime"])
+
+    timeline_start = min(window["startTime"] for window in windows)
+    timeline_end = max(window["endTime"] for window in windows)
+    span = max(timeline_end - timeline_start, 1.0)
+    selected: list[dict[str, Any]] = []
+    selected_ids: set[int] = set()
+
+    for band_index in range(max_sections):
+        band_start = timeline_start + span * band_index / max_sections
+        band_end = timeline_start + span * (band_index + 1) / max_sections
+        candidates = [
+            window
+            for window in windows
+            if window["id"] not in selected_ids
+            and band_start <= (window["startTime"] + window["endTime"]) / 2
+            < band_end
+        ]
+        if not candidates:
+            continue
+
+        best = max(candidates, key=lambda item: (item["score"], len(item["text"])))
+        selected.append(best)
+        selected_ids.add(best["id"])
+
+    return sorted(selected, key=lambda item: item["startTime"])
+
+
+def normalize_seed_boundaries(
+    seeds: list[dict[str, Any]],
+    windows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    ordered = sorted(seeds, key=lambda item: item["startTime"])
+    timeline_end = max(
+        [window["endTime"] for window in windows]
+        + [seed["endTime"] for seed in ordered],
+        default=0.0,
+    )
+
+    for index, seed in enumerate(ordered):
+        next_start = (
+            ordered[index + 1]["startTime"]
+            if index + 1 < len(ordered)
+            else timeline_end
+        )
+        seed["endTime"] = max(seed["startTime"], next_start)
+
+    return ordered
 
 
 def build_seed_sections(
@@ -665,40 +822,51 @@ def build_seed_sections(
     seeds: list[dict[str, Any]] = []
     used_window_ids: set[int] = set()
 
+    used_titles: set[str] = set()
     for section in study_sections:
-      best_window: dict[str, Any] | None = None
-      best_score = 0.0
-      for window in windows:
-          if window["id"] in used_window_ids:
-              continue
-          score = score_window_for_section(window, section)
-          if score > best_score:
-              best_score = score
-              best_window = window
+        best_window: dict[str, Any] | None = None
+        best_score = 0.0
+        section_title = normalize_section_title(section["title"])
+        if section_title.lower() in used_titles:
+            continue
 
-      if not best_window or best_score < 3:
-          continue
+        for window in windows:
+            if window["id"] in used_window_ids:
+                continue
+            score = score_window_for_section(window, section)
+            if score > best_score:
+                best_score = score
+                best_window = window
 
-      used_window_ids.add(best_window["id"])
-      seeds.append({
-          "title": section["title"],
-          "startTime": best_window["startTime"],
-          "endTime": best_window["endTime"],
-          "timestampLabel": best_window["timestampLabel"],
-          "studySummary": summarize_text(section["content"], 220),
-          "transcriptExcerpt": summarize_text(best_window["text"], 320),
-      })
+        if not best_window or best_score < 3:
+            continue
 
-      if len(seeds) >= LESSON_MAX_SECTIONS:
-          break
+        used_window_ids.add(best_window["id"])
+        used_titles.add(section_title.lower())
+        seeds.append({
+            "title": section_title,
+            "startTime": best_window["startTime"],
+            "endTime": best_window["endTime"],
+            "timestampLabel": best_window["timestampLabel"],
+            "studySummary": summarize_text(section["content"], 220),
+            "transcriptExcerpt": summarize_text(best_window["text"], 320),
+        })
+
+        if len(seeds) >= LESSON_MAX_SECTIONS:
+            break
 
     if seeds:
-        return sorted(seeds, key=lambda item: item["startTime"])
+        return normalize_seed_boundaries(seeds, windows)
 
-    ranked_windows = sorted(windows, key=lambda item: item["score"], reverse=True)
-    for window in ranked_windows[:LESSON_MAX_SECTIONS]:
+    selected_windows = representative_windows(windows, LESSON_MAX_SECTIONS)
+    for window in selected_windows:
+        title = fallback_label_for_window(window, source_title, used_titles)
+        if not title:
+            continue
+
+        used_titles.add(title.lower())
         seeds.append({
-            "title": fallback_label_for_window(window, source_title),
+            "title": title,
             "startTime": window["startTime"],
             "endTime": window["endTime"],
             "timestampLabel": window["timestampLabel"],
@@ -706,7 +874,7 @@ def build_seed_sections(
             "transcriptExcerpt": summarize_text(window["text"], 320),
         })
 
-    return sorted(seeds, key=lambda item: item["startTime"])
+    return normalize_seed_boundaries(seeds, windows)
 
 
 def title_to_takeaway(title: str, summary: str) -> str:
@@ -1449,8 +1617,11 @@ def validate_lesson_payload(lesson: dict[str, Any]) -> dict[str, Any]:
     if not sections or len(sections) < 3:
         flags.append("too_few_sections")
 
+    section_titles: list[str] = []
     for section in sections:
         title = normalize_whitespace(section.get("title", ""))
+        if title:
+            section_titles.append(title.lower())
         section_summary = normalize_whitespace(section.get("summary", ""))
         transcript_excerpt = normalize_whitespace(section.get("transcriptExcerpt", ""))
         if not looks_like_concept_title(title):
@@ -1459,6 +1630,9 @@ def validate_lesson_payload(lesson: dict[str, Any]) -> dict[str, Any]:
             flags.append("section_summary_low_signal")
         if transcript_excerpt and jaccard_similarity(section_summary, transcript_excerpt) > 0.88:
             flags.append("section_summary_quote_like")
+
+    if len(section_titles) != len(set(section_titles)):
+        flags.append("duplicate_section_titles")
 
     tutor_pack = lesson.get("tutorPack") if isinstance(lesson.get("tutorPack"), dict) else {}
     if tutor_pack:

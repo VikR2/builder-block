@@ -35,6 +35,25 @@ except ImportError:
 ELEVENLABS_AUDIO_ISOLATION_MAX_DURATION_SECONDS = 3500
 
 
+def effective_frame_interval(
+    duration_seconds: float,
+    requested_interval: int,
+    max_frames: int,
+) -> int:
+    """Return the interval ffmpeg should use after applying the frame cap."""
+    interval = max(1, int(requested_interval))
+    frame_limit = max(1, int(max_frames))
+
+    if duration_seconds <= 0:
+        return interval
+
+    potential_frames = int(duration_seconds / interval)
+    if potential_frames > frame_limit:
+        return max(1, int(duration_seconds / frame_limit))
+
+    return interval
+
+
 def find_executable(name: str) -> str:
     """
     Find executable, checking common Windows install locations.
@@ -206,12 +225,16 @@ def extract_video_frames(
     # Get video duration
     duration_seconds = get_video_duration(video_path)
 
-    # Adjust interval if we'd get too many frames
-    if duration_seconds > 0:
-        potential_frames = int(duration_seconds / frame_interval)
-        if potential_frames > max_frames:
-            frame_interval = int(duration_seconds / max_frames)
-            print(f"  Adjusted interval to {frame_interval}s for {max_frames} frames")
+    # Adjust interval if we'd get too many frames. The caller also persists
+    # this effective value in the manifest so frame timestamps stay accurate.
+    adjusted_interval = effective_frame_interval(
+        duration_seconds,
+        frame_interval,
+        max_frames,
+    )
+    if adjusted_interval != frame_interval:
+        frame_interval = adjusted_interval
+        print(f"  Adjusted interval to {frame_interval}s for {max_frames} frames")
 
     # Extract frames with ffmpeg
     print(f"  Extracting frames at {frame_interval}s intervals...")

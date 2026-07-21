@@ -27,6 +27,7 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.media_extraction import (
     find_executable,
+    effective_frame_interval,
     extract_video_frames,
     extract_scene_frames,
     transcribe_video,
@@ -313,6 +314,7 @@ def process_local_mp4(
 
     # Step 2: Frame extraction
     frame_files = []
+    manifest_frame_interval = frame_interval
     if not skip_frames:
         emit_progress("extracting", 45, "Extracting frames...")
         if scene_detect:
@@ -332,13 +334,21 @@ def process_local_mp4(
                     print(f"Warning: Scene-detection frame extraction failed: {e}")
                 result["frame_extraction_error"] = str(e)
         else:
+            manifest_frame_interval = effective_frame_interval(
+                duration_sec,
+                frame_interval,
+                max_frames,
+            )
             if not emit_progress_json:
-                print(f"\n[2/3] Extracting frames (interval: {frame_interval}s, max: {max_frames})...")
+                print(
+                    "\n[2/3] Extracting frames "
+                    f"(interval: {manifest_frame_interval}s, max: {max_frames})..."
+                )
             try:
                 frame_files = extract_video_frames(
                     video_path,
                     output_dir,
-                    frame_interval=frame_interval,
+                    frame_interval=manifest_frame_interval,
                     max_frames=max_frames,
                     delete_video=False
                 )
@@ -369,7 +379,7 @@ def process_local_mp4(
         source_type="local_mp4",
         transcript_data=transcript_data,
         frame_files=frame_files,
-        frame_interval=frame_interval,
+        frame_interval=manifest_frame_interval,
         duration_seconds=duration_sec,
         extra_metadata={
             "file_hash": file_hash,
