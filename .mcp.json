@@ -1,19 +1,5 @@
 {
   "mcpServers": {
-    "nt-skills": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "$CLAUDE_PROJECT_DIR/.claude/mcp-servers/nt-skills/dist/index.js"
-      ]
-    },
-    "youtube-transcript": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "$CLAUDE_PROJECT_DIR/.claude/mcp-servers/youtube-transcript/index.js"
-      ]
-    },
     "github": {
       "type": "stdio",
       "command": "npx",

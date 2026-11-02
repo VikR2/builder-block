@@ -1,70 +1,43 @@
-# NinjaTrader Script Builder
+# builder-block
 
-A complete system for building, organizing, and learning from NinjaTrader trading strategies.
+Next.js app for the TCM (The Currency Merchant) video library and AI tutor. Admins upload coaching videos; a Python pipeline transcribes them, extracts frames, builds embeddings and generates lessons; members browse the library and ask the tutor questions grounded in the video evidence.
 
-## Features
-
-- **Skills Library** - 10+ reusable trading patterns extracted from your scripts
-- **MCP Integration** - Auto-loads relevant skills into Claude Code context
-- **Next.js UI** - Browse skills, projects, scripts, and trading journal
-- **SQLite Database** - Fast full-text search across all skills
-- **Code Highlighting** - Beautiful C# syntax highlighting with Shiki
-
-## Quick Start
-
-### 1. View the UI
+## Run locally
 
 ```bash
 cd ui
+npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+Open http://localhost:3000. Copy `ui/.env.example` to `ui/.env.local` first.
 
-### 2. Use in Claude Code
+Python dependencies for the video pipeline are in `requirements.render.txt`.
 
-The MCP server is already configured. In your next Claude Code session, skills will automatically load when you mention trading concepts like "sweep", "breakout", or "risk management".
+## Layout
 
-### 3. Extract Skills
+| Path | What it holds |
+|------|---------------|
+| `ui/` | Next.js 15 + React 19 app: library, tutor chat, lessons, admin, auth, Whop billing |
+| `scripts/` | Python video pipeline (`process_local_mp4.py`, `embed_transcripts.py`, `generate_video_lesson.py`, `generate_shorts_brief.py`), FAISS search worker in `scripts/lib/`, Render data bundle tools |
+| `data/` | SQLite schema and migrations, architecture docs used for tutor retrieval. Runtime data (`builder.db`, `local-videos/`) is not tracked in git |
+| `scripts-output/TradingView/` | TCM Pine Script indicators |
+| `ops/render/` | Render deploy and data-release PowerShell tools |
+| `docs/` | Deployment and video-training guides |
 
+## Checks
+
+```bash
+cd ui
+npm run check   # production build
+npm test        # Playwright
 ```
-User: "Extract skills from scripts-output/740.cs"
 
-Claude: [Extracts patterns and saves to database]
-✅ Extracted 10 skills. View at http://localhost:3000/skills
-```
+## Deployment
 
-## Documentation
+Production runs on Render (`render.yaml`, `Dockerfile`). Runtime data lives on the Render disk at `/app/data` and is moved with data bundles, not git.
 
-See [SETUP.md](SETUP.md) for complete documentation.
-
-Deployment and release workflow:
-
-- [Render Deployment Plan](docs/render-deployment.md)
-
-## Structure
-
-- `data/` - SQLite database with skills, projects, scripts
-- `.claude/mcp-servers/nt-skills/` - MCP server for Claude Code integration
-- `.claude/skills/` - Claude Code skills (extraction)
-- `ui/` - Next.js web application
-- `scripts-output/` - Generated NinjaTrader scripts
-
-## What's Included
-
-✅ Database with 10 skills from SevenFortyBiasV6
-✅ MCP server for auto-loading skills
-✅ Next.js UI with skills library
-✅ Code syntax highlighting
-✅ Full-text search
-✅ Projects & journal system
-✅ Extraction skill for Claude Code
-
-## Tech Stack
-
-- **Database**: SQLite with FTS5
-- **Backend**: better-sqlite3
-- **Frontend**: Next.js 15 + React 19
-- **Styling**: Tailwind CSS
-- **Code Highlighting**: Shiki
-- **Integration**: Model Context Protocol (MCP)
+- [Render Deployment Plan](docs/render-deployment.md): release strategy, risk levels, rollback
+- [Render Deployment Playbook](docs/render-deploy-playbook.md): step-by-step first deploy
+- [Render Data Migration](docs/render-data-migration.md): moving runtime data to the Render disk
+- [TCM Video Training](docs/tcm-video-training.md): adding videos to the tutor

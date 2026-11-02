@@ -67,3 +67,17 @@ screenshots/
 ui/playwright-report/
 ui/test-results/
 ui/tsconfig.tsbuildinfo
+
+# Tool caches and stray paths
+.pytest_cache/
+.tldr/
+.claude/cache/
+.claude/tsc-cache/
+.Codex/
+/~/
+/%SystemDrive%/
+*.log
+
+# claude-mem auto-generated stubs (keep the project entry file)
+CLAUDE.md
+!/.claude/CLAUDE.md
