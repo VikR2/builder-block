@@ -1,10 +1,8 @@
 """
 Shared library for media extraction and processing workflows.
 
-This package provides common utilities used by:
-- generate_from_youtube.py (YouTube → NinjaTrader C#)
-- process_local_mp4.py (Local MP4 → Skills + SAD)
-- pine_parser.py (Pine Script → Skills + SAD)
+This package provides common utilities used by the TCM video pipeline
+(process_local_mp4.py, embed_transcripts.py and the FAISS search worker).
 """
 
 from .media_extraction import (

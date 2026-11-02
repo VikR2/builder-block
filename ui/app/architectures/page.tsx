@@ -153,12 +153,8 @@ export default function ArchitecturesPage() {
             </div>
             <h3 className="text-xl font-semibold mb-2">No Architectures Yet</h3>
             <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-              Strategy Architecture Documents are generated from YouTube trading videos
-              using the pipeline.
+              Add Strategy Architecture Documents as Markdown files in data/architectures.
             </p>
-            <code className="text-xs bg-secondary px-3 py-2 rounded-md text-muted-foreground font-mono">
-              uv run python -m runtime.harness scripts/generate_from_youtube.py --url &quot;...&quot;
-            </code>
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

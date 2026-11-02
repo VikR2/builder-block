@@ -12,7 +12,6 @@ Video File → Transcription → Frame Extraction → Embeddings → Lesson + Tu
 
 For the current local extraction and noisy-audio cleanup workflow, see:
 
-- [Video Extraction And Audio Cleanup](../.Codex/rules/video-extraction.md)
 - [TCM ElevenLabs Audio Cleanup Implementation](./tcm-elevenlabs-audio-cleanup-implementation.md)
 
 ## Prerequisites
